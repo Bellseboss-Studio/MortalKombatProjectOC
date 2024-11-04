@@ -112,7 +112,7 @@ jobs:
                         --arg comment "${{ steps.last_commit.outputs.message }}" \
                         --arg key "${{ secrets.DOWNLOAD_UPDATE_JSON }}" \
                         --arg URL "${{ needs.create_release_and_upload_file.outputs.download_url }}" \
-                        '{comment: $comment, data: {key: $key, url_to_download: $URL}}')
+                        '{comment: $comment, data: {key: $key, URL: $URL}}')
           echo "JSON being sent: $json_body"
           response=$(curl -X POST -H "Content-Type: application/json" -d "$json_body" ${{ secrets.DOWNLOAD_UPDATE_URL }})
           echo "Response code: $response"
