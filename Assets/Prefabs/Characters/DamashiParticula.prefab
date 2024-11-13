@@ -30,7 +30,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 5205925368281775729}
-  m_RootOrder: 3
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!198 &5205925367912207174
 ParticleSystem:
@@ -4816,7 +4816,7 @@ GameObject:
   - component: {fileID: 5205925368281775731}
   - component: {fileID: 5205925368281775728}
   m_Layer: 0
-  m_Name: Entidad
+  m_Name: Entidad_Resplandor_Blanco
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4833,12 +4833,10 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
-  - {fileID: 5205925368667604118}
-  - {fileID: 5205925368575177461}
   - {fileID: 5205925368735674751}
   - {fileID: 5205925367912207172}
   m_Father: {fileID: 5205925368997336378}
-  m_RootOrder: 0
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!198 &5205925368281775731
 ParticleSystem:
@@ -9695,12 +9693,12 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5205925368575177466}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
-  m_Father: {fileID: 5205925368281775729}
-  m_RootOrder: 1
+  m_Father: {fileID: 5205925368667604118}
+  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!198 &5205925368575177463
 ParticleSystem:
@@ -14502,8 +14500,9 @@ Transform:
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_Children: []
-  m_Father: {fileID: 5205925368281775729}
+  m_Children:
+  - {fileID: 5205925368575177461}
+  m_Father: {fileID: 5205925368997336378}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!198 &5205925368667604112
@@ -19308,7 +19307,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 5205925368281775729}
-  m_RootOrder: 2
+  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!198 &5205925368735674745
 ParticleSystem:
@@ -24109,6 +24108,7 @@ Transform:
   m_LocalPosition: {x: -2.74, y: 1.636, z: -13.77}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
+  - {fileID: 5205925368667604118}
   - {fileID: 5205925368281775729}
   m_Father: {fileID: 0}
   m_RootOrder: 0

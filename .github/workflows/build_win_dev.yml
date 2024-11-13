@@ -5,18 +5,17 @@ on:
   pull_request:
     branches:
       - develop
-      
+
 jobs:
   build:
     name: Build Project Dev
     runs-on: ubuntu-latest
     steps:
-    
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
           lfs: true
-          
+
       - name: Cache Library
         uses: actions/cache@v2
         with:
@@ -32,22 +31,13 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           targetPlatform: StandaloneWindows64
-          buildName: MKOC_RiseOfLeena
-          outputDir: build/MKOC_RiseOfLeena
-      - name: Rename executable
-        run: |
-          mv build/MKOC_RiseOfLeena/*.exe build/MKOC_RiseOfLeena/MKOC_RiseOfLeena.exe
-
-      - name: Compress build output
-        run: |
-          zip -r MortalKombatProjectOC_RiseOfLeena.zip build/MKOC_RiseOfLeena
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         id: get_artifact_id
         with:
-          name: MortalKombatProjectOC_RiseOfLeena
-          path: MortalKombatProjectOC_RiseOfLeena.zip
+          name: build-Windows
+          path: build
 
       - name: Send Discord Notification
         run: |
