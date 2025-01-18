@@ -163,7 +163,7 @@ public class AttackMovementSystem : MonoBehaviour, IFocusTarget
             _numberOfCombosQuick = 0;
             _numberOfCombosPower = 0;
             attacking = false;
-            _rigidbody.velocity = Vector3.zero;
+            _rigidbody.linearVelocity = Vector3.zero;
             //_rigidbody.useGravity = true;
             /*_rigidbody.constraints = RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezeRotationX;*/
             //Debug.Log("AttackMovementSystem: End Attack");

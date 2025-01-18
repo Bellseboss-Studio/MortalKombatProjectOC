@@ -59,7 +59,7 @@ public class CharacterMovement2D : MonoBehaviour
         // Jump
 	    if ((Input.GetKeyDown(jumpJoystick) || Input.GetKeyDown(jumpKeyboard)) && isGrounded())
 	    {
-	        rigbody.velocity = new Vector3(input.x, jumpVelocity, 0f);
+	        rigbody.linearVelocity = new Vector3(input.x, jumpVelocity, 0f);
 	    }
 	}
 
