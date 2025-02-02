@@ -230,7 +230,7 @@ namespace Bellseboss.Pery.Scripts.Input
             rotationCharacterV2.CanRotate(false);
             movementRigidbodyV2.CanMove(false);
             _canUseButtons = false;
-            rigidbody.velocity = Vector3.zero;
+            rigidbody.linearVelocity = Vector3.zero;
             rigidbody.freezeRotation = true;
             CanReadInputs = true;
             inputPlayerV2.StartToReadInputs(_canUseButtons);

@@ -88,13 +88,13 @@ namespace View
         {
             if (IsInPause)
             {
-                rb.velocity = Vector3.zero;    
+                rb.linearVelocity = Vector3.zero;    
                 return;
             }
 
             var rbVelocity = _inputCustom.InputCalculateForTheMovement(_inputCustom.GetLasPosition()) * (Time.deltaTime * speedGlobal);
-            rbVelocity.y = rb.velocity.y;
-            rb.velocity = rbVelocity;
+            rbVelocity.y = rb.linearVelocity.y;
+            rb.linearVelocity = rbVelocity;
             animatorController.Movement(_inputCustom.GetVelocity(), _inputCustom.GetDirection());
             UpdateLegacy();
         }

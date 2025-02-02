@@ -104,7 +104,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
             var direction = _target.transform.position - transform.position;
             direction.Normalize();
             direction *= GetSpeedToMove();
-            rigidbody.velocity = direction * Time.deltaTime;
+            rigidbody.linearVelocity = direction * Time.deltaTime;
             if (Vector3.Distance(transform.position, _target.transform.position) <
                 (GetPlayer() != null ? minDistanceToArriveToEnemy : minDistanceToArriveToTarget))
             {
@@ -115,11 +115,11 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         else
         {
             rigidbody.ResetInertiaTensor();
-            rigidbody.velocity = Vector3.zero;
+            rigidbody.linearVelocity = Vector3.zero;
             rigidbody.angularVelocity = Vector3.zero;
         }
 
-        animationController.Movement(rigidbody.velocity.magnitude / 10, 0);
+        animationController.Movement(rigidbody.linearVelocity.magnitude / 10, 0);
     }
 
     public override void Stun(bool isStun)
@@ -321,7 +321,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
     {
         CanMove(false);
         CanRotate(false);
-        rigidbody.velocity = Vector3.zero;
+        rigidbody.linearVelocity = Vector3.zero;
     }
 
     public void UpdateAnimation()

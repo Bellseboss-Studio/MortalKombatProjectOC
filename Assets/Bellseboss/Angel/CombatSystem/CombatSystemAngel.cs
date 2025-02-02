@@ -208,7 +208,7 @@ namespace Bellseboss.Angel.CombatSystem
             currentComboSequence = new List<TypeOfAttack>();
             canAttackAgain = true;
             attacking = false;
-            _rigidbody.velocity = Vector3.zero;
+            _rigidbody.linearVelocity = Vector3.zero;
             OnEndAttack?.Invoke();
             oneTimeOnEndAttack?.Invoke();
             oneTimeOnEndAttack = null;
