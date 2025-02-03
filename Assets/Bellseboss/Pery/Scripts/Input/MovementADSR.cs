@@ -132,7 +132,7 @@ public class MovementADSR : MonoBehaviour
         {
             canAttackAgain = true;
             attacking = false;
-            _rigidbody.velocity = Vector3.zero;
+            _rigidbody.linearVelocity = Vector3.zero;
             //_rigidbody.useGravity = true;
             /*_rigidbody.constraints = RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezeRotationX;*/
             //Debug.Log("AttackMovementSystem: End Attack");

@@ -138,26 +138,26 @@ namespace Bellseboss.Pery.Scripts.Input
                     _jump = false;
                 }
             }*/
-            var velocity = new Vector3(resultMovement.x, _rigidbody.velocity.y, resultMovement.z);
+            var velocity = new Vector3(resultMovement.x, _rigidbody.linearVelocity.y, resultMovement.z);
             if (!_movementRigidBodyV2.IsJumpingInWall())
             {
                 if (floorController.IsTouchingFloor())
                 {
-                    _rigidbody.velocity = velocity;
+                    _rigidbody.linearVelocity = velocity;
                 }
                 else
                 {
-                    _rigidbody.velocity = new Vector3(velocity.x / 1.5f, velocity.y, velocity.z / 1.5f);
+                    _rigidbody.linearVelocity = new Vector3(velocity.x / 1.5f, velocity.y, velocity.z / 1.5f);
                 }
             }
 
             
-            if (_rigidbody.velocity.y > 0)
+            if (_rigidbody.linearVelocity.y > 0)
             {
                 isUp = true;
                 isFall = false;
             }
-            else if (_rigidbody.velocity.y < 0 && !floorController.IsTouchingFloor())
+            else if (_rigidbody.linearVelocity.y < 0 && !floorController.IsTouchingFloor())
             {
                 isFall = true;
                 isUp = false;
@@ -192,13 +192,13 @@ namespace Bellseboss.Pery.Scripts.Input
 
         public float GetVelocity()
         {
-            return _rigidbody.velocity.magnitude / 10;
+            return _rigidbody.linearVelocity.magnitude / 10;
         }
 
         public void AddForce(Vector3 runningDirection, float runningDistance,
             AttackMovementSystem.TypeOfAttack typeOfAttack)
         {
-            _rigidbody.velocity = Vector3.zero;
+            _rigidbody.linearVelocity = Vector3.zero;
             Vector3 globalDirection = transform.TransformDirection(runningDirection.normalized);
             //Debug.Log($"MovementRigidbodyV2: AddForce: {globalDirection} - {runningDistance}");
             //_rigidbody.AddForce(globalDirection * runningDistance, ForceMode.Impulse);
@@ -211,7 +211,7 @@ namespace Bellseboss.Pery.Scripts.Input
             _canMove = canMove;
             if (!canMove)
             {
-                _rigidbody.velocity = Vector3.zero;
+                _rigidbody.linearVelocity = Vector3.zero;
                 _lastDirection = Vector2.zero;
             }
         }
@@ -254,7 +254,7 @@ namespace Bellseboss.Pery.Scripts.Input
 
         public float GetXZVelocity()
         {
-            Vector3 velocidadXZ = new Vector3(_rigidbody.velocity.x, 0f, _rigidbody.velocity.z);
+            Vector3 velocidadXZ = new Vector3(_rigidbody.linearVelocity.x, 0f, _rigidbody.linearVelocity.z);
 
             return velocidadXZ.magnitude / 10;
         }
