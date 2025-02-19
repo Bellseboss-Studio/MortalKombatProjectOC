@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
-using Cinemachine;
+using Unity.Cinemachine;
 using TMPro;
 using UnityEngine.Playables;
 
@@ -55,8 +55,8 @@ public class FatalitySystem : MonoBehaviour, IFatalitySystem
         enemy = _characterV2.GetEnemyToKillWithFatality().GetComponent<EnemyV2>();
         cinematicTargetGroup.m_Targets = new[]
         {
-            new CinemachineTargetGroup.Target {target = _cV2.GetGameObject(), radius = 1, weight = 1},
-            new CinemachineTargetGroup.Target {target = enemy.transform, radius = 1, weight = 1}
+            new CinemachineTargetGroup.Target {Object = _cV2.GetGameObject(), Radius = 1, Weight = 1},
+            new CinemachineTargetGroup.Target {Object = enemy.transform, Radius = 1, Weight = 1}
         };
         cinematicVirtualCameraBase.gameObject.SetActive(true);
         enemy.DisableControls();
