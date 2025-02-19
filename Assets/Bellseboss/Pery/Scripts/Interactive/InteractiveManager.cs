@@ -1,6 +1,6 @@
 using System;
 using Bellseboss.Pery.Scripts.Input;
-using Cinemachine;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.Playables;
 using Object = UnityEngine.Object;

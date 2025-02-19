@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Bellseboss.Angel.CombatSystem;
-using Cinemachine;
+using Unity.Cinemachine;
 using ServiceLocatorPath;
 using UnityEngine;
 using View.Installers;

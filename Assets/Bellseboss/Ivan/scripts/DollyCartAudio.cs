@@ -1,5 +1,5 @@
 using System;
-using Cinemachine;
+using Unity.Cinemachine;
 using FMODUnity;
 using UnityEngine;
 using UnityEngine.Serialization;

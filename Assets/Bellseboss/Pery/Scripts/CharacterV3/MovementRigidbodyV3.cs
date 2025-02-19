@@ -1,5 +1,5 @@
 using System;
-using Cinemachine;
+using Unity.Cinemachine;
 using UnityEngine;
 using Bellseboss.Pery.Scripts.Input;
 public class MovementRigidbodyV3 : MonoBehaviour
