@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Bellseboss.Angel;
 using Bellseboss.Pery.Scripts.Input;
-using Cinemachine;
+using Unity.Cinemachine;
 using DG.Tweening;
 using UnityEngine;
 

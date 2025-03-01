@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using Bellseboss.Angel;
-using Cinemachine;
 using DG.Tweening;
+using Unity.Cinemachine;
 using UnityEngine;
 
 public class CameraBehaviourAngel : MonoBehaviour
