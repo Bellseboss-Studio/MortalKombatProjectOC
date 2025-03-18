@@ -254,6 +254,10 @@ PlayableDirector:
     value: {fileID: 961739755}
   - key: {fileID: 4001453664178308125, guid: 42f36741f5c108540b9ad0ac3f71411a, type: 2}
     value: {fileID: 579732783}
+  - key: {fileID: 4161297636913384160, guid: 42f36741f5c108540b9ad0ac3f71411a, type: 2}
+    value: {fileID: 1280702284}
+  - key: {fileID: 4987751099042870418, guid: 42f36741f5c108540b9ad0ac3f71411a, type: 2}
+    value: {fileID: 1773291324}
   m_ExposedReferences:
     m_References:
     - 788b0c2e37059d14a80f7677693c2b1a: {fileID: 738784739}
@@ -972,8 +976,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 579732780}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.01172603, y: 0.7358033, z: -0.012849668, w: 0.6769719}
-  m_LocalPosition: {x: 819.622, y: 47.05, z: 413.811}
+  m_LocalRotation: {x: -0.0077123907, y: 0.9951309, z: 0.05960395, w: 0.078117706}
+  m_LocalPosition: {x: 777.08, y: 46.86, z: 306.08}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1732,7 +1736,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8748985916942111863, guid: 5b99fad0c97a06044b8cd77ea9843cef, type: 3}
       propertyPath: m_Name
-      value: Leena_PREFAB (1)
+      value: Leena_PREFAB (no animar)
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1992,8 +1996,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 961739749}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.01172603, y: 0.7358033, z: -0.012849668, w: 0.6769719}
-  m_LocalPosition: {x: 819.622, y: 47.05, z: 413.811}
+  m_LocalRotation: {x: -0.0077123907, y: 0.9951309, z: 0.05960395, w: 0.078117706}
+  m_LocalPosition: {x: 777.08, y: 46.86, z: 306.08}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2631,8 +2635,9 @@ GameObject:
   - component: {fileID: 1280702282}
   - component: {fileID: 1280702281}
   - component: {fileID: 1280702280}
+  - component: {fileID: 1280702284}
   m_Layer: 0
-  m_Name: Cylinder
+  m_Name: HAT
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2728,7 +2733,29 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 89.401, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &1280702284
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1280702279}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1302702365
 GameObject:
   m_ObjectHideFlags: 0
@@ -3188,6 +3215,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1773291322}
   - component: {fileID: 1773291323}
+  - component: {fileID: 1773291324}
   m_Layer: 0
   m_Name: Cam13_L_Perspective_baraka3_eye_L
   m_TagString: Untagged
@@ -3209,7 +3237,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 620691427}
-  m_LocalEulerAnglesHint: {x: 1.992, y: 92.845, z: -0.075}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1773291323
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3253,6 +3281,28 @@ MonoBehaviour:
       BarrelClipping: 0.25
       Anamorphism: 0
   BlendHint: 0
+--- !u!95 &1773291324
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1773291321}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1856327047
 GameObject:
   m_ObjectHideFlags: 0
