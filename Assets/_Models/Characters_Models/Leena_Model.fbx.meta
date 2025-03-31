@@ -22,7 +22,7 @@ ModelImporter:
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
     importConstraints: 0
-    animationCompression: 1
+    animationCompression: 3
     animationRotationError: 0.5
     animationPositionError: 0.5
     animationScaleError: 0.5
@@ -80,7 +80,872 @@ ModelImporter:
   humanDescription:
     serializedVersion: 3
     human: []
-    skeleton: []
+    skeleton:
+    - name: Leena_Model(Clone)
+      parentName: 
+      position: {x: 0, y: 0, z: 0}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1}
+    - name: hair_low
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: skirt_low
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: boots_low
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: cord_front
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: eyes_Leena
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: body_Leena
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: cord_back
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: bluse
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Blade3_L
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Blade1_L
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Blade2_L
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Blade_Main_L
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Arm_Leena
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Root_Main
+      parentName: Arm_Leena
+      position: {x: -0, y: 0.000000014901161, z: 0}
+      rotation: {x: 0, y: 0, z: 1, w: 0.00000004371139}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Root_Rotate
+      parentName: Root_Main
+      position: {x: -1.17216e-16, y: 0, z: 0.8683391}
+      rotation: {x: -6.1232336e-17, y: 1, z: -6.1232336e-17, w: 0.0000000754979}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Def_pelvis
+      parentName: Root_Rotate
+      position: {x: -0.000000002517385, y: -0.020940863, z: -0.016671777}
+      rotation: {x: -0.6052641, y: 0.00000009489357, z: 0.000000019184498, w: 0.79602474}
+      scale: {x: 1, y: 0.9999998, z: 0.9999998}
+    - name: Def_Spine
+      parentName: Root_Rotate
+      position: {x: -0.000000037050608, y: 0.04254073, z: -0.24551207}
+      rotation: {x: -0.72269666, y: -0.000000030606845, z: 0.00000014070058, w: 0.6911653}
+      scale: {x: 1, y: 1.0000001, z: 0.9999998}
+    - name: Def_Chest
+      parentName: Root_Rotate
+      position: {x: -0.000000062067805, y: 0.035118103, z: -0.41184407}
+      rotation: {x: -0.78006476, y: 0.00000012424982, z: -0.000000034125012, w: 0.6256988}
+      scale: {x: 1, y: 1, z: 0.9999998}
+    - name: Def_Neck
+      parentName: Root_Rotate
+      position: {x: -0.00000009804137, y: -0.016530976, z: -0.6441844}
+      rotation: {x: -0.7050982, y: 0.00000004164811, z: 0.00000005327532, w: 0.70910966}
+      scale: {x: 1, y: 1, z: 0.9999999}
+    - name: Def_Head
+      parentName: Root_Rotate
+      position: {x: -0.000000105706725, y: -0.01620715, z: -0.7012649}
+      rotation: {x: -0.648699, y: 0.00000015431881, z: -0.000000028266674, w: 0.7610451}
+      scale: {x: 1, y: 1, z: 0.9999999}
+    - name: Def_Hair_Leena
+      parentName: Root_Rotate
+      position: {x: -0.00000013626898, y: 0.014586609, z: -0.89324147}
+      rotation: {x: 0.00000013701602, y: 0.48588628, z: 0.87402207, w: 0.000000010209923}
+      scale: {x: 1, y: 0.99999994, z: 0.99999964}
+    - name: Def_Hair_Leena.001
+      parentName: Root_Rotate
+      position: {x: -0.00000011043158, y: -0.08416426, z: -0.7343375}
+      rotation: {x: -0.0000000890143, y: 0.6195654, z: 0.7849425, w: -0.0019978676}
+      scale: {x: 1, y: 1, z: 0.99999964}
+    - name: Def_Hair_Leena.002
+      parentName: Root_Rotate
+      position: {x: 0.00015953764, y: -0.09598755, z: -0.68482655}
+      rotation: {x: 0.00012499513, y: 0.5692394, z: 0.8221694, w: -0.0019938704}
+      scale: {x: 1, y: 1.0000001, z: 0.99999964}
+    - name: Def_Hair_Leena.003
+      parentName: Root_Rotate
+      position: {x: 0.0003350472, y: -0.11404304, z: -0.63680404}
+      rotation: {x: 0.00007160465, y: 0.5909943, z: 0.80667335, w: -0.0019965759}
+      scale: {x: 1, y: 1, z: 0.99999976}
+    - name: Def_Hair_Leena.004
+      parentName: Root_Rotate
+      position: {x: 0.0005079988, y: -0.12981367, z: -0.5869209}
+      rotation: {x: -0.00013857, y: 0.67241794, z: 0.740169, w: -0.001993231}
+      scale: {x: 0.99999994, y: 1, z: 0.9999998}
+    - name: Def_Hair_Leena.005
+      parentName: Root_Rotate
+      position: {x: 0.0006483034, y: -0.13467102, z: -0.53639835}
+      rotation: {x: -0.00017485548, y: 0.6858888, z: 0.7277037, w: -0.0019901176}
+      scale: {x: 0.99999994, y: 1, z: 0.9999998}
+    - name: Def_Hair_Leena.006
+      parentName: Root_Rotate
+      position: {x: 0.00078433467, y: -0.13769755, z: -0.48528248}
+      rotation: {x: -0.000041018127, y: 0.6354928, z: 0.7721042, w: -0.0019975526}
+      scale: {x: 0.99999994, y: 0.99999994, z: 0.9999998}
+    - name: Def_Hair_Leena.007
+      parentName: Root_Rotate
+      position: {x: 0.0009474613, y: -0.14804138, z: -0.43249363}
+      rotation: {x: 0.00004291473, y: 0.6025509, z: 0.79807794, w: -0.0019974548}
+      scale: {x: 1, y: 1.0000001, z: 0.99999994}
+    - name: Def_Hair_Leena.008
+      parentName: Root_Rotate
+      position: {x: 0.0011184183, y: -0.16249143, z: -0.3817461}
+      rotation: {x: 0.00073209725, y: 0.5359276, z: 0.8442561, w: -0.0035607254}
+      scale: {x: 1, y: 1.0000001, z: 0.9999999}
+    - name: Def_Hair_Leena.009
+      parentName: Root_Rotate
+      position: {x: 0.0013897666, y: -0.17947948, z: -0.3456207}
+      rotation: {x: 0.00044358996, y: 0.5034446, z: 0.8640266, w: -0.0012299959}
+      scale: {x: 1, y: 1.0000002, z: 0.99999994}
+    - name: Def_Hair_Leena.010
+      parentName: Root_Rotate
+      position: {x: 0.0015314375, y: -0.20663856, z: -0.29770225}
+      rotation: {x: 0.0005927303, y: 0.39255345, z: 0.9197283, w: -0.0011654159}
+      scale: {x: 0.9999999, y: 1, z: 0.9999998}
+    - name: Def_Hair_Leena.012
+      parentName: Root_Rotate
+      position: {x: 0.0016736436, y: -0.24434507, z: -0.2583452}
+      rotation: {x: 0.0005574964, y: 0.24932827, z: 0.9684179, w: -0.0013776545}
+      scale: {x: 1, y: 1.0000001, z: 1}
+    - name: Def_Hair_Leena.013
+      parentName: Root_Rotate
+      position: {x: 0.0018296804, y: -0.2907213, z: -0.2327699}
+      rotation: {x: 0.00055151596, y: -0.41063705, z: 0.91179854, w: -0.000580991}
+      scale: {x: 0.99999994, y: 1, z: 1.0000001}
+    - name: Def_Eye_L
+      parentName: Root_Rotate
+      position: {x: -0.032628093, y: 0.0829699, z: -0.79674083}
+      rotation: {x: -6.7382806e-14, y: 1, z: -0.00000089170123, w: -0.0000000754979}
+      scale: {x: 1, y: 1.0000001, z: 1.0000001}
+    - name: Def_Eye_R
+      parentName: Root_Rotate
+      position: {x: 0.03262787, y: 0.0829699, z: -0.79674083}
+      rotation: {x: -0.00000005573138, y: 1, z: -0.000000891701, w: -0.00000007549785}
+      scale: {x: 1, y: 1.0000001, z: 1.0000001}
+    - name: Def_Cheekbones_L
+      parentName: Root_Rotate
+      position: {x: -0.057586983, y: 0.07221751, z: -0.7769101}
+      rotation: {x: -0.00000017749856, y: 0.99998945, z: 0.0045904187, w: -0.00006540369}
+      scale: {x: 1, y: 1, z: 1.0000001}
+    - name: Def_Cheekbones_R
+      parentName: Root_Rotate
+      position: {x: 0.05758676, y: 0.07221751, z: -0.7769101}
+      rotation: {x: -0.00000018254188, y: 0.99998945, z: 0.0045907423, w: 0.00006516362}
+      scale: {x: 1, y: 0.9999996, z: 1}
+    - name: Def_Cheeks_L
+      parentName: Root_Rotate
+      position: {x: -0.03959251, y: 0.05933401, z: -0.7264891}
+      rotation: {x: -0.00000023191187, y: 0.9999864, z: 0.0052174586, w: -0.00006588113}
+      scale: {x: 1, y: 0.99999994, z: 0.9999999}
+    - name: Def_Cheeks_R
+      parentName: Root_Rotate
+      position: {x: 0.039592292, y: 0.059334006, z: -0.72648925}
+      rotation: {x: 0.0000002379468, y: 0.9999864, z: 0.0052174586, w: 0.000065642744}
+      scale: {x: 1, y: 0.99999994, z: 0.9999999}
+    - name: Def_Nose_L
+      parentName: Root_Rotate
+      position: {x: -0.00000012119217, y: 0.10782735, z: -0.80480283}
+      rotation: {x: -0.302872, y: 0.70690507, z: 0.6391786, w: 0.0021251028}
+      scale: {x: 1.0000008, y: 1, z: 1.0000001}
+    - name: Def_Nose_R
+      parentName: Root_Rotate
+      position: {x: -0.00000012119217, y: 0.10782735, z: -0.80480283}
+      rotation: {x: 0.3028717, y: 0.7069051, z: 0.6391787, w: -0.0021254818}
+      scale: {x: 0.99999887, y: 0.9999999, z: 0.99999976}
+    - name: Def_Lip_Up_L.002
+      parentName: Root_Rotate
+      position: {x: -0.010070124, y: 0.11595627, z: -0.73540276}
+      rotation: {x: -0.00000022527338, y: 0.9999356, z: 0.011346792, w: -0.000065647386}
+      scale: {x: 1, y: 0.9999996, z: 0.9999999}
+    - name: Def_Lip_Up_R.002
+      parentName: Root_Rotate
+      position: {x: 0.010069902, y: 0.11595627, z: -0.73540276}
+      rotation: {x: 0.00000023861406, y: 0.9999356, z: 0.011346792, w: 0.000065409105}
+      scale: {x: 1, y: 0.9999996, z: 0.9999999}
+    - name: Def_Lip_Up_L.001
+      parentName: Root_Rotate
+      position: {x: -0.027302677, y: 0.09724706, z: -0.737938}
+      rotation: {x: -0.00000022527561, y: 0.9999356, z: 0.011346808, w: -0.00006552817}
+      scale: {x: 1.0000002, y: 1.0000001, z: 1.0000004}
+    - name: Def_Lip_Up_R.001
+      parentName: Root_Rotate
+      position: {x: 0.027302453, y: 0.09724706, z: -0.7379381}
+      rotation: {x: 0.00000023887046, y: 0.9999356, z: 0.011346791, w: 0.000065289896}
+      scale: {x: 1, y: 0.99999946, z: 0.99999964}
+    - name: Def_Lip_Down_L.002
+      parentName: Root_Rotate
+      position: {x: -0.010070119, y: 0.110629536, z: -0.7080911}
+      rotation: {x: 0.0000000019734265, y: 0.9999696, z: 0.007800302, w: -0.00006528495}
+      scale: {x: 0.9999999, y: 0.9999998, z: 1.0000001}
+    - name: Def_Lip_Down_R.002
+      parentName: Root_Rotate
+      position: {x: 0.010069905, y: 0.110629536, z: -0.7080911}
+      rotation: {x: -0.0000000037484265, y: 0.9999696, z: 0.007800302, w: 0.000065165725}
+      scale: {x: 0.9999999, y: 0.9999998, z: 1.0000001}
+    - name: Def_Lip_Down_L.001
+      parentName: Root_Rotate
+      position: {x: -0.027302671, y: 0.08897115, z: -0.71049374}
+      rotation: {x: -0.00000009019615, y: 0.9999696, z: 0.0078003067, w: -0.000065404885}
+      scale: {x: 1, y: 0.99999994, z: 1.0000001}
+    - name: Def_Lip_Down_R.001
+      parentName: Root_Rotate
+      position: {x: 0.027302453, y: 0.08897115, z: -0.71049374}
+      rotation: {x: -0.0000000030717737, y: 0.9999696, z: 0.007800302, w: 0.00006540416}
+      scale: {x: 1, y: 1.0000001, z: 1.0000004}
+    - name: Def_Eyelashes_up_L.001
+      parentName: Root_Rotate
+      position: {x: -0.019714653, y: 0.08854775, z: -0.79314}
+      rotation: {x: 0.000000053711023, y: 0.99998945, z: 0.004592654, w: -0.000065760265}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Def_Eyelashes_up_R.001
+      parentName: Root_Rotate
+      position: {x: 0.019714415, y: 0.08854776, z: -0.7931399}
+      rotation: {x: -0.000000042927994, y: 0.99998945, z: 0.004592654, w: 0.0000656411}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Def_Eyelashes_up_L.002
+      parentName: Root_Rotate
+      position: {x: -0.02610468, y: 0.09400843, z: -0.80289406}
+      rotation: {x: -0.000000026376378, y: 0.99998945, z: 0.0045925356, w: -0.00006576063}
+      scale: {x: 1.0000002, y: 1.0000002, z: 1}
+    - name: Def_Eyelashes_up_R.002
+      parentName: Root_Rotate
+      position: {x: 0.026104437, y: 0.09400844, z: -0.80289406}
+      rotation: {x: 0.000000038804775, y: 0.99998945, z: 0.004592596, w: 0.00006564148}
+      scale: {x: 1.0000002, y: 0.9999995, z: 0.9999997}
+    - name: Def_Eyelashes_up_L.004
+      parentName: Root_Rotate
+      position: {x: -0.038266633, y: 0.09142225, z: -0.80406386}
+      rotation: {x: -0.00000018363905, y: 0.99998945, z: 0.004592179, w: -0.00006564214}
+      scale: {x: 1, y: 0.99999994, z: 1.0000001}
+    - name: Def_Eyelashes_D_L.005
+      parentName: Root_Rotate
+      position: {x: -0.027105855, y: 0.09322545, z: -0.78497523}
+      rotation: {x: 0.00000020594409, y: 0.99998945, z: 0.004592624, w: -0.00006564035}
+      scale: {x: 1.0000002, y: 0.9999999, z: 0.9999998}
+    - name: Def_Eyelashes_up_R.004
+      parentName: Root_Rotate
+      position: {x: 0.038266394, y: 0.091422245, z: -0.80406386}
+      rotation: {x: -0.00000003837114, y: 0.99998945, z: 0.004592176, w: 0.00006552191}
+      scale: {x: 1, y: 0.99999976, z: 0.9999998}
+    - name: Def_Eyelashes_D_L.006
+      parentName: Root_Rotate
+      position: {x: -0.042434312, y: 0.08761009, z: -0.7842501}
+      rotation: {x: 0.000000053710995, y: 0.99998945, z: 0.004592654, w: -0.000065760265}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Def_Eyelashes_D_R.005
+      parentName: Root_Rotate
+      position: {x: 0.027105622, y: 0.09322545, z: -0.78497523}
+      rotation: {x: -0.00000019695199, y: 0.99998945, z: 0.0045925924, w: 0.000065521184}
+      scale: {x: 1.0000002, y: 0.9999996, z: 0.99999976}
+    - name: Def_Eyelashes_D_R.006
+      parentName: Root_Rotate
+      position: {x: 0.042434096, y: 0.08761009, z: -0.7842501}
+      rotation: {x: 0.00000019061866, y: 0.99998945, z: 0.004592654, w: 0.00006552297}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Def_Eyebrows_L.008
+      parentName: Root_Rotate
+      position: {x: -0.017685926, y: 0.102026165, z: -0.8067321}
+      rotation: {x: -0.00000006252635, y: 0.99998945, z: 0.004591661, w: -0.000065760796}
+      scale: {x: 0.9999998, y: 1, z: 1.0000002}
+    - name: Def_Eyebrows_R.008
+      parentName: Root_Rotate
+      position: {x: 0.017685683, y: 0.10202617, z: -0.8067321}
+      rotation: {x: -0.00000015939332, y: 0.99998945, z: 0.0045916587, w: 0.00006564057}
+      scale: {x: 0.99999976, y: 0.9999998, z: 1.0000002}
+    - name: Def_Eyebrows_L.009
+      parentName: Root_Rotate
+      position: {x: -0.045287214, y: 0.092345074, z: -0.81149226}
+      rotation: {x: -0.00000014316069, y: 0.99998945, z: 0.0045925784, w: -0.00006576117}
+      scale: {x: 1.0000002, y: 0.9999997, z: 0.9999997}
+    - name: Def_Eyebrows_R.009
+      parentName: Root_Rotate
+      position: {x: 0.045286976, y: 0.09234508, z: -0.81149226}
+      rotation: {x: -0.00000007705564, y: 0.99998945, z: 0.0045925886, w: 0.00006564095}
+      scale: {x: 1.0000001, y: 1.0000002, z: 1.0000002}
+    - name: Def_Eyebrows_L.010
+      parentName: Root_Rotate
+      position: {x: -0.053119466, y: 0.08456358, z: -0.8083407}
+      rotation: {x: 0.00000005398843, y: 0.99998945, z: 0.0045926324, w: -0.000065760265}
+      scale: {x: 1.0000001, y: 0.9999999, z: 0.9999998}
+    - name: Def_Eyebrows_R.010
+      parentName: Root_Rotate
+      position: {x: 0.053119227, y: 0.08456358, z: -0.8083407}
+      rotation: {x: 0.00000019043196, y: 0.99998945, z: 0.004592662, w: 0.00006552297}
+      scale: {x: 1, y: 0.9999998, z: 0.99999994}
+    - name: Def_Front_Main
+      parentName: Root_Rotate
+      position: {x: -0.00000013160532, y: 0.08256731, z: -0.8742953}
+      rotation: {x: -0.000035297806, y: 0.83767647, z: 0.5461668, w: -0.000054270145}
+      scale: {x: 1, y: 0.99999994, z: 0.9999999}
+    - name: Def_Front_L.012
+      parentName: Root_Rotate
+      position: {x: -0.03462517, y: 0.07744712, z: -0.86796254}
+      rotation: {x: -0.000033065742, y: 0.848489, z: 0.5111158, w: -0.13721187}
+      scale: {x: 0.99999994, y: 1.0000001, z: 1.0000004}
+    - name: Def_Front_L.013
+      parentName: Root_Rotate
+      position: {x: -0.057874337, y: 0.05963581, z: -0.84966964}
+      rotation: {x: -0.000025448106, y: 0.8991288, z: 0.39427036, w: -0.19004828}
+      scale: {x: 1, y: 1, z: 0.9999998}
+    - name: Def_Front_R.012
+      parentName: Root_Rotate
+      position: {x: 0.034624916, y: 0.07744712, z: -0.86796254}
+      rotation: {x: 0.00003308043, y: 0.8484889, z: 0.5111159, w: 0.13721175}
+      scale: {x: 1.0000001, y: 1.0000001, z: 0.99999994}
+    - name: Def_Front_R.013
+      parentName: Root_Rotate
+      position: {x: 0.057874084, y: 0.05963581, z: -0.84966964}
+      rotation: {x: 0.000025522859, y: 0.89912885, z: 0.39427027, w: 0.19004804}
+      scale: {x: 1, y: 0.99999964, z: 0.9999998}
+    - name: Def_Nose_Main
+      parentName: Root_Rotate
+      position: {x: -0.00000012119217, y: 0.10782735, z: -0.80480283}
+      rotation: {x: -0.00003873675, y: 0.800704, z: 0.59906024, w: -0.000051854575}
+      scale: {x: 1, y: 1, z: 0.99999976}
+    - name: Def_Jaw_Main
+      parentName: Root_Rotate
+      position: {x: -0.000000108821105, y: 0.013686549, z: -0.72301024}
+      rotation: {x: 0.24055015, y: 0.0072609237, z: 0.0017994717, w: 0.9706079}
+      scale: {x: 0.99999994, y: 0.9999999, z: 1}
+    - name: Def_Jaw_Main.001
+      parentName: Root_Rotate
+      position: {x: -0.00000010207469, y: 0.09975338, z: -0.67755777}
+      rotation: {x: -0.51598555, y: 0.00000006113833, z: 0.00000003895583, w: 0.85659736}
+      scale: {x: 0.9999999, y: 1, z: 0.9999999}
+    - name: Def_Jaw_L
+      parentName: Root_Rotate
+      position: {x: -0.047042456, y: 0.01368654, z: -0.72301024}
+      rotation: {x: 0.22818108, y: 0.026552916, z: -0.22328904, w: 0.9472963}
+      scale: {x: 1, y: 1, z: 1.0000001}
+    - name: Def_Jaw_R
+      parentName: Root_Rotate
+      position: {x: 0.04704224, y: 0.0136865415, z: -0.72301024}
+      rotation: {x: 0.2281811, y: -0.02655278, z: 0.22328903, w: 0.9472963}
+      scale: {x: 0.9999999, y: 0.9999999, z: 1}
+    - name: Def_Shoulder_L
+      parentName: Root_Rotate
+      position: {x: -0.00000009012655, y: 0.04609443, z: -0.5983315}
+      rotation: {x: 0.844039, y: -0.53299946, z: 0.037355766, w: -0.045981456}
+      scale: {x: 0.9999966, y: 0.99999636, z: 0.99999815}
+    - name: Def_Arm_L
+      parentName: Root_Rotate
+      position: {x: -0.13487573, y: -0.01444089, z: -0.59149855}
+      rotation: {x: 0.723803, y: -0.68768746, z: -0.03833887, w: 0.041538995}
+      scale: {x: 1.0000015, y: 0.99999654, z: 1.0000017}
+    - name: Def_Arm2_L
+      parentName: Root_Rotate
+      position: {x: -0.2690057, y: -0.021296807, z: -0.57624304}
+      rotation: {x: 0.72045416, y: -0.6889367, z: -0.07941265, w: 0.0023896168}
+      scale: {x: 0.99999714, y: 0.9999963, z: 0.99999833}
+    - name: Def_Forearm_L
+      parentName: Root_Rotate
+      position: {x: -0.40313557, y: -0.028152708, z: -0.5609875}
+      rotation: {x: -0.6147478, y: 0.78625464, z: 0.016593676, w: 0.06011153}
+      scale: {x: 0.99999505, y: 0.99999917, z: 0.99999666}
+    - name: DEF_BLADE_MAIN_L
+      parentName: Root_Rotate
+      position: {x: -0.43897903, y: -0.019796787, z: -0.5906812}
+      rotation: {x: -0.6149496, y: 0.78526664, z: 0.016557872, w: 0.07013706}
+      scale: {x: 0.9999949, y: 0.9999996, z: 0.99999636}
+    - name: DEF_BLADE1_L
+      parentName: Root_Rotate
+      position: {x: -0.43216214, y: -0.018928014, z: -0.5659236}
+      rotation: {x: 0.72970366, y: -0.6815921, z: -0.014183777, w: -0.052569717}
+      scale: {x: 0.99999523, y: 0.9999991, z: 0.99999636}
+    - name: DEF_BLADE2_L
+      parentName: Root_Rotate
+      position: {x: -0.5519331, y: -0.0010598808, z: -0.5643177}
+      rotation: {x: 0.7010953, y: -0.6653776, z: -0.013575784, w: -0.25603464}
+      scale: {x: 0.99999547, y: 0.99999905, z: 0.9999962}
+    - name: DEF_BLADE3_L
+      parentName: Root_Rotate
+      position: {x: -0.4504688, y: -0.013322028, z: -0.5731211}
+      rotation: {x: -0.53915966, y: 0.8222971, z: 0.017297005, w: 0.18120489}
+      scale: {x: 0.99999505, y: 0.99999946, z: 0.99999636}
+    - name: Def_Forearm2_L
+      parentName: Root_Rotate
+      position: {x: -0.52813035, y: 0.0032826657, z: -0.56715715}
+      rotation: {x: -0.61485106, y: 0.78666526, z: 0.012188591, w: 0.054474097}
+      scale: {x: 0.99999875, y: 0.9999988, z: 1.0000007}
+    - name: Def_Hand_L
+      parentName: Root_Rotate
+      position: {x: -0.6531251, y: 0.034717932, z: -0.5733263}
+      rotation: {x: -0.61782354, y: 0.78491443, z: 0.000000024816712, w: 0.046940487}
+      scale: {x: 1.0000014, y: 1.000001, z: 1.000001}
+    - name: Def_index_L.001
+      parentName: Root_Rotate
+      position: {x: -0.6949591, y: 0.063762546, z: -0.5690214}
+      rotation: {x: -0.62769413, y: 0.77637464, z: 0.00000004598122, w: -0.05694287}
+      scale: {x: 1.0000014, y: 1.000001, z: 1.000001}
+    - name: Def_index_L.002
+      parentName: Root_Rotate
+      position: {x: -0.75168985, y: 0.07610228, z: -0.5648605}
+      rotation: {x: -0.55929613, y: 0.82561773, z: 0.034166444, w: -0.066150345}
+      scale: {x: 1.0000018, y: 1.000001, z: 1.0000011}
+    - name: Def_index_L.003
+      parentName: Root_Rotate
+      position: {x: -0.766758, y: 0.0822023, z: -0.56272227}
+      rotation: {x: -0.53770685, y: 0.8092185, z: 0.17446783, w: -0.15999275}
+      scale: {x: 1.0000017, y: 1.000001, z: 1.000001}
+    - name: Def_index_L.004
+      parentName: Root_Rotate
+      position: {x: -0.79013395, y: 0.09256006, z: -0.5496791}
+      rotation: {x: -0.4793177, y: 0.79827464, z: 0.28984618, w: -0.22136278}
+      scale: {x: 1.0000018, y: 1.0000011, z: 1.000001}
+    - name: Def_middle_L.001
+      parentName: Root_Rotate
+      position: {x: -0.69966024, y: 0.046473913, z: -0.5690858}
+      rotation: {x: -0.6439718, y: 0.7616867, z: 0.02811647, w: -0.06590296}
+      scale: {x: 1.0000014, y: 1.000001, z: 1.0000011}
+    - name: Def_middle_L.002
+      parentName: Root_Rotate
+      position: {x: -0.7576572, y: 0.056504194, z: -0.5615069}
+      rotation: {x: -0.610386, y: 0.7874448, z: 0.048383337, w: -0.07084299}
+      scale: {x: 1.0000014, y: 1.0000011, z: 1.0000008}
+    - name: Def_middle_L.003
+      parentName: Root_Rotate
+      position: {x: -0.7778933, y: 0.061808478, z: -0.5580577}
+      rotation: {x: -0.5666031, y: 0.7792178, z: 0.19762427, w: -0.18090104}
+      scale: {x: 1.0000014, y: 1.000001, z: 1.0000007}
+    - name: Def_middle_L.004
+      parentName: Root_Rotate
+      position: {x: -0.8030586, y: 0.070485525, z: -0.54214996}
+      rotation: {x: -0.52082384, y: 0.76669335, z: 0.2898842, w: -0.23851836}
+      scale: {x: 1.0000012, y: 1.0000011, z: 1.0000007}
+    - name: Def_ring_L.001
+      parentName: Root_Rotate
+      position: {x: -0.6996666, y: 0.031280667, z: -0.5689544}
+      rotation: {x: -0.69033664, y: 0.7175017, z: 0.00000003275708, w: -0.09287941}
+      scale: {x: 1.0000015, y: 1.000001, z: 1.000001}
+    - name: Def_ring_L.002
+      parentName: Root_Rotate
+      position: {x: -0.7577389, y: 0.034028277, z: -0.5614371}
+      rotation: {x: -0.65721273, y: 0.74782264, z: 0.057548095, w: -0.074303195}
+      scale: {x: 1.0000017, y: 1.000001, z: 1.0000008}
+    - name: Def_ring_L.003
+      parentName: Root_Rotate
+      position: {x: -0.77970225, y: 0.036947682, z: -0.5572956}
+      rotation: {x: -0.6019628, y: 0.75261694, z: 0.20993751, w: -0.16472682}
+      scale: {x: 1.0000017, y: 1.0000008, z: 1.0000008}
+    - name: Def_ring_L.004
+      parentName: Root_Rotate
+      position: {x: -0.80237716, y: 0.042017706, z: -0.5433611}
+      rotation: {x: -0.54280096, y: 0.7463571, z: 0.3392591, w: -0.18226783}
+      scale: {x: 1.0000014, y: 1.0000008, z: 1.0000008}
+    - name: Def_pinky_L.001
+      parentName: Root_Rotate
+      position: {x: -0.70136726, y: 0.015027678, z: -0.5685175}
+      rotation: {x: 0.7178087, y: -0.69066906, z: -0.03005516, w: 0.0826056}
+      scale: {x: 1.0000014, y: 1.000001, z: 1.000001}
+    - name: Def_pinky_L.002
+      parentName: Root_Rotate
+      position: {x: -0.7592988, y: 0.0131307, z: -0.55911607}
+      rotation: {x: 0.7279163, y: -0.68167084, z: -0.050858375, w: 0.053629708}
+      scale: {x: 1.0000012, y: 1.0000006, z: 1.0000008}
+    - name: Def_pinky_L.003
+      parentName: Root_Rotate
+      position: {x: -0.7754802, y: 0.012066677, z: -0.5566992}
+      rotation: {x: -0.674635, y: 0.6812907, z: 0.22912003, w: -0.16797216}
+      scale: {x: 1.0000012, y: 1.0000006, z: 1.0000007}
+    - name: Def_pinky_L.004
+      parentName: Root_Rotate
+      position: {x: -0.7953062, y: 0.011707556, z: -0.5440158}
+      rotation: {x: -0.627054, y: 0.6614099, z: 0.33272538, w: -0.24214469}
+      scale: {x: 1.0000012, y: 1.0000005, z: 1.0000007}
+    - name: Def_Thumb_L.001
+      parentName: Root_Rotate
+      position: {x: -0.66680044, y: 0.05430202, z: -0.57073957}
+      rotation: {x: 0.00006814472, y: 0.8284508, z: 0.37185836, w: 0.41879666}
+      scale: {x: 1.0000011, y: 1.0000012, z: 1.0000011}
+    - name: Def_Thumb_L.002
+      parentName: Root_Rotate
+      position: {x: -0.6734129, y: 0.06966644, z: -0.557653}
+      rotation: {x: -0.02051818, y: 0.8240442, z: 0.37366685, w: 0.42532715}
+      scale: {x: 1.000001, y: 1.0000012, z: 1.0000012}
+    - name: Def_Thumb_L.003
+      parentName: Root_Rotate
+      position: {x: -0.68207574, y: 0.08739978, z: -0.54291314}
+      rotation: {x: -0.013774212, y: 0.8301135, z: 0.35981676, w: 0.42573914}
+      scale: {x: 1.000001, y: 1.0000011, z: 1.0000012}
+    - name: Def_Trapecious_L
+      parentName: Root_Rotate
+      position: {x: -0.1273142, y: -0.014642239, z: -0.6150133}
+      rotation: {x: -0.59373426, y: -0.12611814, z: -0.5289678, w: 0.5930995}
+      scale: {x: 0.99999726, y: 0.9999982, z: 0.99999636}
+    - name: Def_Tit_L
+      parentName: Root_Rotate
+      position: {x: -0.08135759, y: 0.1568731, z: -0.46928877}
+      rotation: {x: 0.9999972, y: -0.00000003571691, z: -0.00000017972054, w: -0.00237055}
+      scale: {x: 0.9999999, y: 0.9999997, z: 0.9999998}
+    - name: Def_Thigh_L
+      parentName: Root_Rotate
+      position: {x: -0.09307411, y: -0.018293042, z: -0.049146995}
+      rotation: {x: -0.0037657772, y: 0.722456, z: 0.69137245, w: -0.0068813544}
+      scale: {x: 0.99999994, y: 0.9999996, z: 0.9999998}
+    - name: MSC_Thigh_L
+      parentName: Def_Thigh_L
+      position: {x: 0.0007425664, y: 0.29189414, z: -0.07581449}
+      rotation: {x: -0.026488844, y: 0.0062341467, z: 0.0027082607, w: 0.99962604}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Def_Knee_L
+      parentName: Root_Rotate
+      position: {x: -0.09140089, y: -0.00023010932, z: 0.36116165}
+      rotation: {x: -0.006452548, y: 0.63309085, z: 0.7739572, w: -0.012024444}
+      scale: {x: 0.9999999, y: 1.0000002, z: 0.9999998}
+    - name: Def_Leg_L
+      parentName: Root_Rotate
+      position: {x: -0.090596974, y: -0.015480704, z: 0.43661493}
+      rotation: {x: -0.0034881642, y: 0.66425574, z: 0.7474658, w: -0.0068615335}
+      scale: {x: 0.99999994, y: 1.0000002, z: 0.99999976}
+    - name: MSC_Leg_L
+      parentName: Def_Leg_L
+      position: {x: 0.001922695, y: -0.04513392, z: -0.08961266}
+      rotation: {x: -0.13477542, y: 0.0054788133, z: -0.00022461079, w: 0.99086106}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Def_Foot_L
+      parentName: Root_Rotate
+      position: {x: -0.08846692, y: -0.059962645, z: 0.8127685}
+      rotation: {x: -0.000000057432356, y: 0.9800755, z: 0.1986256, w: -0.00000033193774}
+      scale: {x: 0.9999999, y: 1.0000039, z: 1.0000004}
+    - name: Def_Toe_L
+      parentName: Root_Rotate
+      position: {x: -0.088466905, y: 0.071507454, z: 0.8683391}
+      rotation: {x: -7.285074e-15, y: 1, z: -0.000000007450584, w: -0.0000000754979}
+      scale: {x: 0.9999999, y: 1.0000048, z: 0.9999996}
+    - name: Def_Gluteus_L
+      parentName: Root_Rotate
+      position: {x: -0.0930741, y: -0.09257421, z: -0.055602536}
+      rotation: {x: -0.000001468046, y: 0.13629247, z: 0.99066865, w: 0.000011108071}
+      scale: {x: 1, y: 1.0000002, z: 1.0000005}
+    - name: Ctrl_Spine
+      parentName: Root_Rotate
+      position: {x: -0.000000037050608, y: 0.04254067, z: -0.24551207}
+      rotation: {x: 1, y: -3.3001179e-15, z: -0.000000075497894, w: -0.00000004371139}
+      scale: {x: 1, y: 0.99999976, z: 1}
+    - name: Ctrl_Tweak_Spine
+      parentName: Ctrl_Spine
+      position: {x: -5.865166e-17, y: -0.000000059604645, z: 0}
+      rotation: {x: 0.6911653, y: -0.00000008613847, z: -0.00000008278839, w: 0.72269666}
+      scale: {x: 1, y: 1.0000001, z: 1.0000001}
+    - name: Ctrl_Tweak_Chest
+      parentName: Ctrl_Tweak_Spine
+      position: {x: 2.359224e-16, y: 0.16649744, z: -0.000000007450581}
+      rotation: {x: -0.0869633, y: 0.0000002394454, z: 0.0000000020480886, w: 0.9962115}
+      scale: {x: 1, y: 1, z: 0.99999994}
+    - name: Ctrl_Neck
+      parentName: Ctrl_Tweak_Chest
+      position: {x: -8.104628e-15, y: 0.23801185, z: 0.000000014901161}
+      rotation: {x: 0.111972414, y: -0.00000012766725, z: 0.0000000024126006, w: 0.9937113}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Ctrl_Head
+      parentName: Ctrl_Neck
+      position: {x: -4.1355808e-15, y: 0.057081427, z: 0.0000000018626451}
+      rotation: {x: 0.07661278, y: 0.00000013222333, z: 0.000000021203718, w: 0.99706095}
+      scale: {x: 1, y: 0.99999994, z: 0.99999994}
+    - name: Def_Lip_Main
+      parentName: Ctrl_Head
+      position: {x: -0.000000005152209, y: 0.04518362, z: 0.023028214}
+      rotation: {x: 0.6486991, y: 0.000000026518522, z: 0.00000018301745, w: 0.761045}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Def_Shoulder_R
+      parentName: Root_Rotate
+      position: {x: -0.00000009012655, y: 0.04609443, z: -0.5983315}
+      rotation: {x: 0.844039, y: 0.5329994, z: -0.037355945, w: -0.045981623}
+      scale: {x: 0.9999967, y: 0.99999636, z: 0.9999983}
+    - name: Def_Arm_R
+      parentName: Root_Rotate
+      position: {x: 0.13487555, y: -0.014440883, z: -0.59149855}
+      rotation: {x: 0.7238027, y: 0.68768764, z: 0.0383391, w: 0.041539263}
+      scale: {x: 1.0000015, y: 0.9999961, z: 1.0000018}
+    - name: Def_Arm2_R
+      parentName: Root_Rotate
+      position: {x: 0.26900545, y: -0.021296686, z: -0.57624304}
+      rotation: {x: 0.7204539, y: 0.688937, z: 0.07941247, w: 0.00238944}
+      scale: {x: 0.9999964, y: 0.9999963, z: 0.99999774}
+    - name: Def_Forearm_R
+      parentName: Root_Rotate
+      position: {x: 0.40313533, y: -0.028152488, z: -0.5609875}
+      rotation: {x: 0.614748, y: 0.7862545, z: 0.016593939, w: -0.060111333}
+      scale: {x: 0.999995, y: 0.9999988, z: 0.9999964}
+    - name: Def_Forearm2_R
+      parentName: Root_Rotate
+      position: {x: 0.52813023, y: 0.0032828231, z: -0.5671568}
+      rotation: {x: 0.6148517, y: 0.78666466, z: 0.012187138, w: -0.054475415}
+      scale: {x: 0.9999975, y: 0.9999987, z: 1.0000002}
+    - name: Def_Hand_R
+      parentName: Root_Rotate
+      position: {x: 0.653125, y: 0.034717932, z: -0.5733265}
+      rotation: {x: 0.61782354, y: 0.7849145, z: -0.000000009521471, w: -0.04694067}
+      scale: {x: 1.0000015, y: 1.0000011, z: 1.000001}
+    - name: Def_Thumb_R.001
+      parentName: Root_Rotate
+      position: {x: 0.6668003, y: 0.05430202, z: -0.5707398}
+      rotation: {x: -0.000068094836, y: 0.8284507, z: 0.37185833, w: -0.4187969}
+      scale: {x: 1.000001, y: 1.0000012, z: 1.0000012}
+    - name: Def_Thumb_R.002
+      parentName: Root_Rotate
+      position: {x: 0.6734128, y: 0.06966643, z: -0.55765325}
+      rotation: {x: 0.020518243, y: 0.8240441, z: 0.37366685, w: -0.4253274}
+      scale: {x: 1.0000008, y: 1.0000011, z: 1.0000011}
+    - name: Def_Thumb_R.003
+      parentName: Root_Rotate
+      position: {x: 0.6820756, y: 0.08739978, z: -0.5429134}
+      rotation: {x: 0.013774358, y: 0.8301133, z: 0.35981676, w: -0.42573947}
+      scale: {x: 1.000001, y: 1.000001, z: 1.0000011}
+    - name: Def_Trapecious_R
+      parentName: Root_Rotate
+      position: {x: 0.12731402, y: -0.014642231, z: -0.6150133}
+      rotation: {x: -0.5937341, y: 0.12611827, z: 0.5289679, w: 0.5930995}
+      scale: {x: 0.9999969, y: 0.9999982, z: 0.9999961}
+    - name: Def_Thigh_R
+      parentName: Root_Rotate
+      position: {x: 0.0930741, y: -0.018293042, z: -0.049147025}
+      rotation: {x: 0.0037658573, y: 0.7224557, z: 0.6913728, w: 0.006881271}
+      scale: {x: 0.9999999, y: 0.9999996, z: 0.9999999}
+    - name: MSC_Thigh_R
+      parentName: Def_Thigh_R
+      position: {x: -0.00074256107, y: 0.29189414, z: -0.07581449}
+      rotation: {x: -0.026488839, y: -0.0062342375, z: -0.002708257, w: 0.99962604}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Def_Knee_R
+      parentName: Root_Rotate
+      position: {x: 0.09140099, y: -0.00023050234, z: 0.36116165}
+      rotation: {x: 0.00645274, y: 0.633091, z: 0.77395713, w: 0.012024442}
+      scale: {x: 0.9999998, y: 0.9999999, z: 0.9999998}
+    - name: Def_Leg_R
+      parentName: Root_Rotate
+      position: {x: 0.0905971, y: -0.015481084, z: 0.4366149}
+      rotation: {x: 0.0034882796, y: 0.664256, z: 0.74746555, w: 0.0068614315}
+      scale: {x: 0.9999999, y: 1.0000004, z: 0.99999976}
+    - name: MSC_Leg_R
+      parentName: Def_Leg_R
+      position: {x: -0.0019226839, y: -0.04513388, z: -0.08961266}
+      rotation: {x: -0.13477546, y: -0.005478796, z: 0.0002246276, w: 0.99086106}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Def_Foot_R
+      parentName: Root_Rotate
+      position: {x: 0.08846715, y: -0.059962764, z: 0.8127685}
+      rotation: {x: 0.00000008111028, y: 0.9800755, z: 0.1986256, w: 0.00000021510363}
+      scale: {x: 0.9999998, y: 1.000004, z: 1.0000004}
+    - name: Def_Toe_R
+      parentName: Root_Rotate
+      position: {x: 0.088467166, y: 0.071507365, z: 0.8683391}
+      rotation: {x: 6.826201e-15, y: 1, z: -0.000000007450584, w: -0.0000000754979}
+      scale: {x: 0.9999998, y: 1.0000051, z: 0.9999996}
+    - name: Def_Gluteus_R
+      parentName: Root_Rotate
+      position: {x: 0.0930741, y: -0.0925742, z: -0.055602625}
+      rotation: {x: 0.0000016116153, y: 0.13629235, z: 0.99066865, w: -0.000011127822}
+      scale: {x: 0.9999998, y: 0.9999997, z: 0.99999976}
+    - name: Def_Tit_R
+      parentName: Root_Rotate
+      position: {x: 0.08135744, y: 0.15687314, z: -0.46928877}
+      rotation: {x: 0.9999972, y: -0.000000036034876, z: 0.00000016300521, w: -0.0023704309}
+      scale: {x: 1, y: 0.9999997, z: 0.99999994}
+    - name: Def_index_R.001
+      parentName: Root_Rotate
+      position: {x: 0.694959, y: 0.063762546, z: -0.56902164}
+      rotation: {x: 0.6276942, y: 0.77637464, z: -0.000000110275266, w: 0.05694259}
+      scale: {x: 1.0000015, y: 1.000001, z: 1.000001}
+    - name: Def_index_R.002
+      parentName: Root_Rotate
+      position: {x: 0.75168973, y: 0.07610227, z: -0.56486076}
+      rotation: {x: 0.5592961, y: 0.8256178, z: 0.034166306, w: 0.06615011}
+      scale: {x: 1.0000014, y: 1.000001, z: 1.0000011}
+    - name: Def_index_R.003
+      parentName: Root_Rotate
+      position: {x: 0.7667579, y: 0.0822023, z: -0.5627225}
+      rotation: {x: 0.53770685, y: 0.80921865, z: 0.17446762, w: 0.15999246}
+      scale: {x: 1.0000015, y: 1.000001, z: 1.0000011}
+    - name: Def_index_R.004
+      parentName: Root_Rotate
+      position: {x: 0.79013383, y: 0.09256007, z: -0.54967934}
+      rotation: {x: 0.4793178, y: 0.7982747, z: 0.28984597, w: 0.22136246}
+      scale: {x: 1.0000013, y: 1.0000011, z: 1.0000011}
+    - name: Def_middle_R.001
+      parentName: Root_Rotate
+      position: {x: 0.6996601, y: 0.046473913, z: -0.569086}
+      rotation: {x: 0.64397174, y: 0.7616868, z: 0.028116256, w: 0.06590278}
+      scale: {x: 1.0000017, y: 1.0000008, z: 1.000001}
+    - name: Def_middle_R.002
+      parentName: Root_Rotate
+      position: {x: 0.75765705, y: 0.05650419, z: -0.56150717}
+      rotation: {x: 0.61038595, y: 0.78744483, z: 0.04838317, w: 0.0708427}
+      scale: {x: 1.0000018, y: 1.0000013, z: 1.0000012}
+    - name: Def_middle_R.003
+      parentName: Root_Rotate
+      position: {x: 0.7778932, y: 0.06180848, z: -0.55805796}
+      rotation: {x: 0.5666031, y: 0.7792179, z: 0.19762407, w: 0.18090074}
+      scale: {x: 1.0000017, y: 1.0000012, z: 1.0000013}
+    - name: Def_middle_R.004
+      parentName: Root_Rotate
+      position: {x: 0.8030585, y: 0.07048554, z: -0.5421502}
+      rotation: {x: 0.52082384, y: 0.76669353, z: 0.28988397, w: 0.23851797}
+      scale: {x: 1.0000017, y: 1.0000013, z: 1.0000014}
+    - name: Def_ring_R.001
+      parentName: Root_Rotate
+      position: {x: 0.6996665, y: 0.031280667, z: -0.56895465}
+      rotation: {x: 0.6903367, y: 0.7175017, z: -0.0000001864209, w: 0.0928792}
+      scale: {x: 1.0000017, y: 1.0000011, z: 1.000001}
+    - name: Def_ring_R.002
+      parentName: Root_Rotate
+      position: {x: 0.7577387, y: 0.03402828, z: -0.5614373}
+      rotation: {x: 0.65721273, y: 0.74782264, z: 0.057547852, w: 0.07430293}
+      scale: {x: 1.0000015, y: 1.0000008, z: 1.0000007}
+    - name: Def_ring_R.003
+      parentName: Root_Rotate
+      position: {x: 0.77970207, y: 0.036947686, z: -0.55729586}
+      rotation: {x: 0.60196286, y: 0.75261694, z: 0.20993727, w: 0.16472653}
+      scale: {x: 1.0000014, y: 1.0000006, z: 1.0000006}
+    - name: Def_ring_R.004
+      parentName: Root_Rotate
+      position: {x: 0.802377, y: 0.04201771, z: -0.54336137}
+      rotation: {x: 0.5428011, y: 0.74635714, z: 0.33925882, w: 0.18226759}
+      scale: {x: 1.0000012, y: 1.0000005, z: 1.0000007}
+    - name: Def_pinky_R.001
+      parentName: Root_Rotate
+      position: {x: 0.70136714, y: 0.015027678, z: -0.56851774}
+      rotation: {x: 0.7178087, y: 0.690669, z: 0.03005497, w: 0.08260544}
+      scale: {x: 1.0000015, y: 1.0000008, z: 1.000001}
+    - name: Def_pinky_R.002
+      parentName: Root_Rotate
+      position: {x: 0.7592987, y: 0.013130702, z: -0.5591163}
+      rotation: {x: 0.7279163, y: 0.6816709, z: 0.050858125, w: 0.05362945}
+      scale: {x: 1.0000012, y: 1.0000004, z: 1.0000008}
+    - name: Def_pinky_R.003
+      parentName: Root_Rotate
+      position: {x: 0.7754801, y: 0.012066679, z: -0.55669945}
+      rotation: {x: 0.67463505, y: 0.6812908, z: 0.22911981, w: 0.16797191}
+      scale: {x: 1.0000011, y: 1.0000005, z: 1.0000007}
+    - name: Def_pinky_R.004
+      parentName: Root_Rotate
+      position: {x: 0.7953061, y: 0.011707557, z: -0.54401606}
+      rotation: {x: 0.6270541, y: 0.66141003, z: 0.3327252, w: 0.24214442}
+      scale: {x: 1.000001, y: 1.0000006, z: 1.0000007}
+    - name: Def_Eyebrows_L.011
+      parentName: Root_Rotate
+      position: {x: -0.02997506, y: 0.10159588, z: -0.81116074}
+      rotation: {x: -0.00000006303313, y: 0.99998945, z: 0.0045926482, w: -0.000065760796}
+      scale: {x: 0.9999999, y: 0.9999996, z: 0.99999976}
+    - name: Def_Eyebrows_R.011
+      parentName: Root_Rotate
+      position: {x: 0.029974815, y: 0.10159586, z: -0.81116074}
+      rotation: {x: 0.000000074045225, y: 0.99998945, z: 0.004592632, w: 0.00006552243}
+      scale: {x: 1.0000002, y: 1.0000004, z: 1.0000002}
+    - name: Def_Eyelashes_up_L.005
+      parentName: Root_Rotate
+      position: {x: -0.05153357, y: 0.08017651, z: -0.7967097}
+      rotation: {x: 0.000000053711023, y: 0.99998945, z: 0.004592654, w: -0.000065760265}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Def_Eyelashes_up_R.005
+      parentName: Root_Rotate
+      position: {x: 0.051533338, y: 0.08017652, z: -0.7967097}
+      rotation: {x: -0.00000027592534, y: 0.99998945, z: 0.004592654, w: 0.00006564003}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Def_Cheekbones_L.001
+      parentName: Root_Rotate
+      position: {x: -0.05087664, y: 0.07326253, z: -0.7516697}
+      rotation: {x: -0.000000026970957, y: 0.99998945, z: 0.0045907386, w: -0.00006552221}
+      scale: {x: 1, y: 1.0000001, z: 1.0000001}
+    - name: Def_Cheekbones_R.001
+      parentName: Root_Rotate
+      position: {x: 0.050876416, y: 0.07326253, z: -0.7516697}
+      rotation: {x: -0.0000000308909, y: 0.99998945, z: 0.004590791, w: 0.00006528352}
+      scale: {x: 1, y: 1, z: 1.0000001}
+    - name: DEF_BLADE_MAIN_R
+      parentName: Root_Rotate
+      position: {x: 0.43897882, y: -0.019796595, z: -0.5906812}
+      rotation: {x: 0.6149497, y: 0.7852665, z: 0.016558213, w: -0.07013695}
+      scale: {x: 0.99999654, y: 1.0000026, z: 0.99999857}
+    - name: DEF_BLADE1_R
+      parentName: Root_Rotate
+      position: {x: 0.43216184, y: -0.018927796, z: -0.5659237}
+      rotation: {x: 0.72970384, y: 0.6815919, z: 0.014184118, w: -0.05256953}
+      scale: {x: 0.999996, y: 0.99999946, z: 0.99999636}
+    - name: DEF_BLADE2_R
+      parentName: Root_Rotate
+      position: {x: 0.5519329, y: -0.001059788, z: -0.56431746}
+      rotation: {x: 0.7010953, y: 0.66537774, z: 0.013576081, w: -0.2560345}
+      scale: {x: 0.99999624, y: 1, z: 0.99999654}
+    - name: DEF_BLADE3_R
+      parentName: Root_Rotate
+      position: {x: 0.4504685, y: -0.013321883, z: -0.5731211}
+      rotation: {x: 0.53915983, y: 0.82229704, z: 0.01729726, w: -0.18120459}
+      scale: {x: 0.9999958, y: 1.0000001, z: 0.99999636}
+    - name: Def_Bluse_Shoulder_L
+      parentName: Root_Rotate
+      position: {x: -0.092920594, y: -0.016216021, z: -0.6574299}
+      rotation: {x: -0.67700225, y: 0.7333257, z: 0.056726765, w: -0.026142143}
+      scale: {x: 0.9999964, y: 0.9999965, z: 0.99999815}
+    - name: Def_Bluse_Shoulder_R
+      parentName: Root_Rotate
+      position: {x: 0.09292043, y: -0.016216034, z: -0.6574299}
+      rotation: {x: 0.6770022, y: 0.7333257, z: 0.05672701, w: 0.026142202}
+      scale: {x: 0.9999965, y: 0.9999964, z: 0.99999815}
+    - name: DEF_BATTLE-STICK
+      parentName: Arm_Leena
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: 0, y: 0, z: 1, w: 0.00000004371139}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: Blade2_R
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Blade1_R
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Blade3_R
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Blade_Main_R
+      parentName: Leena_Model(Clone)
+      position: {x: -0, y: 0, z: 0}
+      rotation: {x: -0.7071068, y: -0.000000030908623, z: -0.000000030908623, w: 0.7071068}
+      scale: {x: 1, y: 1, z: 1}
     armTwist: 0.5
     foreArmTwist: 0.5
     upperLegTwist: 0.5
@@ -91,7 +956,7 @@ ModelImporter:
     globalScale: 1
     rootMotionBoneName: 
     hasTranslationDoF: 0
-    hasExtraRoot: 0
+    hasExtraRoot: 1
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
   autoGenerateAvatarMappingIfUnspecified: 1
