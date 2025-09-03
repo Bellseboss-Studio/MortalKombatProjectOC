@@ -1,0 +1,29 @@
+<linker>
+  <assembly fullname="UnityEngine">
+   <type fullname="UnityEngine.Events.*" preserve="all" />
+  </assembly>
+  <assembly fullname="UnityEngine.CoreModule" ignoreIfMissing="1">
+   <type fullname="UnityEngine.Events.*" preserve="all" />
+  </assembly>
+  <assembly fullname="Assembly-CSharp" ignoreIfMissing="1">
+   <type fullname="FluffyUnderware.*" preserve="all" />
+  </assembly>
+  <assembly fullname="Assembly-CSharp-firstpass" ignoreIfMissing="1">
+   <type fullname="FluffyUnderware.*" preserve="all" />
+  </assembly>
+  <assembly fullname="ToolBuddy.Curvy" ignoreIfMissing="1">
+   <type fullname="FluffyUnderware.*" preserve="all" />
+  </assembly>
+  <assembly fullname="FluffyUnderware.DevTools" ignoreIfMissing="1">
+   <type fullname="FluffyUnderware.*" preserve="all" />
+  </assembly>
+  <assembly fullname="LibTessDotNet" ignoreIfMissing="1">
+   <type fullname="FluffyUnderware.*" preserve="all" />
+  </assembly>  
+  <assembly fullname="ToolBuddy.ArraysPooling" ignoreIfMissing="1">
+   <type fullname="ToolBuddy.*" preserve="all" />
+  </assembly>
+  <assembly fullname="ToolBuddy.ThirdParty.VectorGraphics" ignoreIfMissing="1">
+   <type fullname="ToolBuddy.*" preserve="all" />
+  </assembly>
+</linker> 

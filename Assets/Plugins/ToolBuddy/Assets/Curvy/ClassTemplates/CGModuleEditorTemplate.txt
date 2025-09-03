@@ -1,0 +1,24 @@
+using UnityEngine;
+using UnityEditor;
+using System.Collections.Generic;
+using FluffyUnderware.Curvy.Generator;
+using FluffyUnderware.Curvy.Generator.Modules;
+
+namespace FluffyUnderware.CurvyEditor.Generator.Modules
+{
+    [CustomEditor(typeof(%CLASSNAME%))]
+    public class %CLASSNAME%Editor : CGModuleEditor<%CLASSNAME%>
+    {
+		
+        // Scene View GUI - Called only if the module is initialized and configured
+        //public override void OnModuleSceneGUI() {}
+        
+        // Scene View Debug GUI - Called only when Show Debug Visuals is activated
+        //public override void OnModuleSceneDebugGUI() {}
+        
+        // Inspector Debug GUI - Called only when Show Debug Values is activated
+        //public override void OnModuleDebugGUI() {}
+        
+    }
+   
+}
