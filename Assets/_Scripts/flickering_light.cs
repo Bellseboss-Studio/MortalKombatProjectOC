@@ -1,4 +1,5 @@
 using UnityEngine;
+
 [RequireComponent(typeof(Light))]
 public class flickering_light : MonoBehaviour
 {
