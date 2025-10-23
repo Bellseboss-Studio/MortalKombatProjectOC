@@ -104,9 +104,9 @@ namespace Bellseboss.Pery.Scripts.Input
 
             fatalitySystem.Configure(this, this);
 
-            ServiceLocator.Instance.GetService<IObserverUI>().Observer(this, this);
+            // ServiceLocator.Instance.GetService<IObserverUI>().Observer(this, this);
             
-            ServiceLocator.Instance.GetService<IPauseMainMenu>().onPause += OnPausaMenu; 
+            // ServiceLocator.Instance.GetService<IPauseMainMenu>().onPause += OnPausaMenu; 
 
             ConfigCamera(cameraMain);
             
