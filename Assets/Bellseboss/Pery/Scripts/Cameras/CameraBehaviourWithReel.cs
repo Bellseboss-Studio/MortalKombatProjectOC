@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using _Scripts.Interact;
 using Bellseboss.Angel;
 using Bellseboss.Pery.Scripts.Input;
 using Unity.Cinemachine;

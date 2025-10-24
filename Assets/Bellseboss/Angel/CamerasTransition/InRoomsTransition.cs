@@ -1,4 +1,5 @@
 ﻿using System;
+using _Scripts.Interact;
 using DG.Tweening;
 using UnityEngine;
 

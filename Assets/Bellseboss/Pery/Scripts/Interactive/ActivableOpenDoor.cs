@@ -1,3 +1,4 @@
+using _Scripts.Interact;
 using UnityEngine;
 
 public class ActivableOpenDoor : Activable

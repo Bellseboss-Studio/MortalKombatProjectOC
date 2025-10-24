@@ -1,4 +1,5 @@
 ﻿using System;
+using _Scripts.Interact;
 using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;

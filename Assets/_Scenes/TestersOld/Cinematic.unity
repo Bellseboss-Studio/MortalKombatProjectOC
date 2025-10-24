@@ -13,7 +13,7 @@ OcclusionCullingSettings:
 --- !u!104 &2
 RenderSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 9
+  serializedVersion: 10
   m_Fog: 0
   m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_FogMode: 3
@@ -38,13 +38,12 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 12
-  m_GIWorkflowMode: 1
+  serializedVersion: 13
+  m_BakeOnSceneLoad: 0
   m_GISettings:
     serializedVersion: 2
     m_BounceScale: 1
@@ -67,9 +66,6 @@ LightmapSettings:
     m_LightmapParameters: {fileID: 0}
     m_LightmapsBakeMode: 1
     m_TextureCompression: 1
-    m_FinalGather: 0
-    m_FinalGatherFiltering: 1
-    m_FinalGatherRayCount: 256
     m_ReflectionCompression: 2
     m_MixedBakeMode: 2
     m_BakeBackend: 1
@@ -104,7 +100,7 @@ NavMeshSettings:
   serializedVersion: 2
   m_ObjectHideFlags: 0
   m_BuildSettings:
-    serializedVersion: 2
+    serializedVersion: 3
     agentTypeID: 0
     agentRadius: 0.5
     agentHeight: 2
@@ -117,7 +113,7 @@ NavMeshSettings:
     cellSize: 0.16666667
     manualTileSize: 0
     tileSize: 256
-    accuratePlacement: 0
+    buildHeightMesh: 0
     maxJobWorkers: 0
     preserveTilesOutsideBounds: 0
     debug:
@@ -143,6 +139,7 @@ PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 9379314, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
@@ -191,35 +188,39 @@ PrefabInstance:
       objectReference: {fileID: 8415127805125568746}
     - target: {fileID: 1435300070, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: field of view
-      value: 40
+      value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 1435300071, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -74.0537
+      value: -80.894
       objectReference: {fileID: 0}
     - target: {fileID: 1435300071, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 85.07991
+      value: 82.24
       objectReference: {fileID: 0}
     - target: {fileID: 1435300071, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -221.57675
+      value: -223.363
       objectReference: {fileID: 0}
     - target: {fileID: 1435300071, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.8764628
+      value: 0.8960411
       objectReference: {fileID: 0}
     - target: {fileID: 1435300071, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_LocalRotation.x
-      value: -0.19936348
+      value: 0.25242043
       objectReference: {fileID: 0}
     - target: {fileID: 1435300071, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0.6402578
+      value: 0.35261703
       objectReference: {fileID: 0}
     - target: {fileID: 1435300071, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_LocalRotation.z
-      value: -0.1771993
+      value: -0.09516075
+      objectReference: {fileID: 0}
+    - target: {fileID: 1834485443, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
+      propertyPath: sceneIndex
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6529240109818489431, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
       propertyPath: m_Name
@@ -270,9 +271,17 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
 --- !u!95 &8415127805125568746 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 1749516398707618032, guid: cec682f7cafa71e438b091a28aa7fa66, type: 3}
   m_PrefabInstance: {fileID: 8415127805125568745}
   m_PrefabAsset: {fileID: 0}
+--- !u!1660057539 &9223372036854775807
+SceneRoots:
+  m_ObjectHideFlags: 0
+  m_Roots:
+  - {fileID: 8415127805125568745}
