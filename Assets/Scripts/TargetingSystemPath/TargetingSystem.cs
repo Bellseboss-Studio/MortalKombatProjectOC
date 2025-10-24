@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
 
@@ -24,7 +25,7 @@ namespace TargetingSystemPath
         }
         
         public void SetAutomaticTarget(float distance, List<GameObject> enemies, GameObject player, float attackAngle,
-            ICombatSystemAngel combatSystemAngel = null)
+            ICombatSystemV2 combatSystemAngel = null)
         {
             for (int i = 0; i < enemies.Count; i++)
             {

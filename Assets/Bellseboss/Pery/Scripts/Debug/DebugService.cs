@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;

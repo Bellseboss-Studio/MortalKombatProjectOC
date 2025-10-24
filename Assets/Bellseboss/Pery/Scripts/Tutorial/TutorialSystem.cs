@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
 using UnityEngine.Events;
@@ -76,7 +77,7 @@ public class TutorialSystem : MonoBehaviour
     {
         if (_canSkip)
         {
-            Debug.Log($"Skip tutorial from {gameObject.transform.parent.name}");
+            // Debug.Log($"Skip tutorial from {gameObject.transform.parent.name}");
             _skip = true;
         }
     }

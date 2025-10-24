@@ -1,4 +1,5 @@
 using System;
+using _Scripts.Player;
 using Unity.Cinemachine;
 using UnityEngine;
 using Bellseboss.Pery.Scripts.Input;

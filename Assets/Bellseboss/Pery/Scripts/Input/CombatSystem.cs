@@ -1,3 +1,4 @@
+using _Scripts.Player;
 using UnityEngine;
 
 namespace Bellseboss.Pery.Scripts.Input
