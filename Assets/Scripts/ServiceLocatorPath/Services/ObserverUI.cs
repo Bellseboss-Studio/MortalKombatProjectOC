@@ -1,4 +1,5 @@
-﻿using Bellseboss.Pery.Scripts.Input;
+﻿using _Scripts.Player;
+using Bellseboss.Pery.Scripts.Input;
 using ServiceLocatorPath;
 using UnityEngine;
 using View;

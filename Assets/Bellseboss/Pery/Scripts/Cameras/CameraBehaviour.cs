@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
 using Unity.Cinemachine;
 using UnityEngine;
