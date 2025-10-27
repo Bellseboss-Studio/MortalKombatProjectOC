@@ -257,8 +257,9 @@
                         break;
                 }
 
+                // Cerrar horizontal antes de cerrar vertical (orden inverso al Begin).
+                GUILayout.EndHorizontal(); // Keep tabs constrained to editor window size.
                 EditorGUILayout.EndVertical();
-                GUILayout.BeginHorizontal(); // Keep tabs constrained to editor window size.
                 GUILayout.EndArea();
             }
 
