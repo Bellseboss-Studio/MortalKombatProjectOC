@@ -76,7 +76,7 @@ MonoBehaviour:
   speedWalk: 5
   speedRun: 10
   animationController: {fileID: 479877392063078662}
-  model3D: {fileID: 7511835439772542090, guid: 4389e8a5a82a09846a5ed96c279c01cc, type: 3}
+  model3D: {fileID: 2839897557390405054, guid: 7f9766bc6d980524aa2812f39c852b69, type: 3}
   rotationCharacterV2: {fileID: 5232366101831661028}
   forceRotation: 50
   targetFocus: {fileID: 303605676421905799}
@@ -110,6 +110,32 @@ MonoBehaviour:
   maxSpeed: 1
   isScalableWall: 0
   forceToGravitate: 0
+  acceleration: 10
+  deceleration: 8
+  accelerationCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   _canMove: 0
 --- !u!114 &1323116692971994159
 MonoBehaviour:
@@ -204,9 +230,32 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62a0056ea7fa44038ae5503148eaf5d7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _vector2: {x: 0, y: 0}
-  rotationWithTarget: {x: 0, y: 0, z: 0}
-  _canRotate: 0
+  baseRotationSpeed: 8
+  rotationCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  accelerationTime: 0.3
 --- !u!114 &1332983113479227212
 MonoBehaviour:
   m_ObjectHideFlags: 0
