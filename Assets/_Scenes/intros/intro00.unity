@@ -383,7 +383,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35f5b9c5e9844d0dac15619cfe9d62d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ActivableVideo
-  _videoPlayer: {fileID: 1850185050}
+  videoPlayer: {fileID: 1850185050}
+  nameOfVideo: Goro_intro00.mp4
 --- !u!1 &490845849
 GameObject:
   m_ObjectHideFlags: 0
@@ -1017,7 +1018,7 @@ VideoPlayer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1850185049}
   m_Enabled: 1
-  m_VideoClip: {fileID: 32900000, guid: 2bfe4f56908ccc54eb97a46ea73a0c15, type: 3}
+  m_VideoClip: {fileID: 0}
   m_TargetCameraAlpha: 1
   m_TargetCamera3DLayout: 0
   m_TargetCamera: {fileID: 0}
