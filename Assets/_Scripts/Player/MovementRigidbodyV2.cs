@@ -18,6 +18,13 @@ namespace _Scripts.Player
         [Range(0.5f, 1)] [SerializeField] private float maxSpeed;
         [SerializeField] private bool isScalableWall;
         [SerializeField] private float forceToGravitate;
+        
+        [SerializeField] private float acceleration = 10f;   // Qué tan rápido acelera
+        [SerializeField] private float deceleration = 8f;   // Qué tan rápido frena
+        private Vector3 _currentVelocityXZ;
+        [SerializeField] private AnimationCurve accelerationCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+
+        
         private Rigidbody _rigidbody;
         private float _speedRun, _speedWalk;
         private InputMovementCustomV2 _inputMovementCustom;
@@ -109,47 +116,35 @@ namespace _Scripts.Player
             var result = Vector2.zero;
             result.y = CalculateDirection(_lastDirection.y, _isTarget);
             result.x = CalculateDirection(_lastDirection.x, _isTarget);
+
             var absX = Mathf.Abs(result.x);
             var absY = Mathf.Abs(result.y);
-            var _choiceMax = absX >= maxSpeed || absY >= maxSpeed;
-            if (_lastDirection.x <= inputMin && _lastDirection.y <= inputMin)
-            {
-                _velocityOfAnimation = 0;
-            }
-            else if (_choiceMax)
-            {
-                _velocityOfAnimation = 1;
-            }
-            else
-            {
-                _velocityOfAnimation = 0.4f;
-            }
+            var isRunning = absX >= maxSpeed || absY >= maxSpeed;
 
-            var resultMovement = _inputMovementCustom.CalculateMovement(result, _choiceMax ? _speedRun : _speedWalk,
+            // Movimiento plano
+            var desiredDirection = _inputMovementCustom.CalculateMovement(result, isRunning ? _speedRun : _speedWalk,
                 _camera, _rigidbody.gameObject);
 
-            /*if (_jump)
-            {
-                if (floorController.IsTouchingFloor() || isScalableWall)
-                {
-                    jumpSystem.Jump();
-                    _jump = false;
-                }
-            }*/
-            var velocity = new Vector3(resultMovement.x, _rigidbody.linearVelocity.y, resultMovement.z);
+            // Calculamos la velocidad objetivo (solo XZ)
+            Vector3 targetVelocityXZ = new Vector3(desiredDirection.x, 0, desiredDirection.z);
+            float speedChangeRate = result.magnitude > 0 ? acceleration : deceleration;
+
+            // Interpolación suave entre velocidad actual y deseada
+            float t = accelerationCurve.Evaluate(Time.deltaTime * speedChangeRate);
+            _currentVelocityXZ = Vector3.Lerp(_currentVelocityXZ, targetVelocityXZ, t);
+
+            // Aplicamos velocidad al rigidbody
+            Vector3 finalVelocity = new Vector3(_currentVelocityXZ.x, _rigidbody.linearVelocity.y, _currentVelocityXZ.z);
+
             if (!_movementRigidBodyV2.IsJumpingInWall())
             {
                 if (floorController.IsTouchingFloor())
-                {
-                    _rigidbody.linearVelocity = velocity;
-                }
+                    _rigidbody.linearVelocity = finalVelocity;
                 else
-                {
-                    _rigidbody.linearVelocity = new Vector3(velocity.x / 1.5f, velocity.y, velocity.z / 1.5f);
-                }
+                    _rigidbody.linearVelocity = new Vector3(finalVelocity.x / 1.5f, finalVelocity.y, finalVelocity.z / 1.5f);
             }
 
-            
+            // Actualizamos flags
             if (_rigidbody.linearVelocity.y > 0)
             {
                 isUp = true;
