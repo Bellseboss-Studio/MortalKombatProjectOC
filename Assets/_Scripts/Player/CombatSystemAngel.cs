@@ -24,7 +24,6 @@ namespace _Scripts.Player
         private StatisticsOfCharacter _statisticsOfCharacter;
         private CombatMovement _currentAttack;
         private List<CombatMovement> _movementsQueue;
-        private Action<string> _actionToAnimate;
         private MoveAttackingSystem _moveAttackingSystem;
         private TargetingSystem _targetingSystem;
         [SerializeField] private float angleAttack;
@@ -69,7 +68,7 @@ namespace _Scripts.Player
             if (canAttackAgain)
             {
                 _currentAttack = combatMovement1;
-                _actionToAnimate.Invoke(_currentAttack.transitionParameterName);
+                _combatSystemAngel.GetAnimationController().PlayComboAttack(_currentAttack.transitionParameterName);
                 Attack(_currentAttack);
             }
             else
@@ -91,7 +90,6 @@ namespace _Scripts.Player
             targetFocus.Configure(this);
             _rigidbody = rigidbody;
             _rigidbodyConstraints = _rigidbody.constraints;
-            _actionToAnimate = _combatSystemAngel.GetActionToAnimate();
             _attack = this.tt().Pause().Add(() =>
             {
                 if (isPlayer)
@@ -145,7 +143,7 @@ namespace _Scripts.Player
                 {
                     _currentAttack = _movementsQueue[0];
                     _movementsQueue.RemoveAt(0);
-                    _actionToAnimate.Invoke(_currentAttack.transitionParameterName);
+                    _combatSystemAngel.GetAnimationController().PlayComboAttack(_currentAttack.transitionParameterName);
                     Attack(_currentAttack);
                 }
             }).Loop(loop =>

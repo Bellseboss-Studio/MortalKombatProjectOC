@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Bellseboss.Angel.CombatSystem;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -19,6 +18,11 @@ namespace _Scripts.Player
         }
 
         public Action<StunInfo> OnReceiveDamage { get; set; }
+
+        public AnimationController GetAnimationController()
+        {
+            return animationController;
+        }
 
         [SerializeField] private string id;
         [SerializeField] private InputPlayerV2 inputPlayerV2;
@@ -86,7 +90,7 @@ namespace _Scripts.Player
             inputPlayerV2.onFatalityEvent += OnFatalityEvent;
 
             _model3DInstance = Instantiate(model3D, transform);
-            animationController.Configure(_model3DInstance.GetComponent<ReferencesOfPlayer>().Animator, this);
+            animationController.Configure(_model3DInstance.GetComponent<ReferencesOfPlayer>().Animator, transform);
             targetFocus.Configure(this);
             targetFocus.EnableCollider();
 
@@ -137,11 +141,6 @@ namespace _Scripts.Player
             }
         }
 
-        public void ActivateAnimationTrigger(string animationTrigger)
-        {
-            animationController.ActivateTrigger(animationTrigger);
-        }
-
         public void SetPositionAndRotation(GameObject refOfPlayer)
         {
             transform.position = Vector3.Lerp(transform.position, refOfPlayer.transform.position, 0.5f);
@@ -150,24 +149,24 @@ namespace _Scripts.Player
 
         private void JumpOnEndJump()
         {
-            animationController.JumpRecovery();
+            animationController.PlayJumpLand();
             isAnimationWasRun = false;
             isAnimationRecovered = false;
         }
 
         private void JumpOnRelease()
         {
-            animationController.JumpFall();
+            animationController.PlayJumpFall();
         }
 
         private void JumpOnMidAir()
         {
-            animationController.JumpMidAir();
+            animationController.PlayJumpApex();
         }
 
         private void JumpOnAttack()
         {
-            animationController.JumpJump();
+            animationController.PlayJumpStart();
         }
 
         void OnActionEvent()
@@ -179,7 +178,6 @@ namespace _Scripts.Player
         {
             if (!CanReadInputs || IsAttacking()) return;
             movementRigidbodyV2.Jump();
-            animationController.IsJumping();
         }
 
         private void OnKickEvent()
@@ -196,7 +194,6 @@ namespace _Scripts.Player
 
         private void OnTargetEvent(bool isTarget)
         {
-            animationController.IsTarget(isTarget);
             movementRigidbodyV2.IsTarget(isTarget);
         }
 
@@ -233,7 +230,7 @@ namespace _Scripts.Player
             rigidbody.freezeRotation = true;
             CanReadInputs = true;
             inputPlayerV2.StartToReadInputs(_canUseButtons);
-            animationController.Movement(movementRigidbodyV2.GetXZVelocity(), 0);
+            animationController.UpdateMovementAnimation(movementRigidbodyV2.GetXZVelocity());
         }
 
         public void EnableControls()
@@ -265,12 +262,7 @@ namespace _Scripts.Player
         public void StartDeadAction()
         {
             DisableControls();
-            animationController.Dead();
-        }
-
-        public Action<string> GetActionToAnimate()
-        {
-            return animationController.SetTrigger;
+            animationController.PlayDeath();
         }
 
         public void PlayerTouchEnemy()
@@ -326,14 +318,14 @@ namespace _Scripts.Player
 
         public void UpdateAnimation()
         {
-            animationController.Movement(movementRigidbodyV2.GetXZVelocity(), 0);
+            animationController.UpdateMovementAnimation(movementRigidbodyV2.GetXZVelocity());
         }
 
         public void UpdateAnimation(bool isTouchingFloor, bool isTouchingWall)
         {
-            animationController.Movement(movementRigidbodyV2.GetXZVelocity(), 0);
-            animationController.JumpingWalls(isTouchingFloor, isTouchingWall,
-                movementRigidbodyV2.GetJumpSystem().IsJump());
+            animationController.UpdateMovementAnimation(movementRigidbodyV2.GetXZVelocity());
+            //TODO Revisar el switcheo entre los tipos de salto
+            // animationController.JumpingWalls(isTouchingFloor, isTouchingWall, movementRigidbodyV2.GetJumpSystem().IsJump());
         }
 
         public void ChangeToNormalJump()
@@ -378,12 +370,12 @@ namespace _Scripts.Player
 
         public void PlayerFallV2()
         {
-            animationController.Fall();
+            animationController.PlayJumpFall();
         }
 
         public void PlayerRecoveryV2()
         {
-            animationController.JumpRecovery();
+            animationController.PlayJumpLand();
         }
 
         public bool IsJumpingInWall()
@@ -431,7 +423,8 @@ namespace _Scripts.Player
         public override void SetAnimationToHit(string animationParameterName)
         {
             if (IsDead) return;
-            animationController.TakeDamage(animationParameterName);
+            //TODO: Usar animationParameterName para distintos tipos de hit
+            animationController.PlayHit();
         }
 
         public override void Stun(bool isStun)
@@ -457,7 +450,7 @@ namespace _Scripts.Player
 
         public void StartAnimationFatality()
         {
-            animationController.SetTrigger("fatality");
+            animationController.PlayFatality();
         }
 
         public void StartToReadInputsToFatality(bool canRead)

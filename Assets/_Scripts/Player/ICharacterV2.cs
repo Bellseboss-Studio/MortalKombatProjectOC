@@ -9,10 +9,11 @@ namespace _Scripts.Player
         Action<ICharacterV2> OnDead { get; set; }
         GameObject Model3DInstance { get; }
         void DisableControls();
-        void ActivateAnimationTrigger(string animationTrigger);
         void SetPositionAndRotation(GameObject refOfPlayer);
         void EnableControls();
         Transform GetGameObject();
         void StartDeadAction();
+        
+        AnimationController GetAnimationController();
     }
 }

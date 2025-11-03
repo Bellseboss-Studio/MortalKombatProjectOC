@@ -4,121 +4,282 @@ using UnityEngine;
 
 namespace _Scripts.Player
 {
-    internal class AnimationController : MonoBehaviour
+    /// <summary>
+    /// Controlador centralizado de animaciones del jugador.
+    /// No se exponen parámetros del Animator ni triggers externos.
+    /// Toda animación se ejecuta a través de métodos concretos.
+    /// </summary>
+    public class AnimationController : MonoBehaviour
     {
-        public Action OnFinishAnimationDamage;
-        [SerializeField] private string velocityName, horizontalName, verticalName, targetName, punchName, kickName;
-        private Animator _animator;
-        private IAnimationController _animationController;
-        private bool _isFinishAnimation;
+        public event Action OnFinishAnimation;
 
-        public void Configure(Animator animator, IAnimationController animationController)
+        [Header("Animator Reference")] [SerializeField]
+        private Animator animator;
+
+        [Header("Root Transform (for flip/orientation)")] [SerializeField]
+        private Transform visualRoot;
+
+        [Header("Config")] [SerializeField, Tooltip("Velocidad mínima para caminar")]
+        private float walkThreshold = 0.1f;
+
+        [SerializeField, Tooltip("Velocidad mínima para correr")]
+        private float runThreshold = 3f;
+
+        [SerializeField, Tooltip("Duración de transición entre animaciones")]
+        private float transitionDuration = 0.1f;
+
+        private bool isFacingRight = true;
+        private string currentComboIndex;
+
+        private static class States
         {
-            _animator = animator;
-            _animationController = animationController;
+            public const string Idle = "Idle";
+            public const string StartMove = "StartMove";
+            public const string Walk = "Walk";
+            public const string Run = "Run";
+            public const string StopMove = "StopMove";
+            public const string Stunt = "Stunt";
+            public const string GetFatality = "Get_Fatality";
+
+            public const string JumpStart = "Jump_Start";
+            public const string JumpApex = "Jump_Apex";
+            public const string JumpFall = "Jump_Fall";
+            public const string JumpLand = "Jump_Land";
+            public const string WallJump = "Wall_Jump";
+            public const string WallSlide = "Wall_Slide";
+
+            public const string Hit = "Hit";
+            public const string Death = "Death";
+            public const string Watch = "Watch";
+
+            public const string Activate = "Activate";
         }
 
-        public void Movement(float velocity, float speed)
+        #region === Core Control ===
+
+        public void Configure(Animator animatorRef, Transform visualRootRef = null)
         {
-            _animator.SetFloat(velocityName, velocity);
+            animator = animatorRef;
+            visualRoot = visualRootRef;
         }
 
-        public void IsTarget(bool isTarget)
+        private void Play(string stateName, float fade, Action onFinish)
         {
-            _animator.SetBool(targetName, isTarget);
-        }
-
-        public void Punch()
-        {
-            _animator.SetTrigger(punchName);
-        }
-
-        public void Kick()
-        {
-            _animator.SetTrigger(kickName);
-        }
-
-        public void JumpJump()
-        {
-            _animator.ResetTrigger("j_mid_air");
-            _animator.SetTrigger("j");
-        }
-
-        public void JumpMidAir()
-        {
-            _animator.SetTrigger("j_mid_air");
-        }
-
-        public void JumpFall()
-        {
-            _animator.ResetTrigger("j_recovery");
-            _animator.SetTrigger("j_fall");
-        }
-
-        public void JumpRecovery()
-        {
-            _animator.ResetTrigger("j_mid_air");
-            _animator.ResetTrigger("j_fall");
-            _animator.SetTrigger("j_recovery");
-        }
-
-        public void Fall()
-        {
-            _animator.SetTrigger("j_fall");
-        }
-
-        public void ActivateTrigger(string animationTrigger)
-        {
-            _animator.SetTrigger(animationTrigger);
-        }
-
-        public void TakeDamage(string animationParameterName)
-        {
-            /*nameOfAnimation += numberOfCombos;*/
-            /*Debug.Log(nameOfAnimation);*/
-            StartCoroutine(FinishTimeAnimation(animationParameterName));
-            _animator.Play(animationParameterName);
-        }
-
-        private IEnumerator FinishTimeAnimation(string nameOfAnimation)
-        {
-            var animationClip = _animator.runtimeAnimatorController.animationClips;
-            foreach (var clip in animationClip)
+            if (!animator)
             {
-                if (clip.name == nameOfAnimation)
+                Debug.LogError("[AnimationController] Animator no configurado");
+                return;
+            }
+
+            Debug.Log($"[AnimationController] Playing {stateName}");
+
+            animator.CrossFade(stateName, fade);
+
+            if (onFinish != null)
+                StartCoroutine(WaitForClip(stateName, onFinish));
+        }
+
+        private IEnumerator WaitForClip(string clipName, Action onFinish)
+        {
+            var clips = animator.runtimeAnimatorController.animationClips;
+            foreach (var clip in clips)
+            {
+                if (clip.name == clipName)
                 {
-                    yield return new WaitForSeconds(clip.length);
-                    OnFinishAnimationDamage?.Invoke();
-                    break;
+                    yield return new WaitForSeconds(clip.length / animator.speed);
+                    onFinish?.Invoke();
+                    yield break;
                 }
             }
         }
 
-        public void Die(string animationTrigger)
+        #endregion
+
+        #region === Movement ===
+
+        private string currentMovementState;
+
+        /// <summary>
+        /// Controla automáticamente la animación de movimiento según la velocidad.
+        /// Evita reproducir la misma animación múltiples veces por frame.
+        /// </summary>
+        public void UpdateMovementAnimation(float velocity, Action onFinish = null)
         {
-            _animator.SetTrigger(animationTrigger);
+            if (!animator) return;
+
+            string nextState = GetMovementState(velocity);
+
+            // Si no cambia de estado, no hacemos nada
+            if (nextState == currentMovementState) return;
+
+            currentMovementState = nextState;
+            Play(nextState, transitionDuration, onFinish);
         }
 
-        public void SetTrigger(string paramName)
+        /// <summary>
+        /// Determina el estado de movimiento según la velocidad actual.
+        /// </summary>
+        private string GetMovementState(float velocity)
         {
-            _animator.SetTrigger(paramName);
+            if (velocity <= walkThreshold)
+                return States.Idle;
+
+            if (velocity > walkThreshold && velocity < runThreshold)
+                return States.Walk;
+
+            if (velocity >= runThreshold)
+                return States.Run;
+
+            return States.Idle;
         }
 
-        public void JumpingWalls(bool isTouchingFloor, bool isTouchingWall, bool isJumping)
+        private void PlayIdle(Action onFinish = null)
         {
-            _animator.SetBool("isTouchingFloor", isTouchingFloor);
-            _animator.SetBool("isTouchingWall", isTouchingWall);
-            _animator.SetBool("isJumping", isJumping);
+            if (currentMovementState == States.Idle) return;
+            currentMovementState = States.Idle;
+            Play(States.Idle, transitionDuration, onFinish);
         }
 
-        public void IsJumping()
+        private void PlayStartMove(Action onFinish = null)
         {
-            _animator.SetTrigger("j");
+            if (currentMovementState == States.StartMove) return;
+            currentMovementState = States.StartMove;
+            Play(States.StartMove, transitionDuration, onFinish);
         }
 
-        public void Dead()
+        private void PlayStopMove(Action onFinish = null)
         {
-            _animator.SetTrigger("dead");
+            if (currentMovementState == States.StopMove) return;
+            currentMovementState = States.StopMove;
+            Play(States.StopMove, transitionDuration, onFinish);
         }
+
+        #endregion
+
+        #region === Jump System ===
+
+        public void PlayJumpStart(Action onFinish = null) => Play(States.JumpStart, transitionDuration, onFinish);
+        public void PlayJumpApex(Action onFinish = null) => Play(States.JumpApex, transitionDuration, onFinish);
+        public void PlayJumpFall(Action onFinish = null) => Play(States.JumpFall, transitionDuration, onFinish);
+        public void PlayJumpLand(Action onFinish = null) => Play(States.JumpLand, transitionDuration, onFinish);
+        public void PlayWallJump(Action onFinish = null) => Play(States.WallJump, transitionDuration, onFinish);
+        public void PlayWallSlide(Action onFinish = null) => Play(States.WallSlide, transitionDuration, onFinish);
+
+        #endregion
+
+        #region === Combat ===
+
+        private string currentAttackState;
+        private bool isAttacking;
+
+        /// <summary>
+        /// Ejecuta una animación de combo si no está en curso o si cambió de ataque.
+        /// </summary>
+        public void PlayComboAttack(string comboIndex, Action onFinish = null)
+        {
+            string attackState = $"Attack_{comboIndex}";
+
+            // Si ya está en el mismo ataque, no hacemos nada
+            if (isAttacking && currentAttackState == attackState)
+                return;
+
+            Debug.Log($"[AnimationController] Reproduciendo ataque: {attackState}");
+
+            currentAttackState = attackState;
+            isAttacking = true;
+
+            Play(attackState, transitionDuration, () =>
+            {
+                isAttacking = false;
+                onFinish?.Invoke();
+            });
+        }
+
+        /// <summary>
+        /// Reproduce la animación de recibir daño.
+        /// </summary>
+        public void PlayHit(Action onFinish = null)
+        {
+            isAttacking = false;
+            currentAttackState = null;
+            Play(States.Hit, transitionDuration, onFinish);
+        }
+
+        /// <summary>
+        /// Reproduce la animación de muerte.
+        /// </summary>
+        public void PlayDeath(Action onFinish = null)
+        {
+            isAttacking = false;
+            currentAttackState = null;
+            Play(States.Death, 0.2f, onFinish);
+        }
+
+        /// <summary>
+        /// Indica si actualmente se está ejecutando una animación de ataque.
+        /// </summary>
+        public bool IsInAttackAnimation()
+        {
+            if (!animator || string.IsNullOrEmpty(currentAttackState))
+                return false;
+
+            var info = animator.GetCurrentAnimatorStateInfo(0);
+            return info.IsName(currentAttackState);
+        }
+
+        /// <summary>
+        /// Cancela cualquier ataque activo y vuelve al estado Idle.
+        /// </summary>
+        public void CancelAttack()
+        {
+            isAttacking = false;
+            currentAttackState = null;
+            Play(States.Idle, transitionDuration, null);
+        }
+
+        #endregion
+
+
+        #region === Interaction ===
+
+        public void PlayActivation(string activationAnimation, Action onFinish = null)
+        {
+            Play(activationAnimation, transitionDuration, onFinish);
+        }
+
+        public void PlayWatch(Action onFinish = null)
+        {
+            Play(States.Watch, transitionDuration, onFinish);
+        }
+
+        public void PlayStunt(Action onFinish = null)
+        {
+            Play(States.Stunt, transitionDuration, onFinish);
+        }
+
+        public void PlayGetFatality(Action onFinish = null)
+        {
+            Play(States.GetFatality, transitionDuration, onFinish);
+        }
+
+        public void PlayFatality(Action onFinish = null)
+        {
+            Play(States.GetFatality, transitionDuration, onFinish);
+        }
+
+        #endregion
+
+        #region === Utility ===
+
+        public bool IsPlaying(string stateName)
+        {
+            if (!animator) return false;
+            var info = animator.GetCurrentAnimatorStateInfo(0);
+            return info.IsName(stateName);
+        }
+
+        public void StopAllAnimations(Action onFinish = null) => Play(States.Idle, transitionDuration, onFinish);
+
+        #endregion
     }
 }

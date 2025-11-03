@@ -44,7 +44,7 @@ public class InteractiveObjectWithButton : InteractiveManager
         playableDirector.Play();
         animatorInteractiveObject.SetTrigger("activate");
         _characterV2.DisableControls();
-        _characterV2.ActivateAnimationTrigger(animationTrigger);
+        _characterV2.GetAnimationController().PlayActivation("Level");
         canChangePosition = true;
         deltaTimeLocal = 0;
         cinemachineVirtualCamera.LookAt = refOfPlayer.transform;
