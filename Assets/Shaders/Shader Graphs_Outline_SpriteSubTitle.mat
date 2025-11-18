@@ -21,7 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Shader Graphs_Outline_SpriteSubTitle
-  m_Shader: {fileID: -6465566751694194690, guid: c6654d241ccdff545870028ab74cfc76, type: 3}
+  m_Shader: {fileID: 10770, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -56,8 +56,16 @@ Material:
     m_Floats:
     - Boolean_194724e8863d4ed5acc8865fcda40e63: 0
     - Vector1_3468ffdce03645509d8e22417bef3c59: 0.89
+    - _ColorMask: 15
+    - _Stencil: 0
+    - _StencilComp: 8
+    - _StencilOp: 0
+    - _StencilReadMask: 255
+    - _StencilWriteMask: 255
+    - _UseUIAlphaClip: 0
     m_Colors:
     - Color_1: {r: 1, g: 1, b: 1, a: 1}
     - Color_562e7f5b8ed2470db10b942ae2ed15c9: {r: 0, g: 0, b: 0, a: 0}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
