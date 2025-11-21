@@ -62,6 +62,8 @@ MeshRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -83,6 +85,7 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -120,6 +123,7 @@ GameObject:
   - component: {fileID: 9138848287432093984}
   - component: {fileID: 5547177227745965018}
   - component: {fileID: 499655469731449164}
+  - component: {fileID: 9026288648869468123}
   m_Layer: 0
   m_Name: portal_blue
   m_TagString: Untagged
@@ -135,9 +139,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1561519161795260182}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.5687276, y: 0.8225259, z: -0, w: 0}
+  m_LocalRotation: {x: 0.56872684, y: 0.82252645, z: 0, w: -0}
   m_LocalPosition: {x: 158.778, y: -2.054, z: -9.829}
-  m_LocalScale: {x: 1.776099, y: 1.776099, z: 1.1155713}
+  m_LocalScale: {x: 1.8629838, y: 1.8629838, z: 1.170144}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7793628220996539827}
@@ -172,6 +176,8 @@ MeshRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -193,10 +199,33 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!95 &9026288648869468123
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1561519161795260182}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &4979788272754364286
 GameObject:
   m_ObjectHideFlags: 0
@@ -209,7 +238,6 @@ GameObject:
   - component: {fileID: 6078804424991957088}
   - component: {fileID: 7501453842555278633}
   - component: {fileID: 3933413085220902926}
-  - component: {fileID: 6878578081571479240}
   m_Layer: 0
   m_Name: Lightning
   m_TagString: Untagged
@@ -226,7 +254,7 @@ Transform:
   m_GameObject: {fileID: 4979788272754364286}
   serializedVersion: 2
   m_LocalRotation: {x: -0.40215117, y: -0.5816137, z: 0.5816137, w: 0.40215117}
-  m_LocalPosition: {x: -0.001, y: 0.038, z: 1.214}
+  m_LocalPosition: {x: 0.015, y: -0.005, z: 1.214}
   m_LocalScale: {x: 0.07005278, y: 0.11153092, z: 0.07005277}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -260,6 +288,8 @@ MeshRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -281,6 +311,7 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -307,16 +338,3 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
---- !u!114 &6878578081571479240
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4979788272754364286}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a888dad8806ba45239e41658973fb475, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_CinemachineBrain: {fileID: 0}
