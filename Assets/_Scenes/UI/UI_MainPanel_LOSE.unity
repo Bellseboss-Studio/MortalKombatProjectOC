@@ -619,13 +619,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 365463475}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0.749273, z: -0, w: 0.66226125}
-  m_LocalPosition: {x: 246.391, y: 2.906, z: 72.84}
+  m_LocalRotation: {x: 0.062062107, y: -0.74597573, z: 0.070216194, w: 0.6593469}
+  m_LocalPosition: {x: 246.69, y: 2.939, z: 72.657}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: -97.055, z: 0}
+  m_LocalEulerAnglesHint: {x: 10.754, y: -97.055, z: 0}
 --- !u!1 &435772031
 GameObject:
   m_ObjectHideFlags: 0
@@ -1098,6 +1098,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Dragon_Shrine_dungeon
       objectReference: {fileID: 0}
+    - target: {fileID: 7391405928511999087, guid: 9837c5b659b3d494494d08373adb15a8, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1130,7 +1134,7 @@ PlayableDirector:
   m_Enabled: 1
   serializedVersion: 3
   m_PlayableAsset: {fileID: 11400000, guid: 692925e266fbb4d499e496ace31845ed, type: 2}
-  m_InitialState: 0
+  m_InitialState: 1
   m_WrapMode: 0
   m_DirectorUpdateMode: 1
   m_InitialTime: 0
@@ -1327,11 +1331,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6167692993895370403, guid: ab459e60fa4bc0a41ad07da5bc102e06, type: 3}
       propertyPath: looping
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6167692993895370403, guid: ab459e60fa4bc0a41ad07da5bc102e06, type: 3}
       propertyPath: playOnAwake
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7811046051181766944, guid: ab459e60fa4bc0a41ad07da5bc102e06, type: 3}
       propertyPath: m_Name
@@ -11467,7 +11471,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0.0025024414, y: 265.5547}
+  m_AnchoredPosition: {x: 0.0024414062, y: 265.5547}
   m_SizeDelta: {x: -0.0049, y: 383.0587}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &7899498822647194049
