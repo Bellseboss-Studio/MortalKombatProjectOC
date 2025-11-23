@@ -9,7 +9,8 @@ namespace _Scripts.Player
         private bool _isConfigured;
         private IRotationCharacterV2 _rotationCharacterV2;
 
-        [Header("Rotación")] [SerializeField] private float baseRotationSpeed = 8f;
+        [Header("Rotación")] 
+        [SerializeField] private float baseRotationSpeed = 8f;
         [SerializeField] private AnimationCurve rotationCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
         [SerializeField] private float accelerationTime = 0.3f; // tiempo en segundos para alcanzar velocidad completa
 
@@ -67,13 +68,11 @@ namespace _Scripts.Player
             {
                 desiredDir.Normalize();
                 _lastDirection = desiredDir;
-                // Acelera progresivamente al rotar
-                _rotationVelocity += Time.deltaTime / accelerationTime;
+                _rotationVelocity += Time.deltaTime / accelerationTime;   // Acelera progresivamente
             }
             else
             {
-                // Frena rotación progresivamente al soltar el input
-                _rotationVelocity -= Time.deltaTime / accelerationTime;
+                _rotationVelocity -= Time.deltaTime / accelerationTime;   // Desacelera progresivamente
             }
 
             _rotationVelocity = Mathf.Clamp01(_rotationVelocity);
@@ -83,10 +82,11 @@ namespace _Scripts.Player
             if (_lastDirection != Vector3.zero)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(_lastDirection);
+
                 _player.transform.rotation = Quaternion.RotateTowards(
                     _player.transform.rotation,
                     targetRotation,
-                    _currentRotationSpeed * Time.deltaTime * 100f
+                    _currentRotationSpeed * Time.deltaTime
                 );
             }
         }
@@ -106,7 +106,6 @@ namespace _Scripts.Player
         {
             //invert direction
             direction = -direction;
-            //rotate to direction without lerp
             direction = new Vector3(direction.x, 0, direction.z);
             _player.transform.rotation = Quaternion.LookRotation(direction);
             _lastDirection = direction;
@@ -114,7 +113,6 @@ namespace _Scripts.Player
 
         public void ChangeDirection(Vector3 rotation)
         {
-            /*Debug.Log("Change Direction: " + rotation);*/
             _canChangeDirection = true;
             _lastDirection = rotation;
         }

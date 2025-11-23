@@ -393,6 +393,16 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         throw new NotImplementedException();
     }
 
+    public void OnStartRunning()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void OnStopRunning()
+    {
+        throw new NotImplementedException();
+    }
+
     public void PlayerTouchEnemy()
     {
     }

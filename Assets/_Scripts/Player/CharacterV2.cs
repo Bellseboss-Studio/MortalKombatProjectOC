@@ -383,6 +383,16 @@ namespace _Scripts.Player
             return movementRigidbodyV2.GetJumpSystem().IsJumpingInScalableWall;
         }
 
+        public void OnStartRunning()
+        {
+            
+        }
+
+        public void OnStopRunning()
+        {
+            
+        }
+
         public bool IsAttacking()
         {
             return combatSystemAngel.Attacking;
