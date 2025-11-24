@@ -24,6 +24,16 @@ namespace _Scripts.Player
         [Tooltip("Referencia al MovementRigidbodyV2 para obtener configuración de input")] [SerializeField]
         private MovementRigidbodyV2 movementReference;
 
+        [Header("Rotation Stability")]
+        [Tooltip("Ángulo mínimo de diferencia para cambiar la dirección objetivo (grados)")] [SerializeField]
+        private float directionChangeThreshold = 5f;
+        [Tooltip("Ángulo mínimo para aplicar rotación (grados)")] [SerializeField] 
+        private float rotationThreshold = 1f;
+        [Tooltip("Velocidad mínima de rotación para mantener estabilidad")] [SerializeField]
+        private float minRotationVelocity = 0.1f;
+        [Tooltip("Umbral de alineación entre dirección de movimiento y input (0-1, mayor = más estricto)")] [SerializeField]
+        private float alignmentThreshold = 0.7f;
+
         [Header("Debug")]
         [Tooltip("Mostrar logs de depuración para alineación de rotación")] [SerializeField]
         private bool enableDebugLogs = false;
@@ -65,14 +75,47 @@ namespace _Scripts.Player
         {
             if (worldDirection.sqrMagnitude > 0.0001f)
             {
-                _lastDirection = worldDirection.normalized;
-                _syncDirection = _lastDirection;
-                _usingSyncDirection = true;
-                _lastSyncTime = Time.time;
+                Vector3 normalizedDirection = worldDirection.normalized;
                 
-                if (enableDebugLogs)
+                // Calcular la dirección esperada basada en el input actual
+                Vector3 expectedDirection = CalculateMovementDirection(_vector2);
+                
+                // Solo usar la dirección sincronizada si está alineada con la expectativa del input
+                if (expectedDirection != Vector3.zero)
                 {
-                    Debug.Log($"[RotationCharacterV2] Received movement direction: {_lastDirection}");
+                    float alignment = Vector3.Dot(normalizedDirection, expectedDirection);
+                    
+                    if (alignment > alignmentThreshold) // Umbral de alineación configurable
+                    {
+                        _lastDirection = normalizedDirection;
+                        _syncDirection = _lastDirection;
+                        _usingSyncDirection = true;
+                        _lastSyncTime = Time.time;
+                        
+                        if (enableDebugLogs)
+                        {
+                            Debug.Log($"[RotationCharacterV2] Sync direction accepted: {_lastDirection}, alignment: {alignment:F3}");
+                        }
+                    }
+                    else
+                    {
+                        // Usar dirección esperada en lugar de sincronizada si hay desalineación
+                        _lastDirection = expectedDirection;
+                        _usingSyncDirection = false;
+                        
+                        if (enableDebugLogs)
+                        {
+                            Debug.Log($"[RotationCharacterV2] Sync direction rejected due to misalignment: {alignment:F3}, using expected: {expectedDirection}");
+                        }
+                    }
+                }
+                else
+                {
+                    // Fallback normal
+                    _lastDirection = normalizedDirection;
+                    _syncDirection = _lastDirection;
+                    _usingSyncDirection = true;
+                    _lastSyncTime = Time.time;
                 }
             }
         }
@@ -160,19 +203,37 @@ namespace _Scripts.Player
             
             Vector3 desiredMoveDir;
             
-            if (syncRecent)
+            // SIEMPRE calcular la dirección esperada del input
+            Vector3 expectedFromInput = CalculateMovementDirection(_vector2);
+            
+            if (syncRecent && expectedFromInput != Vector3.zero)
             {
-                // Usar dirección sincronizada desde MovementRigidbodyV2
-                desiredMoveDir = _syncDirection;
-                if (enableDebugLogs)
+                // Verificar alineación entre dirección sincronizada y esperada
+                float alignment = Vector3.Dot(_syncDirection, expectedFromInput);
+                
+                if (alignment > alignmentThreshold)
                 {
-                    Debug.Log($"[RotationCharacterV2] Using SYNC direction: {desiredMoveDir}");
+                    // Usar dirección sincronizada si está bien alineada
+                    desiredMoveDir = _syncDirection;
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] Using SYNC direction: {desiredMoveDir}, alignment: {alignment:F3}");
+                    }
+                }
+                else
+                {
+                    // Priorizar dirección esperada si hay desalineación
+                    desiredMoveDir = expectedFromInput;
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] OVERRIDE sync due to misalignment: {alignment:F3}, using input direction: {desiredMoveDir}");
+                    }
                 }
             }
             else
             {
-                // Fallback: calcular localmente si no hay sincronización reciente
-                desiredMoveDir = CalculateMovementDirection(_vector2);
+                // Fallback: usar dirección calculada del input
+                desiredMoveDir = expectedFromInput;
                 if (enableDebugLogs && hasInput)
                 {
                     Debug.Log($"[RotationCharacterV2] Using LOCAL direction: {desiredMoveDir}");
@@ -183,8 +244,25 @@ namespace _Scripts.Player
             
             if (hasMovement)
             {
-                _lastDirection = desiredMoveDir;
-                _rotationVelocity += Time.deltaTime / accelerationTime;   // Acelera progresivamente
+                // Solo cambiar dirección si es significativamente diferente
+                float angleDifference = Vector3.Angle(_lastDirection, desiredMoveDir);
+                bool shouldUpdateDirection = _lastDirection == Vector3.zero || angleDifference > directionChangeThreshold;
+                
+                if (shouldUpdateDirection)
+                {
+                    _lastDirection = desiredMoveDir;
+                    _rotationVelocity = 1f; // Activar rotación inmediata hacia nueva dirección
+                    
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] Direction changed by {angleDifference:F1}°, updating to: {_lastDirection}");
+                    }
+                }
+                else
+                {
+                    // Dirección estable, mantener rotación actual
+                    _rotationVelocity = Mathf.Max(_rotationVelocity - Time.deltaTime / accelerationTime, minRotationVelocity);
+                }
             }
             else
             {
@@ -201,15 +279,31 @@ namespace _Scripts.Player
                 _currentRotationSpeed *= airRotationSpeedMultiplier;
             }
 
-            if (_lastDirection != Vector3.zero)
+            // Solo rotar si hay una dirección válida Y la velocidad de rotación es significativa
+            if (_lastDirection != Vector3.zero && _rotationVelocity > 0.05f)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(_lastDirection);
-
-                _player.transform.rotation = Quaternion.RotateTowards(
-                    _player.transform.rotation,
-                    targetRotation,
-                    _currentRotationSpeed * Time.deltaTime
-                );
+                
+                // Solo aplicar rotación si el ángulo diferencia es mayor al umbral mínimo configurable
+                float currentAngleDiff = Quaternion.Angle(_player.transform.rotation, targetRotation);
+                
+                if (currentAngleDiff > rotationThreshold)
+                {
+                    _player.transform.rotation = Quaternion.RotateTowards(
+                        _player.transform.rotation,
+                        targetRotation,
+                        _currentRotationSpeed * Time.deltaTime
+                    );
+                    
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] Rotating towards {_lastDirection}, angle diff: {currentAngleDiff:F1}°, speed: {_currentRotationSpeed:F1}");
+                    }
+                }
+                else if (enableDebugLogs)
+                {
+                    Debug.Log($"[RotationCharacterV2] Rotation stable, angle diff: {currentAngleDiff:F1}°");
+                }
             }
         }
 

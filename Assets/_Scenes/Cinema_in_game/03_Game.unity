@@ -342,8 +342,20 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 946475076}
     - target: {fileID: 1237056365323985068, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: maxHeight
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1237056365323985068, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: timeToDecay
+      value: 0.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1237056365323985068, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: sustainLevel
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1237056365323985068, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
       propertyPath: timeToAttack
-      value: 0.7
+      value: 0.2
       objectReference: {fileID: 0}
     - target: {fileID: 1237056365323985068, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
       propertyPath: forceToAttack
@@ -506,8 +518,28 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5232366101831661028, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: movementSystem
+      value: 
+      objectReference: {fileID: 1904853048}
+    - target: {fileID: 5232366101831661028, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
       propertyPath: accelerationTime
-      value: 0.1
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5232366101831661028, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: movementReference
+      value: 
+      objectReference: {fileID: 1904853048}
+    - target: {fileID: 5921671126804642946, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: force
+      value: 17
+      objectReference: {fileID: 0}
+    - target: {fileID: 5921671126804642946, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: targetLock
+      value: 
+      objectReference: {fileID: 1904853035}
+    - target: {fileID: 5921671126804642946, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+      propertyPath: movementStyle
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5921671126804642946, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
       propertyPath: accelerationCurve.m_Curve.Array.size
@@ -1937,8 +1969,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 804762096}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.24357025, y: 0.19745784, z: -0.05055226, w: 0.9482238}
-  m_LocalPosition: {x: -4.6883726, y: 8.237218, z: -14.868765}
+  m_LocalRotation: {x: 0.33406705, y: 0.42990792, z: -0.1750754, w: 0.8203213}
+  m_LocalPosition: {x: -5.055378, y: 7.988472, z: -14.748508}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2101,6 +2133,8 @@ GameObject:
   m_Component:
   - component: {fileID: 946475075}
   - component: {fileID: 946475076}
+  - component: {fileID: 946475078}
+  - component: {fileID: 946475077}
   m_Layer: 0
   m_Name: CinemachineCamera
   m_TagString: Untagged
@@ -2116,8 +2150,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 946475074}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.24357025, y: 0.19745784, z: -0.05055226, w: 0.9482238}
-  m_LocalPosition: {x: -4.6883726, y: 8.237218, z: -14.868765}
+  m_LocalRotation: {x: 0.33406705, y: 0.4299079, z: -0.17507535, w: 0.8203214}
+  m_LocalPosition: {x: -5.055378, y: 7.988472, z: -14.748508}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2143,7 +2177,7 @@ MonoBehaviour:
   m_StreamingVersion: 20241001
   m_LegacyPriority: 0
   Target:
-    TrackingTarget: {fileID: 0}
+    TrackingTarget: {fileID: 1904853035}
     LookAtTarget: {fileID: 0}
     CustomLookAtTarget: 0
   Lens:
@@ -2166,6 +2200,51 @@ MonoBehaviour:
       BarrelClipping: 0.25
       Anamorphism: 0
   BlendHint: 0
+--- !u!114 &946475077
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 946475074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7362d5a2f8ea3347bfcc808a1e9290e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineAutoFocus
+  FocusTarget: 1
+  CustomTarget: {fileID: 0}
+  FocusDepthOffset: 0
+  Damping: 0.2
+--- !u!114 &946475078
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 946475074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f38bda98361e1de48a4ca2bd86ea3c17, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineRotationComposer
+  Composition:
+    ScreenPosition: {x: 0, y: 0}
+    DeadZone:
+      Enabled: 0
+      Size: {x: 0.2, y: 0.2}
+    HardLimits:
+      Enabled: 0
+      Size: {x: 0.8, y: 0.8}
+      Offset: {x: 0, y: 0}
+  CenterOnActivate: 1
+  TargetOffset: {x: 0, y: 0, z: 0}
+  Damping: {x: 0.5, y: 0.5}
+  Lookahead:
+    Enabled: 0
+    Time: 0
+    Smoothing: 0
+    IgnoreY: 0
 --- !u!1 &959048635
 GameObject:
   m_ObjectHideFlags: 0
@@ -3832,6 +3911,22 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1890419309}
   m_CullTransparentMesh: 1
+--- !u!4 &1904853035 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4915230661760063243, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+  m_PrefabInstance: {fileID: 105637334}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1904853048 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5921671126804642946, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
+  m_PrefabInstance: {fileID: 105637334}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c59e4831e8841359a11e2f21df010e5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1989990971
 GameObject:
   m_ObjectHideFlags: 0
