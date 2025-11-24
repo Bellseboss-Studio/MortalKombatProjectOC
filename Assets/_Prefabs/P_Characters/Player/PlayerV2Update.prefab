@@ -162,8 +162,27 @@ MonoBehaviour:
     m_RotationOrder: 4
   acceleration: 10
   deceleration: 8
+  turnSpeed: 320
+  airControlFactor: 0.66
+  startRunEventSpeed: 0.1
+  stopRunEventSpeed: 0.05
   enableDebugLogs: 0
   _canMove: 0
+  brakeMultiplier: 2.2
+  oppositeBrakeMultiplier: 4
+  snapStopSpeed: 0.025
+  snapTurnAngle: 110
+  useCurveDeceleration: 0
+  movementStyle: 0
+  targetLock: {fileID: 0}
+  monksAccelerationTime: 0.1
+  monksDecelerationTime: 0.12
+  monksPivotAngle: 75
+  strafeSpeedMultiplier: 0.85
+  backwardSpeedMultiplier: 0.9
+  monksCardinalDeadZone: 0.25
+  instantFaceTarget: 1
+  normalizeDiagonal: 1
 --- !u!114 &1323116692971994159
 MonoBehaviour:
   m_ObjectHideFlags: 0

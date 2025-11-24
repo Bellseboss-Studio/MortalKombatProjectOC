@@ -8,8 +8,6 @@ namespace _Scripts.Player
         [SerializeField] private float force;
         [SerializeField] private FloorController floorController;
 
-        // NOTE: mantengo estas variables porque están en tu versión original
-        [SerializeField] private bool isFall, isUp;
 
         //[SerializeField] private AttackMovementSystem attackMovementSystem;
         [SerializeField] private JumpSystem jumpSystem;
@@ -18,7 +16,6 @@ namespace _Scripts.Player
         [Range(0, 1f)] [SerializeField] private float minSpeed;
         [Range(0.5f, 1)] [SerializeField] private float maxSpeed;
         [SerializeField] private bool isScalableWall;
-        [SerializeField] private float forceToGravitate;
 
         // --- NUEVAS CONFIGURACIONES PARA ACELERACIÓN/DESACELERACIÓN ---
         [Header("Acceleration / Deceleration (time-based)")]
@@ -34,9 +31,7 @@ namespace _Scripts.Player
         [Tooltip("Curva para la desaceleración (0..1) donde 1=vel completa frenada")]
         [SerializeField] private AnimationCurve decelerationCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
-        // fallback legacy params (no se eliminan)
-        [SerializeField] private float acceleration = 10f;   // legado no principal
-        [SerializeField] private float deceleration = 8f;     // legado no principal
+
 
         // velocidad/estado interno
         private Vector3 _currentVelocityXZ;
@@ -60,7 +55,6 @@ namespace _Scripts.Player
         [Tooltip("Velocidad horizontal por debajo de la cual se dispara OnStopRunning")]
         [SerializeField] private float stopRunEventSpeed = 0.05f;
 
-        [SerializeField] private bool enableDebugLogs = false;
 
         // --- Referencias / estado original ---
         private Rigidbody _rigidbody;
@@ -72,10 +66,12 @@ namespace _Scripts.Player
         private GameObject _camera;
         private bool _isTarget;
         private IMovementRigidBodyV2 _movementRigidBodyV2;
-        private bool _jump; // legado (marcado obsoleto)
         public bool IsJump => jumpSystem != null && jumpSystem.IsJump(); // devuelve estado real del sistema de salto
         private float _velocityOfAnimation;
         private Vector3 _scalableWallFordWard;
+        
+        // Referencias para sincronización
+        private RotationCharacterV2 _rotationSystem;
 
         // trackeo para disparos únicos de animaciones
         private bool _hasTriggeredStartRun = false;
@@ -99,7 +95,7 @@ namespace _Scripts.Player
         [Tooltip("Usar curva de desaceleración original en lugar del frenado lineal reforzado")]
         [SerializeField] private bool useCurveDeceleration = false;
 
-        private float _pivotBrakeTimer; // interno para frenado opuesto
+
 
         private enum MovementStyle { Modern, ShaolinMonks }
         [Header("Movement Style")]
@@ -116,6 +112,10 @@ namespace _Scripts.Player
         [SerializeField] private bool instantFaceTarget = true; // rotar instantáneo hacia el objetivo
         [SerializeField] private bool normalizeDiagonal = true; // mantener misma magnitud en diagonales
 
+        [Header("Debug / Ajustes")]
+        [Tooltip("Mostrar logs de depuración de dirección de movimiento")] [SerializeField]
+        private bool enableMovementDebugLogs = false;
+
         public void Configure(Rigidbody rigidBody, float speedWalk, float speedRun, GameObject camera,
             IMovementRigidBodyV2 movementRigidBodyV2, StatisticsOfCharacter statisticsOfCharacter)
         {
@@ -127,6 +127,14 @@ namespace _Scripts.Player
             _camera = camera;
             _movementRigidBodyV2 = movementRigidBodyV2;
             _canMove = true;
+            
+            // Buscar automáticamente el RotationCharacterV2 en el mismo GameObject
+            _rotationSystem = GetComponent<RotationCharacterV2>();
+            if (_rotationSystem == null)
+            {
+                _rotationSystem = GetComponentInParent<RotationCharacterV2>();
+            }
+            
             if (floorController == null)
             {
                 Debug.LogWarning("[MovementRigidbodyV2] floorController no asignado en el inspector.");
@@ -160,10 +168,8 @@ namespace _Scripts.Player
         {
             // Ajusta flags locales de escalada de pared. No se llama a JumpSystem (método no disponible).
             isScalableWall = pIsScalableWall;
-            forceToGravitate = pForceToGravitate;
             _scalableWallFordWard = direction;
             // Si JumpSystem necesitara saberlo, implementar método correspondiente allí.
-            _jump = false; // legado
         }
 
         private float CalculateDirection(float axis, bool isTarget)
@@ -204,6 +210,11 @@ namespace _Scripts.Player
             float fullTargetSpeed = targetXZ.magnitude;
             Vector3 targetDir = fullTargetSpeed > 0.0001f ? targetXZ.normalized : _currentVelocityXZ.normalized;
 
+            if (enableMovementDebugLogs && hasInput)
+            {
+                Debug.Log($"[MovementRigidbodyV2] Input={result}, TargetDir={targetDir}, DesiredWorld={desiredWorld}");
+            }
+
             // Detectar ángulo respecto a dirección actual (para pivot)
             float angleToTarget = (_currentVelocityXZ.sqrMagnitude > 0.0001f && fullTargetSpeed > 0.0001f)
                 ? Vector3.Angle(_currentVelocityXZ.normalized, targetDir)
@@ -217,7 +228,6 @@ namespace _Scripts.Player
                 {
                     _accelTimer = 0f;
                     _decelTimer = 0f;
-                    _pivotBrakeTimer = 0f;
                     _hasTriggeredStopRun = true;
                     _startDecelSpeed = _currentSpeed; // capturamos por si pivot ocurre inmediatamente
                 }
@@ -225,7 +235,6 @@ namespace _Scripts.Player
                 // Si la dirección es casi opuesta aplicamos frenado agresivo antes de volver a acelerar
                 if (oppositeDirection)
                 {
-                    _pivotBrakeTimer += Time.fixedDeltaTime;
                     float pivotRate = (_speedRun / Mathf.Max(0.0001f, timeToStop)) * oppositeBrakeMultiplier;
                     _currentSpeed = Mathf.MoveTowards(_currentSpeed, 0f, pivotRate * Time.fixedDeltaTime);
                     // Snap a cero para evitar arrastre residual
@@ -273,7 +282,6 @@ namespace _Scripts.Player
                     // inicio fase de desaceleración
                     _decelTimer = 0f;
                     _accelTimer = 0f;
-                    _pivotBrakeTimer = 0f;
                     _startDecelSpeed = _currentSpeed;
                     _decelDirection = _currentSpeed > 0.0001f ? _currentVelocityXZ.normalized : _decelDirection;
                 }
@@ -317,19 +325,11 @@ namespace _Scripts.Player
 
             // 6) Variables para animación
             _velocityOfAnimation = _speedRun > 0.0001f ? (_currentSpeed / _speedRun) : 0f;
-
-            // 7) Flags verticales (legado)
-            if (_rigidbody.linearVelocity.y > 0)
+            
+            // 7) Sincronizar rotación con dirección de movimiento
+            if (_rotationSystem != null && hasInput)
             {
-                isUp = true; isFall = false;
-            }
-            else if (_rigidbody.linearVelocity.y < 0 && !onFloor)
-            {
-                isFall = true; isUp = false;
-            }
-            else
-            {
-                isFall = false; isUp = false;
+                _rotationSystem.SetMovementDirection(targetDir);
             }
         }
 
@@ -401,7 +401,13 @@ namespace _Scripts.Player
         public void ChangeToNormalJump() { /* opcional: IsScalableWall(false, 0, Vector3.zero); */ }
         public void ExitToWall() { isScalableWall = false; /*jumpSystem.ExitToWall();*/ }
         public bool IsJumpingFromADRS() => jumpSystem.IsJump();
-        public float GetXZVelocity() { Vector3 v = new Vector3(_rigidbody.linearVelocity.x, 0f, _rigidbody.linearVelocity.z); return v.magnitude / 10f; }
+        public float GetXZVelocity() 
+        { 
+            Vector3 v = new Vector3(_rigidbody.linearVelocity.x, 0f, _rigidbody.linearVelocity.z); 
+            float result = v.magnitude / 10f;
+            Debug.Log($"[MovementRigidbodyV2] GetXZVelocity: rawVelocity={v.magnitude:F3}, scaledResult={result:F3}");
+            return result;
+        }
 
         // Debug rápido en contexto
         [ContextMenu("DebugPrintState")]
@@ -545,9 +551,6 @@ namespace _Scripts.Player
                 if (onFloor) _rigidbody.linearVelocity = finalVel; else _rigidbody.linearVelocity = new Vector3(finalVel.x * airControlFactor, finalVel.y, finalVel.z * airControlFactor);
             }
             _velocityOfAnimation = _speedRun > 0.0001f ? (_currentSpeed / _speedRun) : 0f;
-            if (_rigidbody.linearVelocity.y > 0) { isUp = true; isFall = false; }
-            else if (_rigidbody.linearVelocity.y < 0 && !onFloor) { isFall = true; isUp = false; }
-            else { isFall = false; isUp = false; }
         }
     }
 }

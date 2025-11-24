@@ -42,6 +42,10 @@ namespace _Scripts.Player
         [SerializeField] private StunSystem stunSystem;
         [SerializeField] private MovementADSR movementADSR;
 
+        [Header("Jump Rotation Control")]
+        [Tooltip("Permitir rotar durante el salto (control aéreo)")] [SerializeField]
+        private bool allowRotationDuringJump = true;
+
         [SerializeField, InterfaceType(typeof(IFatalitySystem))]
         private MonoBehaviour FatalitySystem;
 
@@ -149,7 +153,18 @@ namespace _Scripts.Player
 
         private void JumpOnEndJump()
         {
-            animationController.PlayJumpLand();
+            animationController.PlayJumpLand(() =>
+            {
+                // Callback cuando termina la animación de aterrizaje
+                Debug.Log("[CharacterV2] JumpLand animation finished");
+            });
+            
+            // Forzar actualización inmediata del estado de movimiento
+            // Ya que PlayJumpLand desactiva isInJumpSequence inmediatamente
+            float currentVelocity = movementRigidbodyV2.GetXZVelocity();
+            Debug.Log($"[CharacterV2] JumpOnEndJump: forcing movement update with velocity {currentVelocity:F3}");
+            animationController.ForceUpdateMovementAnimation(currentVelocity);
+            
             isAnimationWasRun = false;
             isAnimationRecovered = false;
         }
@@ -199,11 +214,15 @@ namespace _Scripts.Player
 
         private void OnMove(Vector2 vector2, INPUTS inputs)
         {
+            // Determinar si puede rotar basado en salto y configuración
+            bool canRotateNow = rotationCharacterV2.CanRotate() && 
+                               (allowRotationDuringJump || !movementRigidbodyV2.IsJump);
+
             if (combatSystemAngel.Attacking || !CanReadInputs)
             {
                 combatSystemAngel.oneTimeOnEndAttack += () =>
                 {
-                    if (rotationCharacterV2.CanRotate() && !movementRigidbodyV2.IsJump)
+                    if (canRotateNow)
                     {
                         rotationCharacterV2.Direction(vector2);
                     }
@@ -211,7 +230,7 @@ namespace _Scripts.Player
             }
             else
             {
-                if (rotationCharacterV2.CanRotate() && !movementRigidbodyV2.IsJump)
+                if (canRotateNow)
                 {
                     rotationCharacterV2.Direction(vector2);
                 }
@@ -323,7 +342,12 @@ namespace _Scripts.Player
 
         public void UpdateAnimation(bool isTouchingFloor, bool isTouchingWall)
         {
-            animationController.UpdateMovementAnimation(movementRigidbodyV2.GetXZVelocity());
+            float currentVelocity = movementRigidbodyV2.GetXZVelocity();
+            
+            Debug.Log($"[CharacterV2] UpdateAnimation: velocity={currentVelocity:F3}, onFloor={isTouchingFloor}, jumping={movementRigidbodyV2.GetJumpSystem().IsJump()}, jumpSeq={animationController.IsInJumpSequence()}");
+            
+            animationController.UpdateMovementAnimation(currentVelocity);
+            
             //TODO Revisar el switcheo entre los tipos de salto
             // animationController.JumpingWalls(isTouchingFloor, isTouchingWall, movementRigidbodyV2.GetJumpSystem().IsJump());
         }
@@ -492,3 +516,5 @@ namespace _Scripts.Player
         }
     }
 }
+
+

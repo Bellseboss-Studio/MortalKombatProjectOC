@@ -98,20 +98,49 @@ namespace _Scripts.Player
         #region === Movement ===
 
         private string currentMovementState;
+        private bool isInJumpSequence; // Flag para evitar interrumpir animaciones de salto
 
         /// <summary>
         /// Controla automáticamente la animación de movimiento según la velocidad.
         /// Evita reproducir la misma animación múltiples veces por frame.
+        /// NO interrumpe animaciones de salto en curso.
         /// </summary>
         public void UpdateMovementAnimation(float velocity, Action onFinish = null)
         {
             if (!animator) return;
 
+            // Si estamos en secuencia de salto, no cambiar animaciones de movimiento
+            if (isInJumpSequence) 
+            {
+                Debug.Log($"[AnimationController] UpdateMovementAnimation BLOCKED by jumpSequence (velocity={velocity:F3})");
+                return;
+            }
+
             string nextState = GetMovementState(velocity);
 
-            // Si no cambia de estado, no hacemos nada
-            if (nextState == currentMovementState) return;
+            // Si no cambia de estado Y no es null (que indica reset), no hacemos nada
+            if (nextState == currentMovementState && currentMovementState != null) 
+            {
+                Debug.Log($"[AnimationController] UpdateMovementAnimation: no change needed (current={currentMovementState}, next={nextState})");
+                return;
+            }
 
+            Debug.Log($"[AnimationController] UpdateMovementAnimation: changing from '{currentMovementState}' to '{nextState}'");
+            currentMovementState = nextState;
+            Play(nextState, transitionDuration, onFinish);
+        }
+
+        /// <summary>
+        /// Fuerza una actualización inmediata del estado de movimiento.
+        /// Útil cuando se necesita sincronizar después de eventos como aterrizaje.
+        /// </summary>
+        public void ForceUpdateMovementAnimation(float velocity, Action onFinish = null)
+        {
+            if (!animator) return;
+
+            string nextState = GetMovementState(velocity);
+            
+            // Forzamos el cambio aunque sea el mismo estado
             currentMovementState = nextState;
             Play(nextState, transitionDuration, onFinish);
         }
@@ -121,15 +150,27 @@ namespace _Scripts.Player
         /// </summary>
         private string GetMovementState(float velocity)
         {
+            Debug.Log($"[AnimationController] GetMovementState: velocity={velocity:F3}, walkThreshold={walkThreshold}, runThreshold={runThreshold}");
+            
             if (velocity <= walkThreshold)
+            {
+                Debug.Log($"[AnimationController] → Idle (velocity <= {walkThreshold})");
                 return States.Idle;
+            }
 
             if (velocity > walkThreshold && velocity < runThreshold)
+            {
+                Debug.Log($"[AnimationController] → Walk (velocity between {walkThreshold} and {runThreshold})");
                 return States.Walk;
+            }
 
             if (velocity >= runThreshold)
+            {
+                Debug.Log($"[AnimationController] → Run (velocity >= {runThreshold})");
                 return States.Run;
+            }
 
+            Debug.Log($"[AnimationController] → Idle (fallback)");
             return States.Idle;
         }
 
@@ -158,12 +199,53 @@ namespace _Scripts.Player
 
         #region === Jump System ===
 
-        public void PlayJumpStart(Action onFinish = null) => Play(States.JumpStart, transitionDuration, onFinish);
-        public void PlayJumpApex(Action onFinish = null) => Play(States.JumpApex, transitionDuration, onFinish);
-        public void PlayJumpFall(Action onFinish = null) => Play(States.JumpFall, transitionDuration, onFinish);
-        public void PlayJumpLand(Action onFinish = null) => Play(States.JumpLand, transitionDuration, onFinish);
-        public void PlayWallJump(Action onFinish = null) => Play(States.WallJump, transitionDuration, onFinish);
-        public void PlayWallSlide(Action onFinish = null) => Play(States.WallSlide, transitionDuration, onFinish);
+        public void PlayJumpStart(Action onFinish = null)
+        {
+            isInJumpSequence = true;
+            Play(States.JumpStart, transitionDuration, onFinish);
+        }
+
+        public void PlayJumpApex(Action onFinish = null)
+        {
+            // Mantenemos isInJumpSequence = true
+            Play(States.JumpApex, transitionDuration, onFinish);
+        }
+
+        public void PlayJumpFall(Action onFinish = null)
+        {
+            // Mantenemos isInJumpSequence = true
+            Play(States.JumpFall, transitionDuration, onFinish);
+        }
+
+        public void PlayJumpLand(Action onFinish = null)
+        {
+            // Terminamos la secuencia de salto ANTES de reproducir la animación
+            // Esto permite que UpdateMovementAnimation funcione inmediatamente
+            isInJumpSequence = false;
+            currentMovementState = null; // Reset para forzar cambio de estado
+            
+            Play(States.JumpLand, transitionDuration, onFinish);
+        }
+
+        public void PlayWallJump(Action onFinish = null)
+        {
+            isInJumpSequence = true;
+            Play(States.WallJump, transitionDuration, onFinish);
+        }
+
+        public void PlayWallSlide(Action onFinish = null)
+        {
+            isInJumpSequence = true;
+            Play(States.WallSlide, transitionDuration, onFinish);
+        }
+
+        /// <summary>
+        /// Fuerza el fin de la secuencia de salto (útil para casos especiales)
+        /// </summary>
+        public void ForceEndJumpSequence()
+        {
+            isInJumpSequence = false;
+        }
 
         #endregion
 
@@ -278,7 +360,22 @@ namespace _Scripts.Player
             return info.IsName(stateName);
         }
 
-        public void StopAllAnimations(Action onFinish = null) => Play(States.Idle, transitionDuration, onFinish);
+        /// <summary>
+        /// Indica si actualmente se está ejecutando una secuencia de salto
+        /// </summary>
+        public bool IsInJumpSequence()
+        {
+            return isInJumpSequence;
+        }
+
+        public void StopAllAnimations(Action onFinish = null)
+        {
+            isInJumpSequence = false;
+            isAttacking = false;
+            currentAttackState = null;
+            currentMovementState = null;
+            Play(States.Idle, transitionDuration, onFinish);
+        }
 
         #endregion
     }
