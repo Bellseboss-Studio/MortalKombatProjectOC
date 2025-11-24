@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using _Scripts.Player;
-using Bellseboss.Angel.CombatSystem;
-using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using Random = System.Random;
@@ -14,8 +12,12 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
     public event Action<bool> OnPlayerDetected;
     public event Action<bool> OnPlayerInNearZone;
     public event Action<EnemyV2> OnDead;
-    
-    public Action<StunInfo> OnReceiveDamage {get; set;}
+
+    public Action<StunInfo> OnReceiveDamage { get; set; }
+    public AnimationController GetAnimationController()
+    {
+        return animationController;
+    }
 
     [SerializeField] private string id;
     [SerializeField] private StatisticsOfCharacter statisticsOfCharacter;
@@ -25,6 +27,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
     [SerializeField, InterfaceType(typeof(IAiController))]
     private Object ai;
+
     [SerializeField] private Rigidbody rigidbody;
     [SerializeField] private float minDistanceToArriveToTarget;
     [SerializeField] private float minDistanceToArriveToEnemy;
@@ -49,6 +52,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
     public string Id => id;
     public bool IsDead { get; private set; }
     public bool IsDeadWithFatality { get; private set; }
+
     public GameObject GetGameObject()
     {
         return gameObject;
@@ -56,12 +60,17 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
     public GameObject GetCenterOfTheZone()
     {
-        return centerOfTheZone;   
+        return centerOfTheZone;
     }
 
     public void SetInstaRotation(bool instaRotation)
     {
         isInstarotating = instaRotation;
+    }
+
+    public AnimationController GetAnimatorController()
+    {
+        return animationController;
     }
 
     private bool canAttack = true;
@@ -76,11 +85,11 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         _statisticsOfCharacter = Instantiate(statisticsOfCharacter);
         /*movementADSR.Configure(GetComponent<Rigidbody>(), _statisticsOfCharacter, this);*/
         _model = Instantiate(model, transform);
-        animationController.Configure(_model.GetComponent<Animator>(), this);
+        animationController.Configure(_model.GetComponent<Animator>(), transform);
         _aiController.Configure(this, ref stunSystem.OnEndStunt);
         _state = StatesOfEnemy.NORMAL;
 
-        animationController.OnFinishAnimationDamage += () =>
+        animationController.OnFinishAnimation += () =>
         {
             Debug.Log("EnemyV2: Finish Animation Damage");
             _canMove = true;
@@ -120,7 +129,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
             rigidbody.angularVelocity = Vector3.zero;
         }
 
-        animationController.Movement(rigidbody.linearVelocity.magnitude / 10, 0);
+        animationController.UpdateMovementAnimation(rigidbody.linearVelocity.magnitude / 10);
     }
 
     public override void Stun(bool isStun)
@@ -146,11 +155,6 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         _target = transformForward;
     }
 
-    public void TriggerAnimation(string nameOfAnimation)
-    {
-        animationController.ActivateTrigger(nameOfAnimation);
-    }
-
     public CharacterV2 GetPlayer()
     {
         return _characterV2;
@@ -171,6 +175,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
             transform.rotation = targetRotation;
             return;
         }
+
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 5 * Time.deltaTime);
     }
 
@@ -191,7 +196,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         }*/
 
         _target = direction;
-        
+
         OnReceiveDamage?.Invoke(currentAttackStunTime);
     }
 
@@ -200,7 +205,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         Debug.Log("EnemyV2: Die");
         OnDead?.Invoke(this);
         if (IsDeadWithFatality) return;
-        animationController.Die("dead");
+        animationController.PlayDeath();
     }
 
     public float GetTimeToAttack()
@@ -270,7 +275,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         //TODO set animation to hit
         Debug.Log($"EnemyV2: Set Animation To Hit {animationParameterName}");
         _aiController.TakeDamage();
-        animationController.TakeDamage(animationParameterName);
+        animationController.PlayHit();
     }
 
     public void SetPlayer(CharacterV2 characterV2)
@@ -331,7 +336,6 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
     public void UpdateAnimation(bool isTouchingFloor, bool isJumping)
     {
-        
     }
 
     public void ChangeToNormalJump()
@@ -389,9 +393,14 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
         throw new NotImplementedException();
     }
 
-    public Action<string> GetActionToAnimate()
+    public void OnStartRunning()
     {
-        return animationController.SetTrigger;
+        throw new NotImplementedException();
+    }
+
+    public void OnStopRunning()
+    {
+        throw new NotImplementedException();
     }
 
     public void PlayerTouchEnemy()
@@ -420,13 +429,13 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
     public void Mareado()
     {
-        animationController.SetTrigger("mareado");
+        animationController.PlayStunt();
         _aiController.StopAI();
     }
-    
+
     public void GetFatalities()
     {
-        animationController.SetTrigger("get_fatality");
+        animationController.PlayGetFatality();
     }
 
     public void SetPositionAndRotation(GameObject refOfPlayer)
@@ -437,10 +446,12 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
     public void StartAnimationFatality()
     {
-        animationController.SetTrigger("get_fatality");
-        IsDead = true;
-        IsDeadWithFatality = true;
-        Died();
+        animationController.PlayGetFatality(() =>
+        {
+            IsDead = true;
+            IsDeadWithFatality = true;
+            Died();
+        });
     }
 
     public void DisableColliders()
@@ -451,13 +462,14 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
             collider1.enabled = false;
         }
     }
-    
+
     public void EnableColliders()
     {
         foreach (var collider1 in collidersToDisable)
         {
             collider1.enabled = true;
         }
+
         rigidbody.useGravity = true;
     }
 
@@ -483,7 +495,6 @@ public interface IEnemyV2
     event Action<bool> OnPlayerInNearZone;
     event Action<EnemyV2> OnDead;
     void RotateToTargetIdle(GameObject transformForward, bool b);
-    void TriggerAnimation(string nameOfAnimation);
     CharacterV2 GetPlayer();
     void CanMove(bool b);
     void Died();
@@ -502,6 +513,7 @@ public interface IEnemyV2
     GameObject GetGameObject();
     GameObject GetCenterOfTheZone();
     void SetInstaRotation(bool instaRotation);
+    AnimationController GetAnimatorController();
 }
 
 public class EnemiesV2Factory

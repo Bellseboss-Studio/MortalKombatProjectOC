@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Bellseboss.Angel.CombatSystem;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -20,6 +19,11 @@ namespace _Scripts.Player
 
         public Action<StunInfo> OnReceiveDamage { get; set; }
 
+        public AnimationController GetAnimationController()
+        {
+            return animationController;
+        }
+
         [SerializeField] private string id;
         [SerializeField] private InputPlayerV2 inputPlayerV2;
         [SerializeField] private MovementRigidbodyV2 movementRigidbodyV2;
@@ -37,6 +41,10 @@ namespace _Scripts.Player
         [SerializeField] private CombatSystemAngel combatSystemAngel;
         [SerializeField] private StunSystem stunSystem;
         [SerializeField] private MovementADSR movementADSR;
+
+        [Header("Jump Rotation Control")]
+        [Tooltip("Permitir rotar durante el salto (control aéreo)")] [SerializeField]
+        private bool allowRotationDuringJump = true;
 
         [SerializeField, InterfaceType(typeof(IFatalitySystem))]
         private MonoBehaviour FatalitySystem;
@@ -86,7 +94,7 @@ namespace _Scripts.Player
             inputPlayerV2.onFatalityEvent += OnFatalityEvent;
 
             _model3DInstance = Instantiate(model3D, transform);
-            animationController.Configure(_model3DInstance.GetComponent<ReferencesOfPlayer>().Animator, this);
+            animationController.Configure(_model3DInstance.GetComponent<ReferencesOfPlayer>().Animator, transform);
             targetFocus.Configure(this);
             targetFocus.EnableCollider();
 
@@ -137,11 +145,6 @@ namespace _Scripts.Player
             }
         }
 
-        public void ActivateAnimationTrigger(string animationTrigger)
-        {
-            animationController.ActivateTrigger(animationTrigger);
-        }
-
         public void SetPositionAndRotation(GameObject refOfPlayer)
         {
             transform.position = Vector3.Lerp(transform.position, refOfPlayer.transform.position, 0.5f);
@@ -150,24 +153,35 @@ namespace _Scripts.Player
 
         private void JumpOnEndJump()
         {
-            animationController.JumpRecovery();
+            animationController.PlayJumpLand(() =>
+            {
+                // Callback cuando termina la animación de aterrizaje
+                Debug.Log("[CharacterV2] JumpLand animation finished");
+            });
+            
+            // Forzar actualización inmediata del estado de movimiento
+            // Ya que PlayJumpLand desactiva isInJumpSequence inmediatamente
+            float currentVelocity = movementRigidbodyV2.GetXZVelocity();
+            Debug.Log($"[CharacterV2] JumpOnEndJump: forcing movement update with velocity {currentVelocity:F3}");
+            animationController.ForceUpdateMovementAnimation(currentVelocity);
+            
             isAnimationWasRun = false;
             isAnimationRecovered = false;
         }
 
         private void JumpOnRelease()
         {
-            animationController.JumpFall();
+            animationController.PlayJumpFall();
         }
 
         private void JumpOnMidAir()
         {
-            animationController.JumpMidAir();
+            animationController.PlayJumpApex();
         }
 
         private void JumpOnAttack()
         {
-            animationController.JumpJump();
+            animationController.PlayJumpStart();
         }
 
         void OnActionEvent()
@@ -179,7 +193,6 @@ namespace _Scripts.Player
         {
             if (!CanReadInputs || IsAttacking()) return;
             movementRigidbodyV2.Jump();
-            animationController.IsJumping();
         }
 
         private void OnKickEvent()
@@ -196,17 +209,20 @@ namespace _Scripts.Player
 
         private void OnTargetEvent(bool isTarget)
         {
-            animationController.IsTarget(isTarget);
             movementRigidbodyV2.IsTarget(isTarget);
         }
 
         private void OnMove(Vector2 vector2, INPUTS inputs)
         {
+            // Determinar si puede rotar basado en salto y configuración
+            bool canRotateNow = rotationCharacterV2.CanRotate() && 
+                               (allowRotationDuringJump || !movementRigidbodyV2.IsJump);
+
             if (combatSystemAngel.Attacking || !CanReadInputs)
             {
                 combatSystemAngel.oneTimeOnEndAttack += () =>
                 {
-                    if (rotationCharacterV2.CanRotate() && !movementRigidbodyV2.IsJump)
+                    if (canRotateNow)
                     {
                         rotationCharacterV2.Direction(vector2);
                     }
@@ -214,7 +230,7 @@ namespace _Scripts.Player
             }
             else
             {
-                if (rotationCharacterV2.CanRotate() && !movementRigidbodyV2.IsJump)
+                if (canRotateNow)
                 {
                     rotationCharacterV2.Direction(vector2);
                 }
@@ -233,7 +249,7 @@ namespace _Scripts.Player
             rigidbody.freezeRotation = true;
             CanReadInputs = true;
             inputPlayerV2.StartToReadInputs(_canUseButtons);
-            animationController.Movement(movementRigidbodyV2.GetXZVelocity(), 0);
+            animationController.UpdateMovementAnimation(movementRigidbodyV2.GetXZVelocity());
         }
 
         public void EnableControls()
@@ -265,12 +281,7 @@ namespace _Scripts.Player
         public void StartDeadAction()
         {
             DisableControls();
-            animationController.Dead();
-        }
-
-        public Action<string> GetActionToAnimate()
-        {
-            return animationController.SetTrigger;
+            animationController.PlayDeath();
         }
 
         public void PlayerTouchEnemy()
@@ -326,14 +337,19 @@ namespace _Scripts.Player
 
         public void UpdateAnimation()
         {
-            animationController.Movement(movementRigidbodyV2.GetXZVelocity(), 0);
+            animationController.UpdateMovementAnimation(movementRigidbodyV2.GetXZVelocity());
         }
 
         public void UpdateAnimation(bool isTouchingFloor, bool isTouchingWall)
         {
-            animationController.Movement(movementRigidbodyV2.GetXZVelocity(), 0);
-            animationController.JumpingWalls(isTouchingFloor, isTouchingWall,
-                movementRigidbodyV2.GetJumpSystem().IsJump());
+            float currentVelocity = movementRigidbodyV2.GetXZVelocity();
+            
+            Debug.Log($"[CharacterV2] UpdateAnimation: velocity={currentVelocity:F3}, onFloor={isTouchingFloor}, jumping={movementRigidbodyV2.GetJumpSystem().IsJump()}, jumpSeq={animationController.IsInJumpSequence()}");
+            
+            animationController.UpdateMovementAnimation(currentVelocity);
+            
+            //TODO Revisar el switcheo entre los tipos de salto
+            // animationController.JumpingWalls(isTouchingFloor, isTouchingWall, movementRigidbodyV2.GetJumpSystem().IsJump());
         }
 
         public void ChangeToNormalJump()
@@ -378,17 +394,27 @@ namespace _Scripts.Player
 
         public void PlayerFallV2()
         {
-            animationController.Fall();
+            animationController.PlayJumpFall();
         }
 
         public void PlayerRecoveryV2()
         {
-            animationController.JumpRecovery();
+            animationController.PlayJumpLand();
         }
 
         public bool IsJumpingInWall()
         {
             return movementRigidbodyV2.GetJumpSystem().IsJumpingInScalableWall;
+        }
+
+        public void OnStartRunning()
+        {
+            
+        }
+
+        public void OnStopRunning()
+        {
+            
         }
 
         public bool IsAttacking()
@@ -431,7 +457,8 @@ namespace _Scripts.Player
         public override void SetAnimationToHit(string animationParameterName)
         {
             if (IsDead) return;
-            animationController.TakeDamage(animationParameterName);
+            //TODO: Usar animationParameterName para distintos tipos de hit
+            animationController.PlayHit();
         }
 
         public override void Stun(bool isStun)
@@ -457,7 +484,7 @@ namespace _Scripts.Player
 
         public void StartAnimationFatality()
         {
-            animationController.SetTrigger("fatality");
+            animationController.PlayFatality();
         }
 
         public void StartToReadInputsToFatality(bool canRead)
@@ -489,3 +516,5 @@ namespace _Scripts.Player
         }
     }
 }
+
+

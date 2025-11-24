@@ -324,10 +324,6 @@ PrefabInstance:
       value: PlayerV2Update
       objectReference: {fileID: 0}
     - target: {fileID: 174698100339698576, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
-      propertyPath: model3D
-      value: 
-      objectReference: {fileID: 7511835439772542090, guid: 4389e8a5a82a09846a5ed96c279c01cc, type: 3}
-    - target: {fileID: 174698100339698576, guid: c954a779c031845d29cd88a1ebae81db, type: 3}
       propertyPath: cameraMain
       value: 
       objectReference: {fileID: 946475076}
@@ -660,7 +656,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 77.6
+  m_fontSize: 77.45
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -1299,7 +1295,7 @@ GameObject:
   - component: {fileID: 782737902}
   - component: {fileID: 782737901}
   - component: {fileID: 782737900}
-  m_Layer: 0
+  m_Layer: 13
   m_Name: Plane
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2958,6 +2954,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4c6f73a9e61ebcb448522951ea7088bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  sceneIndex: 0
 --- !u!1 &2137632214
 GameObject:
   m_ObjectHideFlags: 0
@@ -3054,10 +3051,10 @@ SceneRoots:
   - {fileID: 151177507}
   - {fileID: 572700865}
   - {fileID: 804762101}
-  - {fileID: 105637334}
   - {fileID: 782737903}
   - {fileID: 516041005}
   - {fileID: 946475075}
   - {fileID: 1398176839}
   - {fileID: 940200730}
   - {fileID: 6696450}
+  - {fileID: 105637334}
