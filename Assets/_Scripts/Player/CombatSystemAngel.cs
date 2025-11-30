@@ -32,7 +32,9 @@ namespace _Scripts.Player
         [SerializeField] private bool attacking;
         [SerializeField] private float _deltatimeLocal;
         [SerializeField] private TargetFocus targetFocus;
-
+        [Header("Combat Settings")]
+        [Tooltip("Permitir ataques en el aire (para habilitar en el futuro). Por ahora debe estar en false para bloquear ataques aéreos.")]
+        [SerializeField] private bool allowAirAttacks = false;
 
         private List<GameObject> _enemiesInCombat
         {
@@ -42,14 +44,22 @@ namespace _Scripts.Player
 
         public bool Attacking => attacking;
 
-        private void Start()
-        {
-            
-        }
-
+        // Nota: Start no es necesario aquí; la configuración se realiza desde CharacterV2.Configure
         public void ExecuteMovement(TypeOfAttack typeOfAttack)
         {
             if (!_combatSystemAngel.GetCanReadInputs()) return;
+            // Bloquear ataques durante la secuencia de salto si no está permitido.
+            if (!allowAirAttacks)
+            {
+                var animController = _combatSystemAngel.GetAnimationController();
+                if (animController != null && animController.IsInJumpSequence())
+                {
+                    // Debug.Log("[CombatSystemAngel] Ataque ignorado: el personaje está en el aire (jump sequence)");
+                    return;
+                }
+                // Nota: verificamos la secuencia de salto vía AnimationController; si en el futuro necesitamos
+                // comprobar el estado físico del salto podemos exponer una API en IMovementRigidBodyV2.
+            }
             currentComboSequence.Add(typeOfAttack);
             bool found = false;
             CombatMovement combatMovement1 = null;
@@ -122,7 +132,7 @@ namespace _Scripts.Player
                 _decresing.Play();
                 foreach (var enemy in targetFocus.GetEnemies<PJV2>())
                 {
-                    Debug.Log("has da;o");
+                    // Debug.Log("has da;o");
                     enemy.ReceiveDamage(_statisticsOfCharacter.damage, gameObject, _currentAttack.stuntInfo);
                     enemy.SetAnimationToHit(_currentAttack.stuntInfo.parameterName);
                 }

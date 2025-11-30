@@ -56,7 +56,7 @@ namespace _Scripts.Player
         public void Configure(Rigidbody rb, IMovementRigidBodyV2 movementRigidBodyV2,
             FloorController floorController)
         {
-            Debug.Log($"Configured JumpSystem: {rb.gameObject.name}");
+            // Debug.Log($"Configured JumpSystem: {rb.gameObject.name}");
             BehaviourOfJumpSystemWalls.Configure(rb, this);
             BehaviourOfJumpSystemNormal.Configure(rb, this);
             _rigidbody = rb;
@@ -72,7 +72,7 @@ namespace _Scripts.Player
             {
                 if (!_isJump && physicsJumpMode && (Time.time - _lastGroundedTime) > 0.02f)
                 {
-                    Debug.Log("[JumpSystem] Aterrizaje detectado (physics mode)");
+                    // Debug.Log("[JumpSystem] Aterrizaje detectado (physics mode)");
                 }
                 _lastGroundedTime = Time.time;
                 if (physicsJumpMode)
@@ -97,11 +97,11 @@ namespace _Scripts.Player
             _bufferConsumed = false;
             if (preventDoubleDuringSequence && _isJump)
             {
-                Debug.Log("[JumpSystem] Ignorado: ya está en secuencia de salto");
+                // Debug.Log("[JumpSystem] Ignorado: ya está en secuencia de salto");
                 return;
             }
             bool canCoyote = Time.time - _lastGroundedTime <= coyoteTime;
-            Debug.Log($"[JumpSystem] Jump request floor={isTouchingFloor} wall={isTouchingScalableWall} coyote={canCoyote} physicsMode={physicsJumpMode}");
+            // Debug.Log($"[JumpSystem] Jump request floor={isTouchingFloor} wall={isTouchingScalableWall} coyote={canCoyote} physicsMode={physicsJumpMode}");
             if (isTouchingScalableWall && !isTouchingFloor)
             {
                 ExecuteWallJump(scalableWallDirection);
@@ -160,7 +160,7 @@ namespace _Scripts.Player
                 _rigidbody.AddForce(force, ForceMode.VelocityChange);
                 _isJump = true;
                 _isScalableWall = true;
-                OnAttack?.Invoke();
+                // OnAttack?.Invoke();
                 return;
             }
             _isScalableWall = true;

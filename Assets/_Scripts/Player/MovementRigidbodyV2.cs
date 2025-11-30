@@ -137,13 +137,13 @@ namespace _Scripts.Player
             
             if (floorController == null)
             {
-                Debug.LogWarning("[MovementRigidbodyV2] floorController no asignado en el inspector.");
+                // Debug.LogWarning("[MovementRigidbodyV2] floorController no asignado en el inspector.");
                 _isConfigured = false;
                 return;
             }
             if (jumpSystem == null)
             {
-                Debug.LogWarning("[MovementRigidbodyV2] jumpSystem no asignado en el inspector.");
+                // Debug.LogWarning("[MovementRigidbodyV2] jumpSystem no asignado en el inspector.");
                 _isConfigured = false;
                 return;
             }
@@ -405,7 +405,7 @@ namespace _Scripts.Player
         { 
             Vector3 v = new Vector3(_rigidbody.linearVelocity.x, 0f, _rigidbody.linearVelocity.z); 
             float result = v.magnitude / 10f;
-            Debug.Log($"[MovementRigidbodyV2] GetXZVelocity: rawVelocity={v.magnitude:F3}, scaledResult={result:F3}");
+            // Debug.Log($"[MovementRigidbodyV2] GetXZVelocity: rawVelocity={v.magnitude:F3}, scaledResult={result:F3}");
             return result;
         }
 
@@ -413,7 +413,7 @@ namespace _Scripts.Player
         [ContextMenu("DebugPrintState")]
         private void DebugPrintState()
         {
-            Debug.Log($"[MovementRigidbodyV2] speed={_currentSpeed:F2} accelT={_accelTimer:F2} decelT={_decelTimer:F2} input={_lastDirection} onFloor={floorController.IsTouchingFloor()} jumping={jumpSystem.IsJump()} wall={isScalableWall}");
+            // Debug.Log($"[MovementRigidbodyV2] speed={_currentSpeed:F2} accelT={_accelTimer:F2} decelT={_decelTimer:F2} input={_lastDirection} onFloor={floorController.IsTouchingFloor()} jumping={jumpSystem.IsJump()} wall={isScalableWall}");
         }
 
         private Vector2 QuantizeCardinal(Vector2 input)

@@ -156,14 +156,14 @@ namespace _Scripts.Player
             animationController.PlayJumpLand(() =>
             {
                 // Callback cuando termina la animación de aterrizaje
-                Debug.Log("[CharacterV2] JumpLand animation finished");
+                // Debug.Log("[CharacterV2] JumpLand animation finished");
             });
             
-            // Forzar actualización inmediata del estado de movimiento
-            // Ya que PlayJumpLand desactiva isInJumpSequence inmediatamente
-            float currentVelocity = movementRigidbodyV2.GetXZVelocity();
-            Debug.Log($"[CharacterV2] JumpOnEndJump: forcing movement update with velocity {currentVelocity:F3}");
-            animationController.ForceUpdateMovementAnimation(currentVelocity);
+             // Forzar actualización inmediata del estado de movimiento
+             // Ya que PlayJumpLand desactiva isInJumpSequence inmediatamente
+             float currentVelocity = movementRigidbodyV2.GetXZVelocity();
+            // Debug.Log($"[CharacterV2] JumpOnEndJump: forcing movement update with velocity {currentVelocity:F3}");
+             animationController.ForceUpdateMovementAnimation(currentVelocity);
             
             isAnimationWasRun = false;
             isAnimationRecovered = false;
@@ -344,8 +344,8 @@ namespace _Scripts.Player
         {
             float currentVelocity = movementRigidbodyV2.GetXZVelocity();
             
-            Debug.Log($"[CharacterV2] UpdateAnimation: velocity={currentVelocity:F3}, onFloor={isTouchingFloor}, jumping={movementRigidbodyV2.GetJumpSystem().IsJump()}, jumpSeq={animationController.IsInJumpSequence()}");
-            
+            // Debug.Log($"[CharacterV2] UpdateAnimation: velocity={currentVelocity:F3}, onFloor={isTouchingFloor}, jumping={movementRigidbodyV2.GetJumpSystem().IsJump()}, jumpSeq={animationcontroller.IsInJumpSequence()}");
+             
             animationController.UpdateMovementAnimation(currentVelocity);
             
             //TODO Revisar el switcheo entre los tipos de salto
@@ -436,13 +436,13 @@ namespace _Scripts.Player
         {
             if (IsDead) return;
             _statisticsOfCharacter.life -= damage;
-            Debug.Log($"_statisticsOfCharacter.life {_statisticsOfCharacter.life}");
+            // Debug.Log($"_statisticsOfCharacter.life {_statisticsOfCharacter.life}");
             OnEnterDamageEvent?.Invoke(_statisticsOfCharacter.life);
             if (_statisticsOfCharacter.life <= 0)
             {
                 IsDead = true;
                 OnDead?.Invoke(this);
-                Debug.Log("CharacterV2: Dead");
+                // Debug.Log("CharacterV2: Dead");
             }
 
             if (movementADSR.CanAttackAgain() && !IsDead)
@@ -516,5 +516,4 @@ namespace _Scripts.Player
         }
     }
 }
-
 
