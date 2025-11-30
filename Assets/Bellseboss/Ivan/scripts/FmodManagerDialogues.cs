@@ -19,11 +19,11 @@ namespace MortalKombat.Audio
 
         private FMOD.RESULT CallbackMethod(EVENT_CALLBACK_TYPE type, IntPtr eventInstance, IntPtr parameters)
         {
-            Debug.Log($"CallbackMethod: {type}");
+            // Debug.Log($"CallbackMethod: {type}");
             if (type == EVENT_CALLBACK_TYPE.STOPPED)
             {
                 // Code to execute when the SFX stops
-                Debug.Log("SFX has stopped.");
+                // Debug.Log("SFX has stopped.");
             }
 
             return FMOD.RESULT.OK;

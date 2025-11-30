@@ -32,7 +32,7 @@ namespace _Scripts.Player
                     _inputText.text = "QUICK";
                     break;
                 case INPUTS.NONE:
-                    Debug.Log("NONE");
+                    // Debug.Log("NONE");
                     _inputText.text = "";
                     break;
                 default:
