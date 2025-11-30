@@ -132,7 +132,7 @@ internal class AiController : MonoBehaviour
             }
             else
             {
-                _enemy.TriggerAnimation("watch");
+                _enemy.GetAnimatorController().PlayWatch();
                 _enemy.RotateToTargetIdle(_target, false);
             }
         }).Add(timeToWaitToChangePath).Add(() =>
@@ -193,7 +193,7 @@ internal class AiController : MonoBehaviour
         }).Add(() =>
         {
             _enemy.CanMove(false);
-            _enemy.TriggerAnimation("dead");
+            _enemy.GetAnimatorController().PlayDeath();
         }).Add(() =>
         {
             _enemy.Died();

@@ -12,7 +12,6 @@ namespace _Scripts.Player
         /*Vector3 RotateToTargetAngel(Vector3 originalDirection);*/
         /*bool CanAttack();
         AttackMovementSystem GetAttackSystem();*/
-        public Action<string> GetActionToAnimate();
         void PlayerTouchEnemy();
         List<GameObject> GetEnemiesInCombat();
         void SetEnemiesInCombat(List<GameObject> gameObjects);
@@ -21,5 +20,7 @@ namespace _Scripts.Player
         void SetCanReadInputs(bool b);
         bool GetCanReadInputs();
         Action<StunInfo> OnReceiveDamage { get; set; }
+        
+        AnimationController GetAnimationController();
     }
 }

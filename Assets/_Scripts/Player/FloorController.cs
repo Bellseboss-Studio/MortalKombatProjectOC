@@ -17,16 +17,24 @@ namespace _Scripts.Player
         [SerializeField] private float maxDistance;
         private GameObject _player;
         private bool _isConfigured;
+        [Header("Debug / Ajustes")]
+        [Tooltip("Offset vertical desde el que inicia el raycast hacia abajo")] [SerializeField]
+        private float raycastUpOffset = 0.1f;
+        [Tooltip("¿Mostrar logs de depuración de distancia al suelo?")] [SerializeField]
+        private bool logFloorDebug = false;
         
         private void FixedUpdate()
         {
             if (!_isConfigured) return;
-            var touching = false;
             foreach (var origin in raycastsOrigins)
             {
-                if (Physics.Raycast(origin.position + Vector3.up, Vector3.down, out var hit, 10, layerMask))
+                if (Physics.Raycast(origin.position + Vector3.up * raycastUpOffset, Vector3.down, out var hit, 10, layerMask))
                 {
                     var isTouchingFloor = hit.distance <= minDistanceToFloor;
+                    if (logFloorDebug)
+                    {
+                        Debug.Log($"[FloorController] Ray desde {origin.name} dist={hit.distance:F3} minDistance={minDistanceToFloor} touching={isTouchingFloor}");
+                    }
                     if (isTouchingFloor)
                     {
                         OnRecovery?.Invoke();
@@ -39,15 +47,10 @@ namespace _Scripts.Player
                     }
                 }
             }
-            
             if (_isTouchingFloor) OnTouchingFloorChanged?.Invoke(false);
             _isTouchingFloor = false;
         }
 
-        private void Update()
-        {
-            
-        }
 
         private void LateUpdate()
         {
@@ -56,7 +59,7 @@ namespace _Scripts.Player
 
         private void UpdateShadow()
         {
-            if (Physics.Raycast(raycastCenter.position + Vector3.up * 2, Vector3.down, out var hitToShadow, 100, layerMask))
+            if (Physics.Raycast(raycastCenter.position + Vector3.up * (2 + raycastUpOffset), Vector3.down, out var hitToShadow, 100, layerMask))
             {
                 shadow.gameObject.SetActive(true);
                 float distance = Vector3.Distance(transform.position, hitToShadow.point);
@@ -83,7 +86,7 @@ namespace _Scripts.Player
         {
             if(!_isConfigured) return;
             Gizmos.color = Color.blue;
-            Gizmos.DrawRay(raycastCenter.position + Vector3.up * 2, Vector3.down * 10);
+            Gizmos.DrawRay(raycastCenter.position + Vector3.up * (2 + raycastUpOffset), Vector3.down * 10);
             
             Gizmos.color = _isTouchingFloor ? Color.green : Color.red;
             Gizmos.DrawSphere(_player.transform.position + Vector3.up, 0.5f);
