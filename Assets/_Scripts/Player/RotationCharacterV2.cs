@@ -8,73 +8,340 @@ namespace _Scripts.Player
         private GameObject _camera;
         private bool _isConfigured;
         private IRotationCharacterV2 _rotationCharacterV2;
-        [SerializeField] private Vector2 _vector2;
-        [SerializeField] private Vector3 rotationWithTarget;
-        private float _forceRotation;
-        [SerializeField] private bool _canRotate;
-        private bool _canRotateWhileAttack;
-        private Vector3 _lastDirection;
-        private bool _canChangeDirection;
 
-        public void Configure(GameObject camera, GameObject player, IRotationCharacterV2 rotationCharacterV2,
+        [Header("Rotación")] 
+        [SerializeField] private float baseRotationSpeed = 8f;
+        [SerializeField] private AnimationCurve rotationCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+        [SerializeField] private float accelerationTime = 0.3f; // tiempo en segundos para alcanzar velocidad completa
+
+        [Header("Air Control")]
+        [Tooltip("Multiplicador de velocidad de rotación durante el salto")] [SerializeField] 
+        private float airRotationSpeedMultiplier = 0.7f;
+        [Tooltip("Referencia al sistema de movimiento para detectar salto")] [SerializeField]
+        private MovementRigidbodyV2 movementSystem;
+
+        [Header("Input Quantization (sync with MovementRigidbodyV2)")]
+        [Tooltip("Referencia al MovementRigidbodyV2 para obtener configuración de input")] [SerializeField]
+        private MovementRigidbodyV2 movementReference;
+
+        [Header("Rotation Stability")]
+        [Tooltip("Ángulo mínimo de diferencia para cambiar la dirección objetivo (grados)")] [SerializeField]
+        private float directionChangeThreshold = 5f;
+        [Tooltip("Ángulo mínimo para aplicar rotación (grados)")] [SerializeField] 
+        private float rotationThreshold = 1f;
+        [Tooltip("Velocidad mínima de rotación para mantener estabilidad")] [SerializeField]
+        private float minRotationVelocity = 0.1f;
+        [Tooltip("Umbral de alineación entre dirección de movimiento y input (0-1, mayor = más estricto) ")] [SerializeField]
+        private float alignmentThreshold = 0.7f;
+        [Tooltip("Histeresis para evitar toggles cerca del umbral de alineación (0..0.2)")]
+        [SerializeField]
+        private float alignmentHysteresis = 0.03f;
+
+        [Header("Smoothing")]
+        [Tooltip("Factor de suavizado para la dirección objetivo (0=no smoothing, 0.1..0.3 recomendado)")]
+        [SerializeField]
+        [Range(0f, 0.9f)]
+        private float directionSmoothing = 0.12f;
+
+        [Header("Debug")]
+        [Tooltip("Mostrar logs de depuración para alineación de rotación")] [SerializeField]
+        private bool enableDebugLogs = false;
+
+        private float _rotationVelocity; // valor 0–1 que aumenta cuando hay input
+        private Vector2 _vector2;
+        private Vector3 _lastDirection;
+        private Vector3 _smoothedDesiredDir;
+        private bool _canChangeDirection;
+        private bool _canRotate;
+        private bool _canRotateWhileAttack;
+        private bool _isChangingDirection;
+
+        private float _currentRotationSpeed;
+        private float _forceRotation;
+        
+        // Control de sincronización
+        private bool _usingSyncDirection = false;
+        private Vector3 _syncDirection;
+        private float _lastSyncTime;
+
+        public void Configure(GameObject cameraObj, GameObject player, IRotationCharacterV2 rotationCharacterV2,
             float forceRotation)
         {
-            _camera = camera;
+            _camera = cameraObj;
             _player = player;
-            _isConfigured = true;
             _rotationCharacterV2 = rotationCharacterV2;
             _forceRotation = forceRotation;
+            _isConfigured = true;
             _canRotate = true;
         }
 
-        public void Direction(Vector2 vector2)
+        public void Direction(Vector2 vector2) => _vector2 = vector2;
+        public void Direction(Vector3 vector3) => _lastDirection = vector3;
+
+        /// <summary>
+        /// Recibe la dirección de movimiento ya calculada desde MovementRigidbodyV2 para perfecta sincronización
+        /// </summary>
+        public void SetMovementDirection(Vector3 worldDirection)
         {
-            _vector2 = vector2;
+            if (worldDirection.sqrMagnitude > 0.0001f)
+            {
+                Vector3 normalizedDirection = worldDirection.normalized;
+                
+                // Calcular la dirección esperada basada en el input actual
+                Vector3 expectedDirection = CalculateMovementDirection(_vector2);
+                
+                // Solo usar la dirección sincronizada si está alineada con la expectativa del input
+                if (expectedDirection != Vector3.zero)
+                {
+                    float alignment = Vector3.Dot(normalizedDirection, expectedDirection);
+                    float acceptThreshold = alignmentThreshold + alignmentHysteresis;
+                    float rejectThreshold = alignmentThreshold - alignmentHysteresis;
+
+                    if (alignment > acceptThreshold)
+                    {
+                        // Aceptar sincronización
+                        _lastDirection = normalizedDirection;
+                        _syncDirection = _lastDirection;
+                        _usingSyncDirection = true;
+                        _lastSyncTime = Time.time;
+
+                        if (enableDebugLogs)
+                        {
+                            Debug.Log($"[RotationCharacterV2] Sync direction accepted: {_lastDirection}, alignment: {alignment:F3}");
+                        }
+                    }
+                    else
+                    {
+                        // En banda de histéresis: mantener previo; si está claramente desalineado => usar expected
+                        if (alignment >= rejectThreshold)
+                        {
+                            // mantener previo
+                        }
+                        else
+                        {
+                            _lastDirection = expectedDirection;
+                            _usingSyncDirection = false;
+                        }
+
+                        if (enableDebugLogs)
+                        {
+                            Debug.Log($"[RotationCharacterV2] Sync direction rejected due to misalignment: {alignment:F3}, using expected: {expectedDirection}");
+                        }
+                    }
+                }
+                else
+                {
+                    // Fallback normal
+                    _lastDirection = normalizedDirection;
+                    _syncDirection = _lastDirection;
+                    _usingSyncDirection = true;
+                    _lastSyncTime = Time.time;
+                }
+            }
         }
-        
-        public void Direction(Vector3 vector3)
+
+        /// <summary>
+        /// Calcula la dirección de movimiento usando EXACTAMENTE la misma lógica que InputMovementCustomV2.CalculateMovement
+        /// </summary>
+        private Vector3 CalculateMovementDirection(Vector2 input)
         {
-            rotationWithTarget = vector3;
+            if (_camera == null) return Vector3.forward;
+            
+            // PASO 1: Cuantizar input igual que MovementRigidbodyV2
+            Vector2 quantizedInput = Vector2.zero;
+            quantizedInput.y = CalculateDirection(input.y, false);
+            quantizedInput.x = CalculateDirection(input.x, false);
+            
+            if (quantizedInput.sqrMagnitude <= 0.0001f) return Vector3.zero;
+            
+            // PASO 2: usar la forward de la cámara proyectada en XZ para mayor estabilidad cuando la cámara está en LookAt
+            var camForward = _camera.transform.forward;
+            camForward.y = 0f;
+            if (camForward.sqrMagnitude <= 0.000001f)
+            {
+                camForward = _player.transform.position - _camera.transform.position;
+                camForward.y = 0f;
+            }
+            camForward.Normalize();
+            var right = new Vector3(camForward.z, 0f, -camForward.x);
+            var result = quantizedInput.x * right + quantizedInput.y * camForward;
+            
+            if (result.sqrMagnitude > 0.0001f)
+                result.Normalize();
+            
+            if (enableDebugLogs)
+            {
+                Debug.Log($"[RotationCharacterV2] RawInput={input}, QuantizedInput={quantizedInput}, CameraToPlayer={camForward}, Right={right}, Result={result}");
+            }
+            
+            return result;
+        }
+
+        /// <summary>
+        /// Replica la misma lógica de cuantización que MovementRigidbodyV2.CalculateDirection
+        /// </summary>
+        private float CalculateDirection(float axis, bool isTarget)
+        {
+            var axisAbs = Mathf.Abs(axis);
+            
+            // Obtener valores del MovementRigidbodyV2 si está disponible
+            float inputMin = 0.1f;
+            float inputMax = 1f; 
+            float minSpeed = 0.5f;
+            float maxSpeed = 1f;
+            
+            if (movementReference != null)
+            {
+                // Acceder a los valores reales (necesitaríamos propiedades públicas en MovementRigidbodyV2)
+                // Por ahora usamos valores estándar que coincidan
+                inputMin = 0.1f; // inputMin por defecto
+                inputMax = 2f;   // inputMax por defecto 
+                minSpeed = 0.5f; // minSpeed por defecto
+                maxSpeed = 1f;   // maxSpeed por defecto
+            }
+            
+            if (axisAbs < inputMin) return 0;
+            if (isTarget) return axis >= 0 ? minSpeed : -minSpeed;
+            if (axisAbs < inputMax) return axis >= 0 ? minSpeed : -minSpeed;
+            return axis >= 0 ? maxSpeed : -maxSpeed;
         }
 
         private void Update()
         {
             if (!_isConfigured || !_canRotate) return;
-            /*if (!_canChangeDirection) return;*/
+
+            // Si está rotando hacia un target (ataque, lock-on, etc)
             if (_canRotateWhileAttack)
             {
-                _player.transform.rotation = Quaternion.Lerp(_player.transform.rotation, Quaternion.LookRotation(rotationWithTarget), _forceRotation * Time.deltaTime);
+                Quaternion targetRotation = Quaternion.LookRotation(_lastDirection);
+                _player.transform.rotation = Quaternion.Slerp(
+                    _player.transform.rotation,
+                    targetRotation,
+                    _forceRotation * Time.deltaTime
+                );
+                return;
+            }
+
+            // Determinar si usar dirección sincronizada o calcular localmente
+            bool hasInput = _vector2.sqrMagnitude > 0.01f;
+            bool syncRecent = _usingSyncDirection && (Time.time - _lastSyncTime) < 0.1f;
+            
+            Vector3 desiredMoveDir;
+            
+            // SIEMPRE calcular la dirección esperada del input
+            Vector3 expectedFromInput = CalculateMovementDirection(_vector2);
+            
+            if (syncRecent && expectedFromInput != Vector3.zero)
+            {
+                // Verificar alineación entre dirección sincronizada y esperada
+                float alignment = Vector3.Dot(_syncDirection, expectedFromInput);
+                
+                if (alignment > alignmentThreshold)
+                {
+                    // Usar dirección sincronizada si está bien alineada
+                    desiredMoveDir = _syncDirection;
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] Using SYNC direction: {desiredMoveDir}, alignment: {alignment:F3}");
+                    }
+                }
+                else
+                {
+                    // Priorizar dirección esperada si hay desalineación
+                    desiredMoveDir = expectedFromInput;
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] OVERRIDE sync due to misalignment: {alignment:F3}, using input direction: {desiredMoveDir}");
+                    }
+                }
             }
             else
             {
-                var direction = _player.transform.position - _camera.transform.position;
-                direction.y = 0;
-                direction.Normalize();
-                var right = new Vector3(direction.z, 0, -direction.x);
-                var result = _vector2.x * right + _vector2.y * direction;
-                if (result != Vector3.zero && !_canChangeDirection)
+                // Fallback: usar dirección calculada del input
+                desiredMoveDir = expectedFromInput;
+                if (enableDebugLogs && hasInput)
                 {
-                    _lastDirection = result;
-                    _player.transform.rotation = Quaternion.Lerp(_player.transform.rotation, Quaternion.LookRotation(result), _forceRotation * Time.deltaTime);
+                    Debug.Log($"[RotationCharacterV2] Using LOCAL direction: {desiredMoveDir}");
                 }
-                else if (_lastDirection != Vector3.zero)
+            }
+            
+            // Aplicar suavizado a la dirección objetivo para reducir jitter en diagonales
+            if (_smoothedDesiredDir == Vector3.zero)
+                _smoothedDesiredDir = desiredMoveDir;
+            else
+                _smoothedDesiredDir = Vector3.Slerp(_smoothedDesiredDir, desiredMoveDir, Mathf.Clamp01(directionSmoothing));
+            
+            bool hasMovement = _smoothedDesiredDir != Vector3.zero;
+            
+            if (hasMovement)
+            {
+                // Solo cambiar dirección si es significativamente diferente
+                float angleDifference = Vector3.Angle(_lastDirection, _smoothedDesiredDir);
+                bool shouldUpdateDirection = _lastDirection == Vector3.zero || angleDifference > directionChangeThreshold;
+                
+                if (shouldUpdateDirection)
                 {
-                    _player.transform.rotation = Quaternion.Lerp(_player.transform.rotation,
-                        Quaternion.LookRotation(_lastDirection), _forceRotation * Time.deltaTime);
+                    _lastDirection = _smoothedDesiredDir;
+                    _rotationVelocity = 1f; // Activar rotación inmediata hacia nueva dirección
+                    
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] Direction changed by {angleDifference:F1}°, updating to: {_lastDirection}");
+                    }
+                }
+                else
+                {
+                    // Dirección estable, mantener rotación actual
+                    _rotationVelocity = Mathf.Max(_rotationVelocity - Time.deltaTime / accelerationTime, minRotationVelocity);
+                }
+            }
+             else
+             {
+                 _rotationVelocity -= Time.deltaTime / accelerationTime;   // Desacelera progresivamente
+             }
+
+            _rotationVelocity = Mathf.Clamp01(_rotationVelocity);
+            float curveValue = rotationCurve.Evaluate(_rotationVelocity);
+            _currentRotationSpeed = baseRotationSpeed * curveValue;
+
+            // Aplicar multiplicador si está saltando
+            if (movementSystem != null && movementSystem.IsJump)
+            {
+                _currentRotationSpeed *= airRotationSpeedMultiplier;
+            }
+
+            // Solo rotar si hay una dirección válida Y la velocidad de rotación es significativa
+            if (_lastDirection != Vector3.zero && _rotationVelocity > 0.05f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(_lastDirection);
+
+                // Solo aplicar rotación si el ángulo diferencia es mayor al umbral mínimo configurable
+                float currentAngleDiff = Quaternion.Angle(_player.transform.rotation, targetRotation);
+
+                if (currentAngleDiff > rotationThreshold)
+                {
+                    _player.transform.rotation = Quaternion.RotateTowards(
+                        _player.transform.rotation,
+                        targetRotation,
+                        _currentRotationSpeed * Time.deltaTime
+                    );
+
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[RotationCharacterV2] Rotating towards {_lastDirection}, angle diff: {currentAngleDiff:F1}°, speed: {_currentRotationSpeed:F1}");
+                    }
+                }
+                else if (enableDebugLogs)
+                {
+                    Debug.Log($"[RotationCharacterV2] Rotation stable, angle diff: {currentAngleDiff:F1}°");
                 }
             }
         }
 
         public void CanRotate(bool canRotate)
         {
-            //Debug.Log("Can Rotate: " + canRotate);
             _vector2 = Vector2.zero;
             _canRotate = canRotate;
-        }
-        
-        public void CanRotateWhileAttack(bool canRotate)
-        {
-            _canRotateWhileAttack = canRotate;
         }
 
         public bool CanRotate()
@@ -82,18 +349,17 @@ namespace _Scripts.Player
             return _canRotate;
         }
 
-        public void RotateToLookTheTarget(Vector3 getTarget)
+        public void RotateToDirection(Vector3 direction)
         {
-            if(getTarget != Vector3.zero)
-            {
-                _lastDirection = getTarget - _player.transform.position;
-                _lastDirection.y = 0;
-            }
+            //invert direction
+            direction = -direction;
+            direction = new Vector3(direction.x, 0, direction.z);
+            _player.transform.rotation = Quaternion.LookRotation(direction);
+            _lastDirection = direction;
         }
 
         public void ChangeDirection(Vector3 rotation)
         {
-            /*Debug.Log("Change Direction: " + rotation);*/
             _canChangeDirection = true;
             _lastDirection = rotation;
         }
@@ -103,12 +369,25 @@ namespace _Scripts.Player
             _canChangeDirection = false;
         }
 
-        public void RotateToDirection(Vector3 direction)
+        public void CanRotateWhileAttack(bool canRotateWhileAttack)
         {
-            //invert direction
-            direction = -direction;
-            //rotate to direction without lerp
-            direction = new Vector3(direction.x, 0, direction.z);
+            _canRotateWhileAttack = canRotateWhileAttack;
+        }
+
+        public void RotateToLookTheTarget(Vector3 getTarget)
+        {
+            if (getTarget != Vector3.zero)
+            {
+                _lastDirection = getTarget - _player.transform.position;
+                _lastDirection.y = 0;
+            }
+        }
+
+        public void RotateInstant(Vector3 direction)
+        {
+            direction.y = 0;
+            if (direction == Vector3.zero) return;
+
             _player.transform.rotation = Quaternion.LookRotation(direction);
             _lastDirection = direction;
         }

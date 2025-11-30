@@ -16,5 +16,7 @@ namespace _Scripts.Player
         void PlayerFallV2();
         void PlayerRecoveryV2();
         bool IsJumpingInWall();
+        void OnStartRunning();
+        void OnStopRunning();
     }
 }

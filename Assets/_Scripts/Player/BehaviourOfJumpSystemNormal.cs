@@ -6,150 +6,159 @@ namespace _Scripts.Player
     public class BehaviourOfJumpSystemNormal : MonoBehaviour, IBehaviourOfJumpSystem
     {
         public Action OnAttack { get; set; }
-        public Action OnMidAir { get; set; }
-        public Action OnSustain { get; set; }
-        public Action OnRelease { get; set; }
-        public Action OnEndJump { get; set; }
-        
+        public Action OnMidAir { get; set; } // Se dispara al iniciar Decay (apex)
+        public Action OnSustain { get; set; } // Se dispara al entrar a plateau para permitir ataques en aire
+        public Action OnRelease { get; set; } // Se dispara al pasar a caída libre
+        public Action OnEndJump { get; set; } // Se dispara al tocar el suelo
+
         private TeaTime _attack, _decay, _sustain, _release, _endJump;
-        private float _deltatimeLocal;
-        [SerializeField] private float timeToAttack, timeToDecreasing, timeToSustain, timeToRelease;
-        [SerializeField] private float maxHeighJump, heightDecreasing;
-        [SerializeField] private float forceToAttack, forceToDecreasing;
+
+        [Header("ADSR Times (seconds)")]
+        [SerializeField] private float timeToAttack = 0.15f; // subida
+        [SerializeField] private float timeToDecay = 0.20f;  // descenso suave al sustain
+        [SerializeField] private float timeToSustain = 0.08f; // mantener altura para acciones
+        [Tooltip("Tiempo máximo opcional antes de forzar EndJump aunque no haya suelo. <=0 para infinito")] [SerializeField]
+        private float maxFallTime = 0f; // caída infinita por defecto
+
+        [Header("Heights / Shape")]
+        [SerializeField] private float maxHeight = 2.5f; // altura máxima en Attack
+        [Range(0f,1f)] [SerializeField] private float sustainLevel = 0.65f; // fracción de max para plateau
+        [SerializeField] private AnimationCurve attackCurve = AnimationCurve.EaseInOut(0,0,1,1); // subida
+        [SerializeField] private AnimationCurve decayCurve = AnimationCurve.EaseInOut(0,1,1,0);  // curva apex -> plateau
+
+        [Header("Release (Caída)")]
+        [Tooltip("Velocidad vertical inicial negativa al iniciar Release (0 = deja que la gravedad acelere)")] [SerializeField]
+        private float releaseStartVelocityDown = 0f;
+
+        [Header("References")]
         [SerializeField] private FloorController floorController;
 
+        // internos
+        private Rigidbody _rb;
+        private Transform _t;
+        private float _baseY;
+        private float _attackElapsed, _decayElapsed, _sustainElapsed, _releaseElapsed;
+        private bool _falling; // indica si está en fase Release
+        private float _releaseStartTime;
 
-        public void Configure(Rigidbody _rigidbody, IJumpSystem jumpSystem)
+        public void Configure(Rigidbody rb, IJumpSystem jumpSystem)
         {
-            Debug.Log($"Configured BehaviourOfJumpSystemNormal: {_rigidbody.gameObject.name}");
-            var gameObjectToPlayer = _rigidbody.gameObject;
-            _attack = this.tt().Pause().Add(() =>
-            {
-                _deltatimeLocal = 0;
-                _rigidbody.useGravity = false;
-                /*_rigidbody.constraints = RigidbodyConstraints.FreezePositionY | RigidbodyConstraints.FreezeRotationZ |
-                                         RigidbodyConstraints.FreezeRotationX;*/
-                //Debug.Log("JumpSystem: Attack");
-            }).Add(() =>
-            {
-                OnAttack?.Invoke(); 
-                //TODO IVAN: Play sound went jump
-            }).Loop(loop =>
-            {
-                //Debug.Log("JumpSystem: Attack Loop");
-                _deltatimeLocal += loop.deltaTime;
-                if (_deltatimeLocal >= timeToAttack)
+            _rb = rb;
+            _t = rb.transform;
+            BuildSequence(jumpSystem);
+        }
+
+        private void BuildSequence(IJumpSystem jumpSystem)
+        {
+            // ATTACK: subir desde base hasta altura máxima usando curva
+            _attack = this.tt().Pause()
+                .Add(() =>
                 {
-                    loop.Break();
-                }
-
-                float t = _deltatimeLocal / timeToAttack;
-                float heightMultiplier = Mathf.Cos(t * Mathf.PI * 0.5f);
-
-                var position = gameObjectToPlayer.transform.position;
-                position = Vector3.Lerp(position, position + Vector3.up * (maxHeighJump * heightMultiplier),
-                    forceToAttack * loop.deltaTime);
-                gameObjectToPlayer.transform.position = position;
-            }).Add(() => { _decay.Play(); });
-            _decay = this.tt().Pause().Add(() =>
-            {
-                OnMidAir?.Invoke();
-                //TODO IVAN: Play sound went jump is in mid air
-            }).Loop(loop =>
-            {
-                //Debug.Log("JumpSystem: Decreasing Loop");
-                _deltatimeLocal += loop.deltaTime;
-
-                float t = (_deltatimeLocal - timeToAttack) / timeToDecreasing;
-                float heightMultiplier = Mathf.Log(1 + t * 4);
-
-                var position = gameObjectToPlayer.transform.position;
-                position = Vector3.Lerp(position, position - Vector3.up * (heightDecreasing * heightMultiplier),
-                    forceToDecreasing * loop.deltaTime);
-                //Validate NaN value
-                if (!double.IsNaN(position.x) && !double.IsNaN(position.y) && !double.IsNaN(position.z))
+                    ResetTimers();
+                    _rb.useGravity = false;
+                    _falling = false;
+                    var v = _rb.linearVelocity; v.y = 0f; _rb.linearVelocity = v;
+                    _baseY = _t.position.y;
+                })
+                .Add(() => { OnAttack?.Invoke(); })
+                .Loop(loop =>
                 {
-                    gameObjectToPlayer.transform.position = position;
-                }
+                    _attackElapsed += loop.deltaTime;
+                    float dur = Mathf.Max(0.0001f, timeToAttack);
+                    float t = Mathf.Clamp01(_attackElapsed / dur);
+                    float h = maxHeight * Mathf.Clamp01(attackCurve.Evaluate(t));
+                    SetY(_baseY + h);
+                    if (t >= 1f) loop.Break();
+                })
+                .Add(() => { _decay.Play(); });
 
-                if (_deltatimeLocal >= timeToAttack + timeToDecreasing || floorController.IsTouchingFloor())
+            // DECAY: curva desde apex (max) hacia plateau (sustainHeight)
+            _decay = this.tt().Pause()
+                .Add(() => { OnMidAir?.Invoke(); }) // apex alcanzado, inicia descenso
+                .Loop(loop =>
                 {
-                    loop.Break();
-                }
-            }).Add(() => { _sustain.Play(); });
-            _sustain = this.tt().Pause().Add(() =>
-            {
-                OnSustain?.Invoke();
-                //TODO IVAN: Play sound went jump is in sustain
-            }).Loop(loop =>
-            {
-                //Debug.Log("JumpSystem: Sustain Loop");
-                _deltatimeLocal += loop.deltaTime;
-                if (_deltatimeLocal >= timeToAttack + timeToDecreasing + timeToSustain)
+                    _decayElapsed += loop.deltaTime;
+                    float dur = Mathf.Max(0.0001f, timeToDecay);
+                    float t = Mathf.Clamp01(_decayElapsed / dur); // 0->1
+                    float startH = maxHeight;
+                    float endH = maxHeight * sustainLevel;
+                    float factor = Mathf.Clamp01(decayCurve.Evaluate(t)); // 1->0 por defecto
+                    float h = Mathf.Lerp(startH, endH, 1f - factor); // a medida que factor baja, nos acercamos a endH
+                    SetY(_baseY + h);
+                    if (t >= 1f) loop.Break();
+                })
+                .Add(() => { _sustain.Play(); });
+
+            // SUSTAIN: mantener plateau para permitir acciones en aire
+            _sustain = this.tt().Pause()
+                .Add(() => { OnSustain?.Invoke(); })
+                .Loop(loop =>
                 {
-                    loop.Break();
-                }
-            }).Add(() => { _release.Play(); });
-            
-            _release = this.tt().Pause().Add(() =>
-            {
-                OnRelease?.Invoke();
-                //TODO IVAN: Play sound went jump is in release use the gravity
-            }).Loop(loop =>
-            {
-                _deltatimeLocal += loop.deltaTime;
-                if (floorController.IsTouchingFloor())
+                    _sustainElapsed += loop.deltaTime;
+                    float h = maxHeight * sustainLevel;
+                    SetY(_baseY + h);
+                    if (_sustainElapsed >= Mathf.Max(0f, timeToSustain)) loop.Break();
+                })
+                .Add(() => { _release.Play(); });
+
+            // RELEASE: caída infinita hasta tocar suelo (o maxFallTime opcional)
+            _release = this.tt().Pause()
+                .Add(() =>
                 {
-                    loop.Break();
-                }
+                    OnRelease?.Invoke();
+                    _rb.useGravity = true;
+                    _falling = true;
+                    _releaseStartTime = Time.time;
+                    if (releaseStartVelocityDown != 0f)
+                    {
+                        var v = _rb.linearVelocity; v.y = -Mathf.Abs(releaseStartVelocityDown); _rb.linearVelocity = v;
+                    }
+                })
+                .Loop(loop =>
+                {
+                    _releaseElapsed += loop.deltaTime;
+                    // fin si toca piso
+                    if (floorController != null && floorController.IsTouchingFloor())
+                    {
+                        loop.Break();
+                        return;
+                    }
+                    // fin opcional por tiempo máximo de caída
+                    if (maxFallTime > 0f && Time.time - _releaseStartTime >= maxFallTime)
+                    {
+                        loop.Break();
+                        return;
+                    }
+                })
+                .Add(() => { _endJump.Play(); });
 
-                var t = _deltatimeLocal / timeToAttack;
-                var heightMultiplier = Mathf.Log(1 + t * forceToDecreasing);
-
-                var position = gameObjectToPlayer.transform.position;
-                position = Vector3.Lerp(position, position - Vector3.up * (maxHeighJump * heightMultiplier),
-                    forceToDecreasing * loop.deltaTime);
-                gameObjectToPlayer.transform.position = position;
-            }).Add(() => { 
-                _endJump.Play();
-            });
-            
-            _endJump = this.tt().Pause().Add(() =>
-            {
-                _rigidbody.useGravity = true;
-                /*_rigidbody.constraints = RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezeRotationX;*/
-                _deltatimeLocal = 0;
-                //Debug.Log("JumpSystem: Attack End");
-                OnEndJump?.Invoke();
-                jumpSystem.RestoreRotation();
-                //TODO IVAN: Play sound went jump is in end went touch the floor
-            });
+            // END: restaurar estado y eventos finales
+            _endJump = this.tt().Pause()
+                .Add(() =>
+                {
+                    _rb.useGravity = true; // asegurar
+                    _falling = false;
+                    ResetTimers();
+                    OnEndJump?.Invoke();
+                    jumpSystem.RestoreRotation();
+                });
         }
 
-        public TeaTime GetAttack()
+        private void ResetTimers()
         {
-            return _attack;
+            _attackElapsed = _decayElapsed = _sustainElapsed = _releaseElapsed = 0f;
         }
 
-        public TeaTime GetDecay()
+        private void SetY(float newY)
         {
-            return _decay;
+            var p = _t.position; p.y = newY; _t.position = p;
         }
 
-        public TeaTime GetSustain()
-        {
-            return _sustain;
-        }
-
-        public TeaTime GetRelease()
-        {
-            return _release;
-        }
-
-        public TeaTime GetEndJump()
-        {
-            return _endJump;
-        }
+        public TeaTime GetAttack() => _attack;
+        public TeaTime GetDecay() => _decay;
+        public TeaTime GetSustain() => _sustain;
+        public TeaTime GetRelease() => _release;
+        public TeaTime GetEndJump() => _endJump;
 
         public void StopAll()
         {
@@ -161,3 +170,4 @@ namespace _Scripts.Player
         }
     }
 }
+

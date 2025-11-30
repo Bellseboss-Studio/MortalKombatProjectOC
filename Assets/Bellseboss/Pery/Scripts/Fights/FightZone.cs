@@ -48,7 +48,7 @@ public class FightZone : MonoBehaviour, IFightZone
     private void EnemyFactoryMonoV2OnAllEnemiesAreDead()
     {
         var allDead = enemiesMonoV2FactoryMono.All(enemyFactoryMonoV2 => enemyFactoryMonoV2.IsAllEnemiesAreDead);
-        Debug.Log($"AllEnemiesAreDead: {allDead}");
+        // Debug.Log($"AllEnemiesAreDead: {allDead}");
         if (allDead)
         {
             activable?.Activate();

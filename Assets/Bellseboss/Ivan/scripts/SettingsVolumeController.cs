@@ -30,7 +30,7 @@ namespace MortalKombat.Audio
             }
             else
             {
-                Debug.Log("bus not assigned");
+                // Debug.Log("bus not assigned");
             }
         }
 
@@ -43,7 +43,7 @@ namespace MortalKombat.Audio
             }
             else
             {
-                Debug.Log("bus not assigned");
+                // Debug.Log("bus not assigned");
             }
         }
     }

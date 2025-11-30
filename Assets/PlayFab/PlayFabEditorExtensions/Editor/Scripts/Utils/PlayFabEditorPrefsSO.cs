@@ -37,7 +37,6 @@ namespace PlayFab.PfEditor
 
                 AssetDatabase.CreateAsset(_instance, "Assets/PlayFabEditorExtensions/Editor/Resources/PlayFabEditorPrefsSO.asset");
                 AssetDatabase.SaveAssets();
-                Debug.LogWarning("Created missing PlayFabEditorPrefsSO file");
                 return _instance;
             }
         }

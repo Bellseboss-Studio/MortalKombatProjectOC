@@ -9,17 +9,17 @@ public class UIEventsTest : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
 {
     public void OnMouseOver()
     {
-       Debug.Log("MouseOver");
+       // Debug.Log("MouseOver");
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        Debug.Log("MouseEnter");
+        // Debug.Log("MouseEnter");
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        Debug.Log("MouseExit");
+        // Debug.Log("MouseExit");
     }
 
     public void OnPointerClick(PointerEventData eventData)
