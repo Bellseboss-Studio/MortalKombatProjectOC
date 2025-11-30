@@ -91,7 +91,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
         animationController.OnFinishAnimation += () =>
         {
-            Debug.Log("EnemyV2: Finish Animation Damage");
+            // Debug.Log("EnemyV2: Finish Animation Damage");
             _canMove = true;
             _canRotate = true;
         };
@@ -183,7 +183,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
     {
         if (IsDead) return;
         _statisticsOfCharacter.life -= damage;
-        Debug.Log(_statisticsOfCharacter.life);
+        // Debug.Log(_statisticsOfCharacter.life);
         if (_statisticsOfCharacter.life <= 0)
         {
             IsDead = true;
@@ -202,7 +202,7 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
     public void Died()
     {
-        Debug.Log("EnemyV2: Die");
+        // Debug.Log("EnemyV2: Die");
         OnDead?.Invoke(this);
         if (IsDeadWithFatality) return;
         animationController.PlayDeath();
@@ -270,10 +270,10 @@ public abstract class EnemyV2 : PJV2, IAnimationController, IEnemyV2, IMovementR
 
     public override void SetAnimationToHit(string animationParameterName)
     {
-        Debug.Log($"EnemyV2: IsDead {IsDead}");
+        // Debug.Log($"EnemyV2: IsDead {IsDead}");
         if (IsDead) return;
         //TODO set animation to hit
-        Debug.Log($"EnemyV2: Set Animation To Hit {animationParameterName}");
+        // Debug.Log($"EnemyV2: Set Animation To Hit {animationParameterName}");
         _aiController.TakeDamage();
         animationController.PlayHit();
     }

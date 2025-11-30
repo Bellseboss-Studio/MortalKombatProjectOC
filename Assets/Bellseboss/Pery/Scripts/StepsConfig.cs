@@ -18,15 +18,15 @@ namespace V2
             this.countOfSteps = countOfSteps;
             currentStep = 0;
             SetStep(currentStep);
-            Debug.Log($"StepsConfig Configure {countOfSteps}");
+            // Debug.Log($"StepsConfig Configure {countOfSteps}");
         }
 
         public void SetStep(int step)
         {
-            Debug.Log($"StepsConfig SetStep {step} / {countOfSteps}");
+            // Debug.Log($"StepsConfig SetStep {step} / {countOfSteps}");
             if (step < 0 || step > countOfSteps)
             {
-                Debug.LogError("Step out of range");
+                // Debug.LogError("Step out of range");
                 return;
             }
 
@@ -35,14 +35,14 @@ namespace V2
 
         public void NextStep()
         {
-            Debug.Log("StepsConfig NextStep");
+            // Debug.Log("StepsConfig NextStep");
             currentStep++;
             SetStep(currentStep);
         }
 
         public void PreviousStep()
         {
-            Debug.Log("StepsConfig PreviousStep");
+            // Debug.Log("StepsConfig PreviousStep");
             currentStep--;
             SetStep(currentStep);
         }

@@ -33,7 +33,7 @@ namespace _Scripts.Player
                     var isTouchingFloor = hit.distance <= minDistanceToFloor;
                     if (logFloorDebug)
                     {
-                        Debug.Log($"[FloorController] Ray desde {origin.name} dist={hit.distance:F3} minDistance={minDistanceToFloor} touching={isTouchingFloor}");
+                        // Debug.Log($"[FloorController] Ray desde {origin.name} dist={hit.distance:F3} minDistance={minDistanceToFloor} touching={isTouchingFloor}");
                     }
                     if (isTouchingFloor)
                     {

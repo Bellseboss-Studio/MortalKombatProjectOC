@@ -47,7 +47,7 @@ public class AiControllerV2 : MonoBehaviour, IAiController
         _enemy.OnDead += EnemyOnOnDead;
         _enemy.OnPlayerDetected += isDetected =>
         {
-            Debug.Log($"OnPlayerDetected {isDetected}");
+            // Debug.Log($"OnPlayerDetected {isDetected}");
 
             StopAllStartIdle();
         };

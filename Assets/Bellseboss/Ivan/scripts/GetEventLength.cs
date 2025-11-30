@@ -16,9 +16,7 @@ public class GetEventLength : MonoBehaviour
         eventInstance.start();
         eventInstance.getDescription(out var eventDescription);
         eventDescription.getLength(out var length);
-        Debug.Log($"Length of Event: {length}ms");
+        // Debug.Log($"Length of Event: {length}ms");
         eventInstance.release();
     }
 }
-
-
