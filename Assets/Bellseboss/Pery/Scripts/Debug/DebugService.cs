@@ -81,8 +81,8 @@ public class DebugService : MonoBehaviour, IDebugService
     private bool CanUse(InputAction.CallbackContext context)
     {
         var result = _isActionPressed && context.started && context.ReadValue<float>() > 0.5f;
-        Debug.Log(
-            $"_isActionPressed: {_isActionPressed} context.started: {context.started} context.ReadValue<float>(): {context.ReadValue<float>()} result: {result}");
+        // Debug.Log(
+        //     $"_isActionPressed: {_isActionPressed} context.started: {context.started} context.ReadValue<float>(): {context.ReadValue<float>()} result: {result}");
         return result;
     }
 

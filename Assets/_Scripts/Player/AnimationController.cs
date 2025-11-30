@@ -67,11 +67,11 @@ namespace _Scripts.Player
         {
             if (!animator)
             {
-                Debug.LogError("[AnimationController] Animator no configurado");
+                // Debug.LogError("[AnimationController] Animator no configurado");
                 return;
             }
 
-            Debug.Log($"[AnimationController] Playing {stateName}");
+            // Debug.Log($"[AnimationController] Playing {stateName}");
 
             animator.CrossFade(stateName, fade);
 
@@ -112,7 +112,7 @@ namespace _Scripts.Player
             // Si estamos en secuencia de salto, no cambiar animaciones de movimiento
             if (isInJumpSequence) 
             {
-                Debug.Log($"[AnimationController] UpdateMovementAnimation BLOCKED by jumpSequence (velocity={velocity:F3})");
+                // Debug.Log($"[AnimationController] UpdateMovementAnimation BLOCKED by jumpSequence (velocity={velocity:F3})");
                 return;
             }
 
@@ -121,11 +121,11 @@ namespace _Scripts.Player
             // Si no cambia de estado Y no es null (que indica reset), no hacemos nada
             if (nextState == currentMovementState && currentMovementState != null) 
             {
-                Debug.Log($"[AnimationController] UpdateMovementAnimation: no change needed (current={currentMovementState}, next={nextState})");
+                // Debug.Log($"[AnimationController] UpdateMovementAnimation: no change needed (current={currentMovementState}, next={nextState})");
                 return;
             }
 
-            Debug.Log($"[AnimationController] UpdateMovementAnimation: changing from '{currentMovementState}' to '{nextState}'");
+            // Debug.Log($"[AnimationController] UpdateMovementAnimation: changing from '{currentMovementState}' to '{nextState}'");
             currentMovementState = nextState;
             Play(nextState, transitionDuration, onFinish);
         }
@@ -150,27 +150,27 @@ namespace _Scripts.Player
         /// </summary>
         private string GetMovementState(float velocity)
         {
-            Debug.Log($"[AnimationController] GetMovementState: velocity={velocity:F3}, walkThreshold={walkThreshold}, runThreshold={runThreshold}");
+            // Debug.Log($"[AnimationController] GetMovementState: velocity={velocity:F3}, walkThreshold={walkThreshold}, runThreshold={runThreshold}");
             
             if (velocity <= walkThreshold)
             {
-                Debug.Log($"[AnimationController] → Idle (velocity <= {walkThreshold})");
+                // Debug.Log($"[AnimationController] → Idle (velocity <= {walkThreshold})");
                 return States.Idle;
             }
 
             if (velocity > walkThreshold && velocity < runThreshold)
             {
-                Debug.Log($"[AnimationController] → Walk (velocity between {walkThreshold} and {runThreshold})");
+                // Debug.Log($"[AnimationController] → Walk (velocity between {walkThreshold} and {runThreshold})");
                 return States.Walk;
             }
 
             if (velocity >= runThreshold)
             {
-                Debug.Log($"[AnimationController] → Run (velocity >= {runThreshold})");
+                // Debug.Log($"[AnimationController] → Run (velocity >= {runThreshold})");
                 return States.Run;
             }
 
-            Debug.Log($"[AnimationController] → Idle (fallback)");
+            // Debug.Log($"[AnimationController] → Idle (fallback)");
             return States.Idle;
         }
 
@@ -265,7 +265,7 @@ namespace _Scripts.Player
             if (isAttacking && currentAttackState == attackState)
                 return;
 
-            Debug.Log($"[AnimationController] Reproduciendo ataque: {attackState}");
+            // Debug.Log($"[AnimationController] Reproduciendo ataque: {attackState}");
 
             currentAttackState = attackState;
             isAttacking = true;

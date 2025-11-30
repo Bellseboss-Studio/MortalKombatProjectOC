@@ -31,8 +31,17 @@ namespace _Scripts.Player
         private float rotationThreshold = 1f;
         [Tooltip("Velocidad mínima de rotación para mantener estabilidad")] [SerializeField]
         private float minRotationVelocity = 0.1f;
-        [Tooltip("Umbral de alineación entre dirección de movimiento y input (0-1, mayor = más estricto)")] [SerializeField]
+        [Tooltip("Umbral de alineación entre dirección de movimiento y input (0-1, mayor = más estricto) ")] [SerializeField]
         private float alignmentThreshold = 0.7f;
+        [Tooltip("Histeresis para evitar toggles cerca del umbral de alineación (0..0.2)")]
+        [SerializeField]
+        private float alignmentHysteresis = 0.03f;
+
+        [Header("Smoothing")]
+        [Tooltip("Factor de suavizado para la dirección objetivo (0=no smoothing, 0.1..0.3 recomendado)")]
+        [SerializeField]
+        [Range(0f, 0.9f)]
+        private float directionSmoothing = 0.12f;
 
         [Header("Debug")]
         [Tooltip("Mostrar logs de depuración para alineación de rotación")] [SerializeField]
@@ -41,6 +50,7 @@ namespace _Scripts.Player
         private float _rotationVelocity; // valor 0–1 que aumenta cuando hay input
         private Vector2 _vector2;
         private Vector3 _lastDirection;
+        private Vector3 _smoothedDesiredDir;
         private bool _canChangeDirection;
         private bool _canRotate;
         private bool _canRotateWhileAttack;
@@ -54,10 +64,10 @@ namespace _Scripts.Player
         private Vector3 _syncDirection;
         private float _lastSyncTime;
 
-        public void Configure(GameObject camera, GameObject player, IRotationCharacterV2 rotationCharacterV2,
+        public void Configure(GameObject cameraObj, GameObject player, IRotationCharacterV2 rotationCharacterV2,
             float forceRotation)
         {
-            _camera = camera;
+            _camera = cameraObj;
             _player = player;
             _rotationCharacterV2 = rotationCharacterV2;
             _forceRotation = forceRotation;
@@ -84,14 +94,17 @@ namespace _Scripts.Player
                 if (expectedDirection != Vector3.zero)
                 {
                     float alignment = Vector3.Dot(normalizedDirection, expectedDirection);
-                    
-                    if (alignment > alignmentThreshold) // Umbral de alineación configurable
+                    float acceptThreshold = alignmentThreshold + alignmentHysteresis;
+                    float rejectThreshold = alignmentThreshold - alignmentHysteresis;
+
+                    if (alignment > acceptThreshold)
                     {
+                        // Aceptar sincronización
                         _lastDirection = normalizedDirection;
                         _syncDirection = _lastDirection;
                         _usingSyncDirection = true;
                         _lastSyncTime = Time.time;
-                        
+
                         if (enableDebugLogs)
                         {
                             Debug.Log($"[RotationCharacterV2] Sync direction accepted: {_lastDirection}, alignment: {alignment:F3}");
@@ -99,10 +112,17 @@ namespace _Scripts.Player
                     }
                     else
                     {
-                        // Usar dirección esperada en lugar de sincronizada si hay desalineación
-                        _lastDirection = expectedDirection;
-                        _usingSyncDirection = false;
-                        
+                        // En banda de histéresis: mantener previo; si está claramente desalineado => usar expected
+                        if (alignment >= rejectThreshold)
+                        {
+                            // mantener previo
+                        }
+                        else
+                        {
+                            _lastDirection = expectedDirection;
+                            _usingSyncDirection = false;
+                        }
+
                         if (enableDebugLogs)
                         {
                             Debug.Log($"[RotationCharacterV2] Sync direction rejected due to misalignment: {alignment:F3}, using expected: {expectedDirection}");
@@ -134,19 +154,24 @@ namespace _Scripts.Player
             
             if (quantizedInput.sqrMagnitude <= 0.0001f) return Vector3.zero;
             
-            // PASO 2: EXACTAMENTE la misma lógica que InputMovementCustomV2
-            var direction = _player.transform.position - _camera.transform.position;
-            direction.y = 0; // Ignora la componente Y para mantener el movimiento en el plano XZ
-            direction.Normalize();
-            var right = new Vector3(direction.z, 0, -direction.x);
-            var result = quantizedInput.x * right + quantizedInput.y * direction;
+            // PASO 2: usar la forward de la cámara proyectada en XZ para mayor estabilidad cuando la cámara está en LookAt
+            var camForward = _camera.transform.forward;
+            camForward.y = 0f;
+            if (camForward.sqrMagnitude <= 0.000001f)
+            {
+                camForward = _player.transform.position - _camera.transform.position;
+                camForward.y = 0f;
+            }
+            camForward.Normalize();
+            var right = new Vector3(camForward.z, 0f, -camForward.x);
+            var result = quantizedInput.x * right + quantizedInput.y * camForward;
             
             if (result.sqrMagnitude > 0.0001f)
                 result.Normalize();
             
             if (enableDebugLogs)
             {
-                Debug.Log($"[RotationCharacterV2] RawInput={input}, QuantizedInput={quantizedInput}, CameraToPlayer={direction}, Right={right}, Result={result}");
+                Debug.Log($"[RotationCharacterV2] RawInput={input}, QuantizedInput={quantizedInput}, CameraToPlayer={camForward}, Right={right}, Result={result}");
             }
             
             return result;
@@ -240,17 +265,23 @@ namespace _Scripts.Player
                 }
             }
             
-            bool hasMovement = desiredMoveDir != Vector3.zero;
+            // Aplicar suavizado a la dirección objetivo para reducir jitter en diagonales
+            if (_smoothedDesiredDir == Vector3.zero)
+                _smoothedDesiredDir = desiredMoveDir;
+            else
+                _smoothedDesiredDir = Vector3.Slerp(_smoothedDesiredDir, desiredMoveDir, Mathf.Clamp01(directionSmoothing));
+            
+            bool hasMovement = _smoothedDesiredDir != Vector3.zero;
             
             if (hasMovement)
             {
                 // Solo cambiar dirección si es significativamente diferente
-                float angleDifference = Vector3.Angle(_lastDirection, desiredMoveDir);
+                float angleDifference = Vector3.Angle(_lastDirection, _smoothedDesiredDir);
                 bool shouldUpdateDirection = _lastDirection == Vector3.zero || angleDifference > directionChangeThreshold;
                 
                 if (shouldUpdateDirection)
                 {
-                    _lastDirection = desiredMoveDir;
+                    _lastDirection = _smoothedDesiredDir;
                     _rotationVelocity = 1f; // Activar rotación inmediata hacia nueva dirección
                     
                     if (enableDebugLogs)
@@ -264,10 +295,10 @@ namespace _Scripts.Player
                     _rotationVelocity = Mathf.Max(_rotationVelocity - Time.deltaTime / accelerationTime, minRotationVelocity);
                 }
             }
-            else
-            {
-                _rotationVelocity -= Time.deltaTime / accelerationTime;   // Desacelera progresivamente
-            }
+             else
+             {
+                 _rotationVelocity -= Time.deltaTime / accelerationTime;   // Desacelera progresivamente
+             }
 
             _rotationVelocity = Mathf.Clamp01(_rotationVelocity);
             float curveValue = rotationCurve.Evaluate(_rotationVelocity);
@@ -283,10 +314,10 @@ namespace _Scripts.Player
             if (_lastDirection != Vector3.zero && _rotationVelocity > 0.05f)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(_lastDirection);
-                
+
                 // Solo aplicar rotación si el ángulo diferencia es mayor al umbral mínimo configurable
                 float currentAngleDiff = Quaternion.Angle(_player.transform.rotation, targetRotation);
-                
+
                 if (currentAngleDiff > rotationThreshold)
                 {
                     _player.transform.rotation = Quaternion.RotateTowards(
@@ -294,7 +325,7 @@ namespace _Scripts.Player
                         targetRotation,
                         _currentRotationSpeed * Time.deltaTime
                     );
-                    
+
                     if (enableDebugLogs)
                     {
                         Debug.Log($"[RotationCharacterV2] Rotating towards {_lastDirection}, angle diff: {currentAngleDiff:F1}°, speed: {_currentRotationSpeed:F1}");

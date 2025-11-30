@@ -63,7 +63,7 @@ internal class AiController : MonoBehaviour
         _enemy.OnPlayerInNearZone += isNear =>
         {
             if (_isDeath) return;
-            Debug.Log("entro is near");
+            // Debug.Log("entro is near");
             enemy.GetPlayer().GetIntoEnemyZone(gameObject, isNear);
             if(isNear)
             {
@@ -209,7 +209,7 @@ internal class AiController : MonoBehaviour
 
     private void EnemyOnOnDead(EnemyV2 obj)
     {
-        Debug.Log("AiController: Enemy is dead");
+        // Debug.Log("AiController: Enemy is dead");
         _isDeath = true;
         /*_enemy.CanRotate(false);*/
         _died.Play();

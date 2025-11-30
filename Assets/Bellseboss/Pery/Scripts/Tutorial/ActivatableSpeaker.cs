@@ -17,7 +17,7 @@ namespace MortalKombat.Audio
             }
             catch
             {
-                Debug.Log("error on Activatable Speaker");
+                // Debug.Log("error on Activatable Speaker");
             }
             
         }
@@ -38,6 +38,3 @@ namespace MortalKombat.Audio
     {
     }
 }
-
-
-

@@ -14,7 +14,7 @@ namespace _Scripts.Player
 
         private void OnDead(ICharacterV2 obj)
         {
-            Debug.Log("Dead!");
+            // Debug.Log("Dead!");
             _character.StartDeadAction();
         }
     }
