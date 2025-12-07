@@ -16,7 +16,7 @@ Material:
   m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3001
+  m_CustomRenderQueue: 3000
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
@@ -38,12 +38,13 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Clouds_Alpha: 0.12
-    - _Clouds_Power: 0.3
-    - _Clouds_Scale: 100
+    - _Clouds_Alpha: 0.5
+    - _Clouds_Power: 0.6
+    - _Clouds_Scale: 50
     - _DistortScale: 60
+    - _Power_clamp: 0.11
     - _QueueControl: 0
-    - _QueueOffset: 1
+    - _QueueOffset: 0
     m_Colors:
     - _Clouds_Color: {r: 1.3205354, g: 0.590004, b: 1.3721024, a: 1}
     - _Clouds_Speed: {r: 0.05, g: 0, b: 0, a: 0}
