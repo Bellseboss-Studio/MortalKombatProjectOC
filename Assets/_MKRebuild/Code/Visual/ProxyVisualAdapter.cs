@@ -17,8 +17,12 @@ namespace MK.Rebuild
         [SerializeField] private float turnSpeed = 0f;
 
         private PlayerParams paramsRef;
+        private MoveState moveState = MoveState.Free;
 
         public Vector3 Facing => (facingRoot != null ? facingRoot : transform).forward;
+
+        /// <summary>Last movement state pushed by PlayerMotor (animation hook seam).</summary>
+        public MoveState CurrentMoveState => moveState;
 
         /// <summary>Inject params so turnSpeed stays data-driven (called by PlayerMotor).</summary>
         public void Bind(PlayerParams paramsAsset) => paramsRef = paramsAsset;
@@ -39,5 +43,13 @@ namespace MK.Rebuild
         }
 
         public void SetGrounded(bool grounded) { /* M0: no animation hooks */ }
+
+        public void SetMoveState(MoveState state) => moveState = state;
+
+        public void SetSpeed(float metersPerSecond) { /* Fallback proxy: no animator hooks */ }
+
+        public void SetVerticalSpeed(float verticalVelocity) { /* Fallback proxy: no animator hooks */ }
+
+        public void SetRunning(bool running) { /* Fallback proxy: no animator hooks */ }
     }
 }

@@ -13,17 +13,22 @@ MonoBehaviour:
   m_Name: PlayerParams
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerParams
   walkSpeed: 6
+  runSpeed: 9
   jumpVelocity: 8
   gravity: -20
+  walkInputThreshold: 0.2
+  runInputThreshold: 0.4
   jumpBuffer: 0.15
   coyoteTime: 0.12
+  fallGravityMultiplier: 2.2
+  jumpCutMultiplier: 0.45
+  maxFallSpeed: -25
+  jumpStartSpeed: 8.2
+  flipMidAirSpeed: 3.5
   accelTime: 0.08
   decelTime: 0.1
   airControlFactor: 0.66
   turnSpeed: 1500
-  fallGravityMultiplier: 2.2
-  jumpCutMultiplier: 0.45
-  maxFallSpeed: -25
   wallCheckDistance: 0.7
   wallNormalThreshold: 0.5
   wallSlideSpeed: 0
@@ -35,6 +40,4 @@ MonoBehaviour:
   wallReleaseHop: 3
   wallReleaseThreshold: -0.5
   autoMantle: 0
-  ledgeMantleVelocity: 7
-  ledgeMantlePushOff: 3
-  ledgeMantleLockTime: 0.25
+  mantleDuration: 0.3

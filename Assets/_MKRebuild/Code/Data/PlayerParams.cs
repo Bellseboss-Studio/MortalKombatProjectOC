@@ -6,14 +6,26 @@ namespace MK.Rebuild
     public sealed class PlayerParams : ScriptableObject
     {
         [Header("Locomotion")]
-        [Tooltip("Walk speed in m/s.")]
+        [Tooltip("Walk speed in m/s (FIXED across the walk input zone — not analog-scaled).")]
         public float walkSpeed = 6.0f;
+
+        [Tooltip("Run speed in m/s (FIXED across the run input zone).")]
+        public float runSpeed = 9.0f;
 
         [Tooltip("Takeoff velocity in m/s (NOT height). apex = v^2 / 2g.")]
         public float jumpVelocity = 8.0f;
 
         [Tooltip("Gravity applied when airborne (negative Y, m/s^2).")]
         public float gravity = -20f;
+
+        [Header("Move input zones (fixed discrete speeds)")]
+        [Tooltip("Stick magnitude below this = deadzone/idle.")]
+        [Range(0f, 1f)]
+        public float walkInputThreshold = 0.2f;
+
+        [Tooltip("Stick magnitude up to this = walk; above = run.")]
+        [Range(0f, 1f)]
+        public float runInputThreshold = 0.4f;
 
         [Header("Timing")]
         [Tooltip("Seconds a jump press stays buffered while airborne.")]
@@ -32,6 +44,15 @@ namespace MK.Rebuild
 
         [Tooltip("Fastest allowed fall speed (negative Y, m/s).")]
         public float maxFallSpeed = -25f;
+
+        [Header("Jump clip retiming (TEMPORARY — set to 1 once clips are retimed to x1)")]
+        [Tooltip("Animator state speed multiplier for JumpStart (~ clipLength / launchWindow; " +
+                 "launch = ascent half, ~0.20 s). Somersault-on-ascent iteration.")]
+        public float jumpStartSpeed = 8.2f;
+
+        [Tooltip("Animator state speed multiplier for FlipMidAir (~ clipLength / flipWindow; " +
+                 "flip = mid-ascent to touchdown, ~0.49 s). Somersault-on-ascent iteration.")]
+        public float flipMidAirSpeed = 3.5f;
 
         [Header("Feel (tunables)")]
         [Tooltip("Seconds to reach full speed (ground).")]
@@ -83,13 +104,7 @@ namespace MK.Rebuild
         [Tooltip("True = auto-mantle the top on contact; false = hang + Jump to mantle (default).")]
         public bool autoMantle = false;
 
-        [Tooltip("Auto-mantle upward velocity (m/s).")]
-        public float ledgeMantleVelocity = 7.0f;
-
-        [Tooltip("Auto-mantle forward push over the top (m/s).")]
-        public float ledgeMantlePushOff = 3.0f;
-
-        [Tooltip("Seconds of horizontal control lockout during the mantle.")]
-        public float ledgeMantleLockTime = 0.25f;
+        [Tooltip("Seconds the animation-driven mantle warp lasts (SmoothStep from hang to stand).")]
+        public float mantleDuration = 0.3f;
     }
 }

@@ -50,7 +50,12 @@ namespace MK.Rebuild
         private float wallJumpLockTimer;
         private float wallReGrabTimer;
         private float wallCoyoteTimer;
-        private float mantleLockTimer;
+
+        // Mantle: animation-driven timed warp (A2: direct root set, no kinematic switch).
+        private bool mantling;
+        private Vector3 warpStart;
+        private Vector3 warpEnd;
+        private float warpT;
 
         // State-driven facing contract (animation readiness): facing is LOCKED while
         // on a wall/ledge or during a scripted wall-jump turn, and FREE (input) otherwise.
@@ -70,9 +75,9 @@ namespace MK.Rebuild
         {
             rb = GetComponent<Rigidbody>();
             body = GetComponent<CapsuleCollider>();
-            visual = GetComponent<ProxyVisualAdapter>();
-            var adapter = visual as ProxyVisualAdapter;
-            if (adapter != null) adapter.Bind(paramsAsset);
+            visual = GetComponent<ICharacterVisual>();
+            // One-time params seam for the concrete driver (turnSpeed stays data-driven).
+            if (visual is AnimatorVisual animatorVisual) animatorVisual.Bind(paramsAsset);
 
             // M0 physical contract (also set in scene): interpolated, no torque.
             rb.interpolation = RigidbodyInterpolation.Interpolate;
@@ -131,6 +136,30 @@ namespace MK.Rebuild
             float dt = Time.fixedDeltaTime;
             bufferTimer = Mathf.Max(0f, bufferTimer - dt);
 
+            // Mantle: animation-driven timed warp. Owns the root while active; input is
+            // ignored and control returns exactly on arrival (A2: no kinematic switch).
+            // Handled before the geometry probes so facing stays stable through the warp.
+            if (mantling)
+            {
+                float duration = Mathf.Max(0.0001f, paramsAsset.mantleDuration);
+                warpT += dt / duration;
+                rb.linearVelocity = Vector3.zero;
+                if (warpT >= 1f)
+                {
+                    rb.position = warpEnd; // snap exact — no overshoot
+                    mantling = false;
+                    verticalVel = 0f;
+                    smoothVel = Vector3.zero;
+                    lockHoriz = Vector3.zero;
+                }
+                else
+                {
+                    rb.position = Vector3.Lerp(warpStart, warpEnd, Mathf.SmoothStep(0f, 1f, warpT));
+                }
+                ExposeMantleState();
+                return;
+            }
+
             bool grounded = CheckGrounded();
             // Touching the ground clears the re-grab ban (and the coyote source).
             if (grounded)
@@ -157,7 +186,6 @@ namespace MK.Rebuild
             // Wall timers.
             wallJumpLockTimer = Mathf.Max(0f, wallJumpLockTimer - dt);
             wallReGrabTimer = Mathf.Max(0f, wallReGrabTimer - dt);
-            mantleLockTimer = Mathf.Max(0f, mantleLockTimer - dt);
 
             // A wall is grabbable only while airborne and not in a jump/mantle
             // lockout. Gating with !grounded stops the ground jump from being
@@ -166,7 +194,7 @@ namespace MK.Rebuild
                 && wallContact
                 && wallReGrabTimer <= 0f
                 && wallJumpLockTimer <= 0f
-                && mantleLockTimer <= 0f;
+                && !mantling;
 
             // Ledge hang: overlapping a Ledge trigger while airborne (works with
             // or without a Grabbable wall underneath).
@@ -174,7 +202,7 @@ namespace MK.Rebuild
                 && ledgeContact
                 && wallReGrabTimer <= 0f
                 && wallJumpLockTimer <= 0f
-                && mantleLockTimer <= 0f;
+                && !mantling;
 
             bool hanging = wallGrab || ledgeHang;
 
@@ -261,6 +289,14 @@ namespace MK.Rebuild
                 hanging = false;
             }
 
+            // Mantle triggered THIS frame: skip physics/control now and expose the state
+            // immediately (the warp proper runs on the next FixedUpdate).
+            if (mantling)
+            {
+                ExposeMantleState();
+                return;
+            }
+
             if (grounded)
             {
                 if (verticalVel < 0f) verticalVel = stickForce;
@@ -269,11 +305,6 @@ namespace MK.Rebuild
             {
                 // Hang: hold vertical at the tunable slide speed (0 = full stop).
                 verticalVel = paramsAsset.wallSlideSpeed;
-            }
-            else if (mantleLockTimer > 0f)
-            {
-                // Mantle: keep driving up until the lock ends.
-                verticalVel = paramsAsset.ledgeMantleVelocity;
             }
             else
             {
@@ -284,10 +315,32 @@ namespace MK.Rebuild
                 verticalVel = Mathf.Max(verticalVel, paramsAsset.maxFallSpeed);
             }
 
-            // Camera-relative wish direction on XZ.
+            // Camera-relative wish direction on XZ (UNIT vector: the stick magnitude
+            // is handled separately by the fixed input zones below, never scaling speed).
             Vector3 wishDir = CameraRelative(moveInput);
+
+            // Fixed DISCRETE target speed by input zone: deadzone / walk / run.
+            // NOT analog-scaled by how far the stick is pushed.
+            float inputMagnitude = moveInput.magnitude;
+            float targetSpeed;
+            bool running = false;
+            if (inputMagnitude < paramsAsset.walkInputThreshold)
+            {
+                targetSpeed = 0f; // idle / deadzone
+            }
+            else if (inputMagnitude <= paramsAsset.runInputThreshold)
+            {
+                targetSpeed = paramsAsset.walkSpeed; // walk zone (fixed)
+            }
+            else
+            {
+                targetSpeed = paramsAsset.runSpeed; // run zone (fixed)
+                running = true;
+            }
+            bool moving = targetSpeed > 0.0001f;
+
             Vector3 horizontal;
-            if (wallJumpLockTimer > 0f || mantleLockTimer > 0f)
+            if (wallJumpLockTimer > 0f)
             {
                 // Control locked: keep the impulse, skip the wish.
                 horizontal = lockHoriz;
@@ -295,8 +348,8 @@ namespace MK.Rebuild
             }
             else
             {
-                Vector3 target = wishDir * paramsAsset.walkSpeed;
-                float smoothTime = wishDir.sqrMagnitude > 0.0001f
+                Vector3 target = wishDir * targetSpeed;
+                float smoothTime = moving
                     ? paramsAsset.accelTime
                     : paramsAsset.decelTime;
                 if (!grounded) smoothTime /= Mathf.Max(0.01f, paramsAsset.airControlFactor);
@@ -325,25 +378,34 @@ namespace MK.Rebuild
                 locked = true;
                 faceDir = HangIntoDir();
             }
-            else if (mantleLockTimer > 0f)
+            else if (wishDir.sqrMagnitude > 0.000001f && moving)
             {
-                // Mantle: LOCKED facing the ledge (into/over it).
-                locked = true;
-                faceDir = HangIntoDir();
-            }
-            else if (wishDir.sqrMagnitude > 0.000001f)
-            {
-                // Free: input/movement direction.
+                // Free: input/movement direction (only once past the deadzone).
                 faceDir = wishDir;
             }
 
             facingLocked = locked;
             desiredFacing = faceDir;
 
+            // Movement state for the animator: most specific active state wins.
+            MoveState moveState;
+            if (mantling) moveState = MoveState.Mantle;
+            else if (holdingWallJumpFacing) moveState = MoveState.WallJump;
+            else if (ledgeHang) moveState = MoveState.LedgeHang;
+            else if (wallGrab) moveState = MoveState.WallGrab;
+            else moveState = MoveState.Free;
+
             if (visual != null)
             {
                 if (faceDir.sqrMagnitude > 0.000001f) visual.SetFacing(faceDir);
                 visual.SetGrounded(grounded);
+                visual.SetMoveState(moveState);
+                // Animation hooks: XZ speed picks Idle/Walk; vertical velocity picks
+                // the jump sub-phases (JumpStart → FlipMidAir → Landing).
+                visual.SetSpeed(new Vector2(rb.linearVelocity.x, rb.linearVelocity.z).magnitude);
+                visual.SetVerticalSpeed(rb.linearVelocity.y);
+                // Discrete input zone: true = run (fixed runSpeed), false = walk/idle.
+                visual.SetRunning(running);
             }
 
             // Sticky grab: persist while airborne on a grabbable wall, so contact
@@ -360,7 +422,7 @@ namespace MK.Rebuild
             forward.Normalize();
             Vector3 right = new Vector3(forward.z, 0f, -forward.x);
             Vector3 dir = forward * stick.y + right * stick.x;
-            return dir.sqrMagnitude > 1f ? dir.normalized : dir;
+            return dir.sqrMagnitude > 0.000001f ? dir.normalized : Vector3.zero;
         }
 
         private bool CheckGrounded()
@@ -431,15 +493,69 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Starts a mantle: up + over the top, with a short control lock. Shared by
-        /// the opt-in auto path (<c>autoMantle</c>) and the manual Jump path.
+        /// Starts the animation-driven mantle warp: capture the hang pose and the exact
+        /// stand pose (wall top + half height), then let FixedUpdate interpolate. Shared
+        /// by the opt-in auto path (<c>autoMantle</c>) and the manual Jump path.
         /// </summary>
         private void ApplyMantle()
         {
-            verticalVel = paramsAsset.ledgeMantleVelocity;
-            lockHoriz = HangIntoDir() * paramsAsset.ledgeMantlePushOff;
-            mantleLockTimer = paramsAsset.ledgeMantleLockTime;
+            warpStart = rb.position;
+            warpEnd = ComputeWarpEnd();
+            warpT = 0f;
+            mantling = true;
             wallCoyoteTimer = 0f;
+            wallContact = false;
+        }
+
+        /// <summary>
+        /// Exact stand pose over a ledge: wall top + half height, XZ = slab center +
+        /// inward offset (offset = body radius; tune if the capsule clips the lip).
+        /// With no Grabbable wall the top is not derivable — Ledge-based derivation is
+        /// deferred, so fall back to a body-sized climb that always releases control
+        /// instead of crashing.
+        /// </summary>
+        private Vector3 ComputeWarpEnd()
+        {
+            Vector3 into = HangIntoDir();
+            if (wallCollider != null)
+            {
+                Bounds wall = wallCollider.bounds;
+                // Inward offset from the slab center to clear the lip. Tuned to 0:
+                // with this 0.5-wide slab, center + body.radius (0.5) landed past the
+                // top footprint (x=2.0 > 1.75) and the capsule fell off the far side.
+                // The slab center is the stand, so the offset stays 0 here.
+                float offset = 0f;
+                return new Vector3(
+                    wall.center.x + into.x * offset,
+                    wall.max.y + body.height * 0.5f,
+                    wall.center.z + into.z * offset);
+            }
+
+            return new Vector3(
+                warpStart.x + into.x * body.radius,
+                warpStart.y + body.height,
+                warpStart.z + into.z * body.radius);
+        }
+
+        /// <summary>
+        /// Locks facing into/over the edge and reports <see cref="MoveState.Mantle"/> to
+        /// the visual. Shared by the trigger frame and the warp frames.
+        /// </summary>
+        private void ExposeMantleState()
+        {
+            facingLocked = true;
+            desiredFacing = HangIntoDir();
+            if (visual != null)
+            {
+                if (desiredFacing.sqrMagnitude > 0.000001f) visual.SetFacing(desiredFacing);
+                visual.SetGrounded(false);
+                visual.SetMoveState(MoveState.Mantle);
+                // Warp velocity is zeroed — mirrors the controller out of locomotion.
+                visual.SetSpeed(0f);
+                visual.SetVerticalSpeed(0f);
+                visual.SetRunning(false);
+            }
+            wallGrabHeld = false;
             wallContact = false;
         }
 
