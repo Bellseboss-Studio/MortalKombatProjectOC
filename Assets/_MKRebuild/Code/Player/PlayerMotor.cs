@@ -57,6 +57,10 @@ namespace MK.Rebuild
         private Vector3 warpEnd;
         private float warpT;
 
+        // Last ground-probe result (cached for the read-only debug seam).
+        // Updated every FixedUpdate by CheckGrounded().
+        private bool grounded;
+
         // State-driven facing contract (animation readiness): facing is LOCKED while
         // on a wall/ledge or during a scripted wall-jump turn, and FREE (input) otherwise.
         private bool facingLocked;
@@ -67,6 +71,13 @@ namespace MK.Rebuild
 
         /// <summary>True while facing is state-driven (wall/ledge/flight) and input cannot steer it.</summary>
         public bool FacingLocked => facingLocked;
+
+        /// <summary>
+        /// True when the ground probe found a floor collider on the latest step.
+        /// Read-only, no setter: exposed so the isolated debug module can observe
+        /// the motor without any game→debug coupling.
+        /// </summary>
+        public bool IsGrounded => grounded;
 
         /// <summary>World-space direction the character should face this step (XZ). Zero = keep.</summary>
         public Vector3 DesiredFacing => desiredFacing;
@@ -160,7 +171,7 @@ namespace MK.Rebuild
                 return;
             }
 
-            bool grounded = CheckGrounded();
+            grounded = CheckGrounded();
             // Touching the ground clears the re-grab ban (and the coyote source).
             if (grounded)
             {
@@ -545,6 +556,7 @@ namespace MK.Rebuild
         {
             facingLocked = true;
             desiredFacing = HangIntoDir();
+            grounded = false; // the warp is airborne; keep the debug readout honest
             if (visual != null)
             {
                 if (desiredFacing.sqrMagnitude > 0.000001f) visual.SetFacing(desiredFacing);
