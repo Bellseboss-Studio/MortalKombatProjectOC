@@ -245,6 +245,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d789f82fb2654047b2f01f9cd029e7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.Grabbable
+--- !u!134 &276840317
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &312964266
 GameObject:
   m_ObjectHideFlags: 0
@@ -633,19 +646,6 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!134 &474005234
-PhysicsMaterial:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 2
-  m_DynamicFriction: 0.6
-  m_StaticFriction: 0.6
-  m_Bounciness: 0
-  m_FrictionCombine: 0
-  m_BounceCombine: 0
 --- !u!1 &715734535
 GameObject:
   m_ObjectHideFlags: 0
@@ -1036,19 +1036,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.7, y: 0.7, z: 6}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!134 &1547424440
-PhysicsMaterial:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: ' (Instance) (Instance) (Instance) (Instance) (Instance)'
-  serializedVersion: 2
-  m_DynamicFriction: 0.6
-  m_StaticFriction: 0.6
-  m_Bounciness: 0
-  m_FrictionCombine: 0
-  m_BounceCombine: 0
 --- !u!1 &1561170865
 GameObject:
   m_ObjectHideFlags: 0
@@ -1209,6 +1196,7 @@ GameObject:
   - component: {fileID: 1837699318}
   - component: {fileID: 1837699317}
   - component: {fileID: 1837699319}
+  - component: {fileID: 1837699320}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1289,7 +1277,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1837699311}
-  m_Material: {fileID: 1547424440}
+  m_Material: {fileID: 2053963101}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1370,6 +1358,20 @@ MonoBehaviour:
   animator: {fileID: 459002693}
   facingRoot: {fileID: 1780519587}
   turnSpeed: 0
+--- !u!114 &1837699320
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1837699311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0788a0f4cb28a04b8cb744b8538cf2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerCombat
+  lightAttack: {fileID: 11400000, guid: 45529e462004ef24e80cf8d9c3f1dfaa, type: 2}
+  heavyAttack: {fileID: 11400000, guid: d9d7b645ef9f3104795f485625b72bba, type: 2}
 --- !u!1 &2013586933
 GameObject:
   m_ObjectHideFlags: 0
@@ -1382,6 +1384,7 @@ GameObject:
   - component: {fileID: 2013586936}
   - component: {fileID: 2013586935}
   - component: {fileID: 2013586934}
+  - component: {fileID: 2013586938}
   m_Layer: 0
   m_Name: Dummy
   m_TagString: Untagged
@@ -1445,7 +1448,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2013586933}
-  m_Material: {fileID: 474005234}
+  m_Material: {fileID: 276840317}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1484,6 +1487,36 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2013586938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2013586933}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58e47bcbbac22a948a483d9ae679b247, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HitReceiver
+  maxHp: 20
+  flashDuration: 0.12
+  flashTint: {r: 1, g: 0.35, b: 0.35, a: 1}
+  knockbackSpeed: 6
+  knockbackDamping: 18
+--- !u!134 &2053963101
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &2070183346
 GameObject:
   m_ObjectHideFlags: 0

@@ -114,6 +114,10 @@ namespace MK.Rebuild.Debugging
             dummy.name = "DebugDummy_" + spawned.Count;
             dummy.transform.position = spawnPos;
 
+            // Spawned targets are hittable too (M1 combat): the grey dummy needs
+            // the same hurtbox as the scene Dummy, or attacks whiff on it.
+            dummy.AddComponent<HitReceiver>();
+
             var renderer = dummy.GetComponent<Renderer>();
             if (renderer != null)
             {
