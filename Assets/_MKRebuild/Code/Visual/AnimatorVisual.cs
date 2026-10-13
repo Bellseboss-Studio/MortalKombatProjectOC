@@ -33,6 +33,7 @@ namespace MK.Rebuild
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
+        private static readonly int LauncherStateHash = Animator.StringToHash("LauncherState");
         private static readonly int AttackP1SpeedHash = Animator.StringToHash("AttackP1Speed");
         private static readonly int AttackP2SpeedHash = Animator.StringToHash("AttackP2Speed");
         private static readonly int AttackP3SpeedHash = Animator.StringToHash("AttackP3Speed");
@@ -182,6 +183,29 @@ namespace MK.Rebuild
         public void ReleaseDashAttack()
         {
             if (animator != null) animator.SetInteger(DashAttackStateHash, 0);
+        }
+
+        /// <summary>
+        /// DORMANT launcher slot (slice 3nonies): mirrors <see cref="PlayDashAttack"/> for the
+        /// EMPTY <c>Attack_Launcher</c> state (the launcher variant's own clip slot). Called by
+        /// <see cref="PlayerCombat"/> ONLY when the launcher step has an assigned clip
+        /// (<c>ComboStep.clip</c>) — entering the motion-less state with no clip would freeze
+        /// the pose, so until the animation exists the visual is skipped entirely. Pushing
+        /// LauncherState = 1 lets the controller's mirror exits (gated <c>LauncherState == 0</c>)
+        /// return to locomotion. Uses a DEDICATED param (NOT MoveState): the AnyState
+        /// <c>MoveState != 0</c> would hijack it.
+        /// </summary>
+        public void PlayLauncher(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            animator.CrossFade("Attack_Launcher", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+            animator.SetInteger(LauncherStateHash, 1);
+        }
+
+        /// <summary>DORMANT: sets LauncherState back to 0 (none) so the mirror exits return to locomotion.</summary>
+        public void ReleaseLauncher()
+        {
+            if (animator != null) animator.SetInteger(LauncherStateHash, 0);
         }
 
         /// <summary>

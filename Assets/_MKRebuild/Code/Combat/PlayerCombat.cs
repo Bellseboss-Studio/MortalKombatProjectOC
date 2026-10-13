@@ -270,22 +270,29 @@ namespace MK.Rebuild
         /// </summary>
         private bool TryStartAttack(bool light, bool heavy)
         {
+            // DIRECTIONAL VARIANT (slice 3nonies, decision a/f): read the RAW stick in
+            // the FRAME OF THE PRESS and classify it. Done HERE, before StartCombo ->
+            // ApplyAimAssist: the direction picks WHICH attack (root), the aim-assist
+            // then corrects WHICH WAY the body faces (different axes, no conflict).
+            AttackDirection direction = ReadAttackDirection();
+
             // DASH-ATTACK OPENER (slice 3octies): an attack during the dash or within
             // dashAttackWindow after it uses the dedicated dashAttack FIRST. Its
             // continuation chains into the normal combo roots (TryAdvanceOnBuffer).
             if ((light || heavy) && TryStartDashAttack()) return true;
 
             // Combo entry (multi-root): pick the longest chain whose root matches
-            // the pressed input; a lone press ends that chain's single step cleanly
-            // while a continuation chains. No match -> grey-box standalone swing.
+            // the pressed input AND the stick direction (exact > Any wildcard); a
+            // lone press ends that chain's single step cleanly while a continuation
+            // chains. No match -> grey-box standalone swing.
             if (light)
             {
-                ComboDefinition c = SelectRoot(ComboInput.Ligero);
+                ComboDefinition c = SelectRoot(ComboInput.Ligero, direction);
                 if (c != null) { StartCombo(c); return true; }
             }
             if (heavy)
             {
-                ComboDefinition c = SelectRoot(ComboInput.Pesado);
+                ComboDefinition c = SelectRoot(ComboInput.Pesado, direction);
                 if (c != null) { StartCombo(c); return true; }
             }
 
@@ -429,11 +436,13 @@ namespace MK.Rebuild
 
             // OPENER -> NORMAL COMBO (slice 3octies): the dash-attack's continuation
             // resolves the NORMAL roots by the pressed input, so GolpeDeDash chains into
-            // the standard combo (GolpeDeDash -> Golpe -> Golpe...).
+            // the standard combo (GolpeDeDash -> Golpe -> Golpe...). Decision d: the
+            // continuation is INPUT-ONLY (no stick re-read mid-chain) -> Neutral, which
+            // keeps the legacy Any-wildcard roots eligible.
             if (dashAttackActive)
             {
                 dashAttackActive = false;
-                ComboDefinition next = SelectRoot(currentStep.siguiente.input);
+                ComboDefinition next = SelectRoot(currentStep.siguiente.input, AttackDirection.Neutral);
                 if (next != null) { StartCombo(next); return; }
                 EndCombo(); // no normal root for that input -> end the opener cleanly
                 return;
@@ -443,25 +452,49 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Root resolution (input-prefix rule, multi-combo): among
-        /// <see cref="combos"/> whose first step input matches
-        /// <paramref name="pressed"/>, pick the LONGEST chain (most steps) so a
-        /// lone press still ends cleanly at step 0 while a continuation chains;
-        /// ties keep the first in the array. Null when nothing matches.
+        /// Root resolution (input-prefix + directional variant rule, multi-combo):
+        /// among <see cref="combos"/> whose first step input matches
+        /// <paramref name="pressed"/> AND whose step-0 direction is
+        /// <paramref name="direction"/> (exact) OR <see cref="AttackDirection.Any"/>
+        /// (wildcard), pick the LONGEST chain so a lone press still ends cleanly at
+        /// step 0 while a continuation chains. An EXACT direction always beats a
+        /// wildcard; ties (same exactness, same length) keep the first in the array.
+        /// Null when nothing matches.
         /// </summary>
-        private ComboDefinition SelectRoot(ComboInput pressed)
+        private ComboDefinition SelectRoot(ComboInput pressed, AttackDirection direction)
         {
             ComboDefinition best = null;
             int bestLen = -1;
+            bool bestExact = false;
             if (combos == null) return null;
             for (int i = 0; i < combos.Length; i++)
             {
                 ComboDefinition c = combos[i];
                 if (c == null || !c.TryGetStep(0, out ComboStep s0)) continue;
                 if (s0.input != pressed) continue;
-                if (c.Length > bestLen) { bestLen = c.Length; best = c; }
+
+                bool exact = s0.direction == direction;
+                bool wildcard = s0.direction == AttackDirection.Any;
+                if (!exact && !wildcard) continue;
+
+                bool better = best == null
+                    || (exact && !bestExact)                       // exact beats wildcard
+                    || (exact == bestExact && c.Length > bestLen); // then longest chain
+                if (better) { best = c; bestLen = c.Length; bestExact = exact; }
             }
             return best;
+        }
+
+        /// <summary>
+        /// Reads the RAW Move stick THIS frame and classifies it into an
+        /// <see cref="AttackDirection"/> (slice 3nonies, decision a). Zero / no input
+        /// -> Neutral. The stick is camera-relative by construction (fixed camera),
+        /// so this is the frame the press happened in — no facing dependency.
+        /// </summary>
+        private AttackDirection ReadAttackDirection()
+        {
+            if (input == null) return AttackDirection.Neutral;
+            return AttackDirectionClassifier.FromStick(input.Player.Move.ReadValue<Vector2>());
         }
 
         private void StartCombo(ComboDefinition definition, bool dashOpener = false)
@@ -515,6 +548,7 @@ namespace MK.Rebuild
             {
                 animatorVisual.ReleaseAttack();
                 animatorVisual.ReleaseDashAttack(); // dormant opener slot never stays gated
+                animatorVisual.ReleaseLauncher();   // dormant launcher slot never stays gated
             }
         }
 
@@ -570,6 +604,16 @@ namespace MK.Rebuild
                 // renders with whatever locomotion pose is live (no pose freeze).
                 if (def.clip != null)
                     animatorVisual.PlayDashAttack(Mathf.Max(0f, crossFadeDuration));
+                return;
+            }
+
+            // LAUNCHER variant (slice 3nonies): its OWN dormant clip slot (Attack_Launcher),
+            // entered ONLY when the step has an assigned clip. With no clip it falls through to
+            // the grey-box Attack_P mapping below (attackStateIndex) — never enters the EMPTY
+            // state (no pose freeze).
+            if (def.launch && def.clip != null)
+            {
+                animatorVisual.PlayLauncher(Mathf.Max(0f, crossFadeDuration));
                 return;
             }
 
@@ -670,7 +714,7 @@ namespace MK.Rebuild
         /// the origin is offset along the facing, so a target behind never counts.
         /// Returns true when at least one target was hit.
         /// </summary>
-        private bool ProbeAt(Vector3 origin, float radius, int damage, float knockback)
+        private bool ProbeAt(Vector3 origin, float radius, int damage, float knockback, float launchImpulse)
         {
             Collider[] cols = Physics.OverlapSphere(
                 origin, radius, Physics.AllLayers, QueryTriggerInteraction.Ignore);
@@ -691,7 +735,10 @@ namespace MK.Rebuild
                 if (to.sqrMagnitude < 0.0001f) to = FacingVector();
                 to.Normalize();
 
-                receiver.TakeHit(damage, to * knockback);
+                // LAUNCHER (slice 3nonies): the vertical impulse is passed SEPARATELY
+                // (not baked into the XZ push) so HitReceiver can drive the juggle-lite
+                // arc (rise -> fall -> land) with its own gravity. 0 = normal hit.
+                receiver.TakeHit(damage, to * knockback, launchImpulse);
                 connected = true;
             }
             return connected;
@@ -699,8 +746,9 @@ namespace MK.Rebuild
 
         private void ProbeHitboxStep()
         {
+            float launch = currentStep.launch ? Mathf.Max(0f, currentStep.launchImpulse) : 0f;
             if (ProbeAt(HitboxOrigin(currentStep.hitboxRadius, currentStep.hitboxOffset),
-                    currentStep.hitboxRadius, currentStep.dano, currentStep.knockback))
+                    currentStep.hitboxRadius, currentStep.dano, currentStep.knockback, launch))
             {
                 connectedThisStep = true; // wider cancel window (hit-cancel)
                 BeginHitstop(currentStep.hitstopMs);
@@ -710,7 +758,7 @@ namespace MK.Rebuild
         private void ProbeHitbox()
         {
             if (ProbeAt(HitboxOrigin(current.hitboxRadius, current.hitboxOffset),
-                    current.hitboxRadius, current.damage, current.knockback))
+                    current.hitboxRadius, current.damage, current.knockback, 0f))
             {
                 BeginHitstop(current.hitstopMs);
             }

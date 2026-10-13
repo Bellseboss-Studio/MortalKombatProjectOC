@@ -13,7 +13,8 @@ namespace MK.Rebuild
     /// (<c>Time.timeScale = 0</c>) — scaled time would freeze them.
     ///
     /// The victim has no Rigidbody (scene Dummy), so knockback is a manual
-    /// damped push, not a physics impulse.
+    /// damped push, not a physics impulse. A LAUNCHER hit also drives the
+    /// juggle-lite vertical arc (rise -> fall -> land), manual velocity + gravity.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HitReceiver : MonoBehaviour
@@ -33,10 +34,16 @@ namespace MK.Rebuild
         [Tooltip("Knockback exponential damping (1/s). Higher = shorter, snappier push.")]
         [SerializeField] private float knockbackDamping = 18f;
 
+        [Tooltip("JUGGLE-LITE gravity in m/s^2 (placeholder). The launched victim rises then falls back to the ground plane under this manual gravity.")]
+        [SerializeField] private float launchGravity = 18f;
+
         private int hp;
         private Renderer cachedRenderer;
         private Color originalColor;
         private Coroutine feedbackRoutine;
+        private Coroutine arcRoutine;
+        private bool groundCaptured;
+        private float groundY;
 
         /// <summary>Current HP (read-only for the debug/verify seam).</summary>
         public int HP => hp;
@@ -59,10 +66,13 @@ namespace MK.Rebuild
 
         /// <summary>
         /// Applies <paramref name="damage"/> and shows the grey-box feedback.
-        /// <paramref name="dir"/> is the FULL push vector (direction already scaled
-        /// by the attack's knockback distance) — see <see cref="PlayerCombat"/>.
+        /// <paramref name="dir"/> is the FULL horizontal push vector (direction already
+        /// scaled by the attack's knockback distance) — see <see cref="PlayerCombat"/>.
+        /// <paramref name="launchImpulse"/> (m/s) drives the juggle-lite arc when the
+        /// hit is a LAUNCHER: the victim rises, falls under manual gravity and lands
+        /// back on the ground plane. 0 = normal hit (feedback only).
         /// </summary>
-        public void TakeHit(int damage, Vector3 dir)
+        public void TakeHit(int damage, Vector3 dir, float launchImpulse = 0f)
         {
             if (!IsAlive) return;
             hp = Mathf.Max(0, hp - damage);
@@ -79,6 +89,44 @@ namespace MK.Rebuild
 
             if (feedbackRoutine != null) StopCoroutine(feedbackRoutine);
             feedbackRoutine = StartCoroutine(Feedback(dir));
+
+            // JUGGLE-LITE (slice 3nonies): only a launcher (impulse > 0) starts the
+            // vertical arc. The ground Y is captured ONCE (the resting height) so
+            // re-launches while airborne still land on the same plane.
+            if (launchImpulse > 0f)
+            {
+                if (!groundCaptured) { groundY = transform.position.y; groundCaptured = true; }
+                if (arcRoutine != null) StopCoroutine(arcRoutine);
+                arcRoutine = StartCoroutine(LaunchArc(launchImpulse));
+            }
+        }
+
+        /// <summary>
+        /// JUGGLE-LITE placeholder: a manual vertical arc (velocity + gravity, UNSCALED
+        /// so it reads during hitstop). The victim rises to an apex (≈ impulse² / 2g)
+        /// then falls; on reaching the ground plane it snaps to it and stops — it LANDS,
+        /// it does NOT float. NO Rigidbody, NO aerial state machine (deferred).
+        /// </summary>
+        private IEnumerator LaunchArc(float launchImpulse)
+        {
+            float vy = launchImpulse;
+            float g = Mathf.Max(0.001f, launchGravity);
+            while (true)
+            {
+                float dt = Time.unscaledDeltaTime;
+                vy -= g * dt;
+                Vector3 p = transform.position;
+                p.y += vy * dt;
+                if (p.y <= groundY && vy < 0f)
+                {
+                    p.y = groundY; // landed — snap to the ground plane
+                    transform.position = p;
+                    break;
+                }
+                transform.position = p;
+                yield return null;
+            }
+            arcRoutine = null;
         }
 
         /// <summary>

@@ -30,6 +30,29 @@ namespace MK.Rebuild
         Ability = 1
     }
 
+    /// <summary>
+    /// Stick variant that selects a combo ROOT (slice 3nonies, DMC-style directional
+    /// attacks). APPEND-ONLY — the int values are serialized in the combo assets and
+    /// must stay stable forever. <see cref="Any"/> (0) is the WILDCARD: a root whose
+    /// direction is Any matches ANY stick direction, so <c>Combo_1.asset</c> (authored
+    /// before this field existed) serializes 0 and stays INTACT.
+    /// Only the ROOT (step 0) uses direction in this slice; <c>siguiente</c> stays
+    /// input-only (the direction is not propagated or re-classified mid-chain).
+    /// </summary>
+    public enum AttackDirection
+    {
+        /// <summary>Wildcard: matches any stick direction (legacy assets, neutral defaults).</summary>
+        Any = 0,
+        /// <summary>No meaningful stick input at the press frame (mag below the deadzone).</summary>
+        Neutral = 1,
+        /// <summary>Stick pushed toward the camera-forward axis (y &gt;= |x|, y &gt; 0).</summary>
+        Forward = 2,
+        /// <summary>Stick pushed away from the camera (y &lt;= -|x|, y &lt; 0) — the launcher variant.</summary>
+        Back = 3,
+        /// <summary>Stick pushed sideways (|x| &gt; |y|); left/right collapse into one.</summary>
+        Side = 4
+    }
+
     /// <summary>Continuation of a step: the input that advances and the target step index.</summary>
     [Serializable]
     public struct ComboLink
@@ -47,13 +70,17 @@ namespace MK.Rebuild
     /// (hitNorm × duracion, hitstopMs, radius/offset) plus the combo metadata
     /// (clip, cancel windows, next step). Hits are timed by NORMALIZED time,
     /// NEVER by Animation Events (doc pillar: timing parametrizado).
-    /// Deferred (rename-ready): launch, estiloPts, sfx.
+    /// Launch (slice 3nonies) is implemented (launch + launchImpulse);
+    /// Deferred (rename-ready): estiloPts, sfx.
     /// </summary>
     [Serializable]
     public struct ComboStep
     {
         [Tooltip("Input that enters/advances into this step (Ligero = gamepad X / click izq, Pesado = Y / click der, H1/H2/Launcher/Dash = PREPARE-only, sin behavior).")]
         public ComboInput input;
+
+        [Tooltip("Stick variant that selects this ROOT (step 0): exact direction > Any (wildcard). Only the ROOT uses it in this slice; default Any keeps legacy assets intact.")]
+        public AttackDirection direction;
 
         [Tooltip("What this step executes: Attack = the generic hitbox seam, Ability = delegates to the abilityRef (no generic probe). Default Attack.")]
         public ComboStepType stepType;
@@ -108,6 +135,12 @@ namespace MK.Rebuild
 
         [Tooltip("Animator Attack_P{n} state index for this step (1..N). 0 = auto (step index + 1). Set > 0 to make a 1-step combo play a deeper clip (e.g. Combo_H -> 3 = quick_P3).")]
         public int attackStateIndex;
+
+        [Tooltip("LAUNCHER (slice 3nonies): on connect the victim is launched (juggle-lite: rises, falls and lands back on the ground). Grey-box placeholder physics. Default false = normal hit.")]
+        public bool launch;
+
+        [Tooltip("Upward launch speed in m/s (used when launch = true). Apex height ≈ impulse^2 / (2 * gravity). 0 = no rise.")]
+        public float launchImpulse;
     }
 
     /// <summary>
