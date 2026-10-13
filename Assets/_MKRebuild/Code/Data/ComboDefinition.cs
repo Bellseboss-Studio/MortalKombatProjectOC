@@ -31,13 +31,14 @@ namespace MK.Rebuild
     }
 
     /// <summary>
-    /// Stick variant that selects a combo ROOT (slice 3nonies, DMC-style directional
-    /// attacks). APPEND-ONLY — the int values are serialized in the combo assets and
-    /// must stay stable forever. <see cref="Any"/> (0) is the WILDCARD: a root whose
-    /// direction is Any matches ANY stick direction, so <c>Combo_1.asset</c> (authored
-    /// before this field existed) serializes 0 and stays INTACT.
-    /// Only the ROOT (step 0) uses direction in this slice; <c>siguiente</c> stays
-    /// input-only (the direction is not propagated or re-classified mid-chain).
+    /// Stick variant that selects a combo ROOT (slice 3nonies) and keys a
+    /// CONTINUATION mid-combo (follow-up slice: <see cref="ComboLink.direction"/>).
+    /// APPEND-ONLY — the int values are serialized in the combo assets and must stay
+    /// stable forever. <see cref="Any"/> (0) is the WILDCARD: a link whose direction
+    /// is Any matches ANY stick direction, so <c>Combo_1.asset</c> (authored before
+    /// this field existed) serializes 0 and stays INTACT.
+    /// The direction is classified RELATIVE TO THE FACING (see
+    /// <see cref="AttackDirectionClassifier"/>): Back = opposite the front.
     /// </summary>
     public enum AttackDirection
     {
@@ -53,12 +54,19 @@ namespace MK.Rebuild
         Side = 4
     }
 
-    /// <summary>Continuation of a step: the input that advances and the target step index.</summary>
+    /// <summary>
+    /// Continuation of a step: the (input, stick direction) that advances and the
+    /// target step index. The direction is classified RELATIVE TO THE FACING; Any
+    /// (default) is the wildcard so legacy links (input-only) stay valid.
+    /// </summary>
     [Serializable]
     public struct ComboLink
     {
         [Tooltip("Input that advances into the next step (Ligero/Pesado).")]
         public ComboInput input;
+
+        [Tooltip("Stick direction (relative to the facing) that keys this continuation. Any = wildcard (input-only, backward compatible). Exact > Any.")]
+        public AttackDirection direction;
 
         [Tooltip("Target step index (0-based). -1 = no continuation (finisher / end of combo).")]
         public int paso;
@@ -79,7 +87,7 @@ namespace MK.Rebuild
         [Tooltip("Input that enters/advances into this step (Ligero = gamepad X / click izq, Pesado = Y / click der, H1/H2/Launcher/Dash = PREPARE-only, sin behavior).")]
         public ComboInput input;
 
-        [Tooltip("Stick variant that selects this ROOT (step 0): exact direction > Any (wildcard). Only the ROOT uses it in this slice; default Any keeps legacy assets intact.")]
+        [Tooltip("Stick variant that selects this ROOT (step 0): exact direction > Any (wildcard). Default Any keeps legacy assets intact; only the ROOT (step 0) uses it for root selection.")]
         public AttackDirection direction;
 
         [Tooltip("What this step executes: Attack = the generic hitbox seam, Ability = delegates to the abilityRef (no generic probe). Default Attack.")]
@@ -118,8 +126,11 @@ namespace MK.Rebuild
         [Tooltip("Cancel window when the hit CONNECTED (hit-cancel) — wider/earlier than cancelNorm. The juice.")]
         public Vector2 cancelHitNorm;
 
-        [Tooltip("Next step: the input that advances and the target step index (paso = -1 ends the combo).")]
+        [Tooltip("Next step: the input (+ direction) that advances and the target step index (paso = -1 ends the combo). This is the PRIMARY/default continuation; extra keyed continuations go in 'branches'.")]
         public ComboLink siguiente;
+
+        [Tooltip("Extra continuations keyed by (input, direction) so a step can BRANCH mid-combo (e.g. attack + Back -> launcher step). Resolved by exact direction > Any wildcard, first wins; the scalar 'siguiente' above stays the default so legacy assets are untouched. Empty = no extra branches.")]
+        public List<ComboLink> branches;
 
         [Tooltip("Playback speed multiplier for this step's clip (1 = normal). Drives the state speed parameter.")]
         public float speedMultiplier;

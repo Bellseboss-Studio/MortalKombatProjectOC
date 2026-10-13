@@ -80,6 +80,7 @@ namespace MK.Rebuild
         private ICharacterVisual visual;
         private PlayerMotor motor;
         private PlayerDash dash;
+        private Transform cameraTransform; // reference frame for the facing-relative stick
 
         // One-shot taps submitted out-of-band (editor smoke driver / future
         // menu or demo hooks). Consumed by the next Update as if pressed this frame.
@@ -110,6 +111,11 @@ namespace MK.Rebuild
         // Input taps (unscaled timers, jumpBuffer pattern keyed by button).
         private float lightBuffer;
         private float heavyBuffer;
+
+        // Direction (relative to the facing) classified at the PRESS frame and carried
+        // with the buffer, so a mid-combo branch matches the direction the player pressed
+        // even if the stick is released before the cancel window opens (follow-up slice).
+        private AttackDirection bufferedDirection;
 
         // Hitstop state.
         private float hitstopRemaining;          // unscaled seconds left frozen
@@ -150,6 +156,13 @@ namespace MK.Rebuild
             motor = GetComponent<PlayerMotor>();
             dash = GetComponent<PlayerDash>();
             input = new PlayerInput();
+            RefreshCamera();
+        }
+
+        private void RefreshCamera()
+        {
+            var cam = Camera.main;
+            cameraTransform = cam != null ? cam.transform : null;
         }
 
         private void OnEnable()
@@ -326,8 +339,19 @@ namespace MK.Rebuild
         private void UpdateCombo()
         {
             // Feed the buffer from this step onward (the pending input for the NEXT step).
-            if (LightPressedThisFrame()) lightBuffer = inputBufferSeconds;
-            if (HeavyPressedThisFrame()) heavyBuffer = inputBufferSeconds;
+            // The stick direction is classified at the PRESS frame (relative to the facing,
+            // which is locked toward the target mid-combo) and carried with the buffer, so
+            // a directional branch matches even if the stick is released before the window.
+            if (LightPressedThisFrame())
+            {
+                lightBuffer = inputBufferSeconds;
+                bufferedDirection = ReadAttackDirection();
+            }
+            if (HeavyPressedThisFrame())
+            {
+                heavyBuffer = inputBufferSeconds;
+                bufferedDirection = ReadAttackDirection();
+            }
 
             // Scaled time: hitstop (timeScale = 0) freezes the step mid-window.
             stepTime += Time.deltaTime;
@@ -410,16 +434,13 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// If the buffered input matches <c>siguiente</c> and the step is inside its
-        /// cancel window, advance to the next step. The hit window is WIDER when the
-        /// step connected (hit-cancel, decision d) than on whiff.
+        /// If the buffered input matches a continuation (<c>siguiente</c> + <c>branches</c>)
+        /// keyed by (input, direction) and the step is inside its cancel window, advance to
+        /// the matching step. The window is WIDER when the step connected (hit-cancel).
         /// </summary>
         private void TryAdvanceOnBuffer()
         {
             if (activeCombo == null) return;
-            // A finisher (paso < 0) has no in-combo continuation — EXCEPT the dash-attack
-            // opener, whose continuation chains into the normal roots instead of by index.
-            if (!dashAttackActive && currentStep.siguiente.paso < 0) return;
 
             Vector2 window = connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm;
             float duration = EffectiveDuration(currentStep);
@@ -427,28 +448,74 @@ namespace MK.Rebuild
             float c1 = Mathf.Clamp01(window.y) * duration;
             if (stepTime < c0 || stepTime > c1) return;
 
-            bool wantsLight = currentStep.siguiente.input == ComboInput.Ligero;
-            bool buffered = wantsLight ? lightBuffer > 0f : heavyBuffer > 0f;
-            if (!buffered) return;
+            // Continuation keyed by (input, direction): the scalar 'siguiente' plus any
+            // extra 'branches'. A finisher (paso < 0) is not a candidate, so a step with
+            // no live matching link simply ends as before.
+            if (!TryResolveContinuation(currentStep, out ComboLink link)) return;
 
             lightBuffer = 0f; // consume the tap (both — only one can match)
             heavyBuffer = 0f;
 
             // OPENER -> NORMAL COMBO (slice 3octies): the dash-attack's continuation
             // resolves the NORMAL roots by the pressed input, so GolpeDeDash chains into
-            // the standard combo (GolpeDeDash -> Golpe -> Golpe...). Decision d: the
-            // continuation is INPUT-ONLY (no stick re-read mid-chain) -> Neutral, which
-            // keeps the legacy Any-wildcard roots eligible.
+            // the standard combo (GolpeDeDash -> Golpe -> Golpe...). The root is resolved
+            // with Neutral (input-only), which keeps the legacy Any-wildcard roots eligible.
             if (dashAttackActive)
             {
                 dashAttackActive = false;
-                ComboDefinition next = SelectRoot(currentStep.siguiente.input, AttackDirection.Neutral);
+                ComboDefinition next = SelectRoot(link.input, AttackDirection.Neutral);
                 if (next != null) { StartCombo(next); return; }
                 EndCombo(); // no normal root for that input -> end the opener cleanly
                 return;
             }
 
-            AdvanceCombo(currentStep.siguiente.paso);
+            AdvanceCombo(link.paso);
+        }
+
+        /// <summary>
+        /// Resolves the continuation of <paramref name="step"/> matching a LIVE buffered
+        /// input AND the buffered (facing-relative) direction: among the scalar
+        /// <c>siguiente</c> and the extra <c>branches</c>, picks the link whose input has
+        /// a buffer and whose direction is EXACT or <see cref="AttackDirection.Any"/>
+        /// (wildcard). Exact beats wildcard; ties keep the first (siguiente, then the
+        /// branches in list order). Links with <c>paso &lt; 0</c> (finisher) are skipped,
+        /// as is a non-attack input (no press edge in this slice). False when nothing
+        /// matches.
+        /// </summary>
+        private bool TryResolveContinuation(ComboStep step, out ComboLink best)
+        {
+            ComboLink result = default;
+            bool found = false;
+            bool bestExact = false;
+
+            Consider(step.siguiente);
+            if (step.branches != null)
+            {
+                for (int i = 0; i < step.branches.Count; i++) Consider(step.branches[i]);
+            }
+
+            best = result;
+            return found;
+
+            void Consider(ComboLink link)
+            {
+                if (link.paso < 0) return; // finisher: not an in-combo continuation
+                bool live = link.input == ComboInput.Ligero ? lightBuffer > 0f
+                          : link.input == ComboInput.Pesado ? heavyBuffer > 0f
+                          : false; // H1/H2/Launcher/Dash: no press edge in this slice
+                if (!live) return;
+
+                bool exact = link.direction != AttackDirection.Any && link.direction == bufferedDirection;
+                bool wildcard = link.direction == AttackDirection.Any;
+                if (!exact && !wildcard) return;
+
+                if (!found || (exact && !bestExact)) // exact beats wildcard; else first wins
+                {
+                    result = link;
+                    found = true;
+                    bestExact = exact;
+                }
+            }
         }
 
         /// <summary>
@@ -487,14 +554,16 @@ namespace MK.Rebuild
 
         /// <summary>
         /// Reads the RAW Move stick THIS frame and classifies it into an
-        /// <see cref="AttackDirection"/> (slice 3nonies, decision a). Zero / no input
-        /// -> Neutral. The stick is camera-relative by construction (fixed camera),
-        /// so this is the frame the press happened in — no facing dependency.
+        /// <see cref="AttackDirection"/> RELATIVE TO THE FACING (follow-up slice): the
+        /// stick is turned into a world direction (camera-relative) and projected onto
+        /// the facing, so Back = away from the front. Zero / no input -> Neutral.
         /// </summary>
         private AttackDirection ReadAttackDirection()
         {
             if (input == null) return AttackDirection.Neutral;
-            return AttackDirectionClassifier.FromStick(input.Player.Move.ReadValue<Vector2>());
+            if (cameraTransform == null) RefreshCamera();
+            return AttackDirectionClassifier.FromStick(
+                input.Player.Move.ReadValue<Vector2>(), FacingVector(), cameraTransform);
         }
 
         private void StartCombo(ComboDefinition definition, bool dashOpener = false)
