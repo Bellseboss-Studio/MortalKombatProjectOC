@@ -19,6 +19,14 @@ namespace MK.Rebuild
     /// hitstop freeze (<see cref="PlayerCombat.IsHitstopped"/> guard). Abilities are
     /// out of scope (PREPARE-only) — PlayerDash only reads the Dash input through
     /// <see cref="PlayerCombat.ConsumeDashTap"/>.
+    ///
+    /// ADDITIVE mode (slice 3ter, <see cref="additive"/>) — the dash is a BURST ON TOP
+    /// of the player's current speed: at dash start the horizontal velocity is captured
+    /// (<see cref="baseVelocity"/>, direction locked), and during the dash the velocity
+    /// = base velocity + the curve impulse along the locked facing. Run + dash ends back
+    /// at ~run speed (the run CONTINUES, no dip to 0); stand + dash is a burst from ~0
+    /// (the pre-additive feel). Legacy pure-burst replay is kept via <see cref="additive"/>
+    /// = false (A/B toggle, data-driven).
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody))]
@@ -39,6 +47,9 @@ namespace MK.Rebuild
         [Tooltip("Normalized speed SHAPE over the dash (1 -> 0): strong impulse at the start, decaying to 0. Empty = default ease-out. The code integrates it so the total distance is exactly dashDistance.")]
         [SerializeField] private AnimationCurve dashCurve;
 
+        [Tooltip("ADDITIVE dash (default true, slice 3ter): the velocity during the dash = the BASE horizontal velocity captured at dash start (direction locked) + the curve impulse. Run + dash = burst ON TOP and the run continues afterwards at ~base speed; stand + dash = burst from ~0. false = legacy pure-burst: the curve REPLACES the velocity (run stops then resumes). A/B toggle — data-driven, everything else stays in data.")]
+        [SerializeField] private bool additive = true;
+
         private Rigidbody rb;
         private PlayerMotor motor;
         private PlayerCombat combat;
@@ -50,6 +61,7 @@ namespace MK.Rebuild
         private float invulnTimer;    // unscaled seconds left of IsInvulnerable
         private float cooldownTimer;  // unscaled seconds left until the dash is ready
         private Vector3 dashDir;      // locked facing/direction of the impulse
+        private Vector3 baseVelocity; // horizontal velocity captured at dash start (additive mode, direction locked)
 
         /// <summary>True while the dash impulse is running (read-only seam).</summary>
         public bool IsDashing => isDashing;
@@ -92,16 +104,26 @@ namespace MK.Rebuild
         }
 
         /// <summary>Curve impulse while the dash runs: keep the vertical velocity
-        /// (gravity/jump untouched), write the horizontal dash velocity along the
-        /// locked facing. Speed decays per dashCurve; its integral = dashDistance.</summary>
+        /// (gravity/jump untouched). ADDITIVE: velocity = the base velocity captured at
+        /// dash start (direction locked) + the curve impulse along the locked facing, so
+        /// a run+dash is a burst ON TOP and the run continues at dash end. Legacy mode
+        /// (additive = false): the curve REPLACES the whole horizontal velocity.</summary>
         private void FixedUpdate()
         {
             if (!isDashing || rb == null) return;
             float window = Mathf.Max(0.001f, dashDuration);
             float speed = Mathf.Max(0f, CurveMotion.Speed(dashCurve, dashDistance, window, dashElapsed));
             Vector3 v = rb.linearVelocity;
-            v.x = dashDir.x * speed;
-            v.z = dashDir.z * speed;
+            if (additive)
+            {
+                v.x = baseVelocity.x + dashDir.x * speed;
+                v.z = baseVelocity.z + dashDir.z * speed;
+            }
+            else
+            {
+                v.x = dashDir.x * speed;
+                v.z = dashDir.z * speed;
+            }
             rb.linearVelocity = v;
         }
 
@@ -119,6 +141,15 @@ namespace MK.Rebuild
             // proxy/visual-less setups — same pattern as PlayerCombat.
             dashDir = FacingNow();
             if (visual != null) visual.SetFacing(dashDir);
+
+            // ADDITIVE seam: capture the horizontal velocity at the dash MOMENT as a
+            // full vector (direction locked too — it is NOT re-aimed at the facing).
+            // Run + dash keeps this base through the whole dash and hands back control
+            // at ~base speed at dash end; stand + dash captures ~0 (burst from zero).
+            if (rb != null)
+                baseVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+            else
+                baseVelocity = Vector3.zero;
 
             if (motor != null) motor.InputLocked = true;
         }
