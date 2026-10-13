@@ -31,6 +31,13 @@ namespace MK.Rebuild
     /// <see cref="PlayerDash.TryCancelByAttack"/>, cuts the dash short and starts the attack
     /// the SAME frame (dash-cancel into attack). Before that window the press is buffered
     /// (held while the lock) and fires at the dash-end handoff — the 3sexies path is the fallback.
+    ///
+    /// Dash-attack opener (slice 3octies): an attack DURING a dash or within
+    /// <c>dashAttackWindow</c> after it runs the dedicated <c>dashAttack</c> combo FIRST
+    /// (its OWN clip slot + hit data + lunge); its <c>siguiente</c> then chains into the
+    /// NORMAL combo roots (GolpeDeDash -> Golpe -> Golpe...). Outside the window the attack
+    /// is normal. The opener's visual is a DORMANT slot (Attack_Dash state), entered only
+    /// once a clip is assigned to the step — with no clip it never freezes the pose.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody))]
@@ -45,11 +52,22 @@ namespace MK.Rebuild
         [Tooltip("Combo chains (data-driven, multi-root). Each combo's root is its step 0 input; when several combos match a press, the LONGEST chain wins (input-prefix rule): L→Combo_1 (L→L→P), P→Combo_H, etc. Any combo can be tested alone by assigning only it.")]
         [SerializeField] private ComboDefinition[] combos = new ComboDefinition[0];
 
+        [Tooltip("DASH-ATTACK OPENER (slice 3octies): a dedicated combo whose FIRST step is the attack that comes out of a dash (its OWN clip slot + hit data + lunge). When an attack starts during a dash or within dashAttackWindow after it, this runs FIRST; its 'siguiente' then chains into the NORMAL combo roots (GolpeDeDash -> Golpe -> Golpe...). Null = no opener (attacks always use the normal roots).")]
+        [SerializeField] private ComboDefinition dashAttack;
+
+        [Tooltip("Unscaled SECONDS after a dash during which the first attack counts as the dash-attack opener. 0 = only while the dash runs. Default 0.35 ~ the dash duration.")]
+        [SerializeField] private float dashAttackWindow = 0.35f;
+
         [Tooltip("Soft trajectory corrector (aim-assist): at attack entry, turn the facing toward the nearest alive target inside the frontal cone + range. Drags lunge + hitbox (single point: visual.Facing). Null/disabled = forward-only (current behavior).")]
         [SerializeField] private AimAssistDefinition aimAssist;
 
         // Active combo (the one currently running), resolved by SelectRoot at entry.
         private ComboDefinition activeCombo;
+
+        // Dash-attack opener state (slice 3octies): true while the active combo IS the
+        // opener. PlayAttackVisual routes to the dormant Attack_Dash clip slot, and
+        // TryAdvanceOnBuffer chains into the NORMAL combo roots instead of by index.
+        private bool dashAttackActive;
 
         [Tooltip("CrossFade duration (seconds) used to enter every attack state (decision b, ~0.1).")]
         [SerializeField] private float crossFadeDuration = 0.1f;
@@ -107,6 +125,9 @@ namespace MK.Rebuild
 
         /// <summary>Index of the active combo step, -1 when not in a combo (read-only debug seam).</summary>
         public int CurrentStepIndex => stepIndex;
+
+        /// <summary>True while the active combo is the DASH-ATTACK opener (read-only debug seam).</summary>
+        public bool DashAttackActive => dashAttackActive;
 
         /// <summary>
         /// True while the hitstop freeze is active (timeScale = 0). Seam for the dash:
@@ -249,6 +270,11 @@ namespace MK.Rebuild
         /// </summary>
         private bool TryStartAttack(bool light, bool heavy)
         {
+            // DASH-ATTACK OPENER (slice 3octies): an attack during the dash or within
+            // dashAttackWindow after it uses the dedicated dashAttack FIRST. Its
+            // continuation chains into the normal combo roots (TryAdvanceOnBuffer).
+            if ((light || heavy) && TryStartDashAttack()) return true;
+
             // Combo entry (multi-root): pick the longest chain whose root matches
             // the pressed input; a lone press ends that chain's single step cleanly
             // while a continuation chains. No match -> grey-box standalone swing.
@@ -273,6 +299,21 @@ namespace MK.Rebuild
                     $"{name}: attack pressed but no AttackDefinition assigned in the inspector.", this);
             }
             return false;
+        }
+
+        /// <summary>
+        /// Starts the DASH-ATTACK OPENER when configured and the player is inside the
+        /// opener window (during the dash or within <see cref="dashAttackWindow"/> unscaled
+        /// seconds after it). Returns false when there is no opener / step 0 / dash, or the
+        /// window has passed — the caller then falls through to the normal roots.
+        /// </summary>
+        private bool TryStartDashAttack()
+        {
+            if (dashAttack == null || dash == null) return false;
+            if (dash.SecondsSinceDash > dashAttackWindow) return false;
+            if (!dashAttack.TryGetStep(0, out ComboStep _)) return false;
+            StartCombo(dashAttack, true);
+            return true;
         }
 
         private void UpdateCombo()
@@ -368,7 +409,10 @@ namespace MK.Rebuild
         /// </summary>
         private void TryAdvanceOnBuffer()
         {
-            if (activeCombo == null || currentStep.siguiente.paso < 0) return;
+            if (activeCombo == null) return;
+            // A finisher (paso < 0) has no in-combo continuation — EXCEPT the dash-attack
+            // opener, whose continuation chains into the normal roots instead of by index.
+            if (!dashAttackActive && currentStep.siguiente.paso < 0) return;
 
             Vector2 window = connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm;
             float duration = EffectiveDuration(currentStep);
@@ -382,6 +426,19 @@ namespace MK.Rebuild
 
             lightBuffer = 0f; // consume the tap (both — only one can match)
             heavyBuffer = 0f;
+
+            // OPENER -> NORMAL COMBO (slice 3octies): the dash-attack's continuation
+            // resolves the NORMAL roots by the pressed input, so GolpeDeDash chains into
+            // the standard combo (GolpeDeDash -> Golpe -> Golpe...).
+            if (dashAttackActive)
+            {
+                dashAttackActive = false;
+                ComboDefinition next = SelectRoot(currentStep.siguiente.input);
+                if (next != null) { StartCombo(next); return; }
+                EndCombo(); // no normal root for that input -> end the opener cleanly
+                return;
+            }
+
             AdvanceCombo(currentStep.siguiente.paso);
         }
 
@@ -407,12 +464,13 @@ namespace MK.Rebuild
             return best;
         }
 
-        private void StartCombo(ComboDefinition definition)
+        private void StartCombo(ComboDefinition definition, bool dashOpener = false)
         {
             if (definition == null || !definition.TryGetStep(0, out ComboStep first)) return;
             activeCombo = definition;
             current = null;
             comboActive = true;
+            dashAttackActive = dashOpener;
             stepIndex = 0;
             currentStep = first;
             stepTime = 0f;
@@ -444,6 +502,7 @@ namespace MK.Rebuild
         private void EndCombo()
         {
             comboActive = false;
+            dashAttackActive = false;
             stepIndex = -1;
             activeCombo = null;
             currentStep = default;
@@ -452,7 +511,11 @@ namespace MK.Rebuild
             hitThisStep.Clear();
             ClearAimAssist();
             if (motor != null) motor.InputLocked = false; // release the attack lock -> wish control returns
-            if (visual is AnimatorVisual animatorVisual) animatorVisual.ReleaseAttack();
+            if (visual is AnimatorVisual animatorVisual)
+            {
+                animatorVisual.ReleaseAttack();
+                animatorVisual.ReleaseDashAttack(); // dormant opener slot never stays gated
+            }
         }
 
         /// <summary>
@@ -497,14 +560,24 @@ namespace MK.Rebuild
         /// </summary>
         private void PlayAttackVisual(int step, ComboStep def)
         {
-            if (visual is AnimatorVisual animatorVisual)
+            if (!(visual is AnimatorVisual animatorVisual)) return;
+
+            if (dashAttackActive)
             {
-                // attackStateIndex > 0 overrides the auto index+1 so a 1-step
-                // combo can play a deeper clip (Combo_H -> Attack_P3).
-                int state = def.attackStateIndex > 0 ? def.attackStateIndex : step;
-                animatorVisual.PlayAttack(state, Mathf.Max(0f, crossFadeDuration));
-                animatorVisual.SetAttackSpeed(state, def.speedMultiplier);
+                // DASH-ATTACK opener: its OWN clip slot (dormant Attack_Dash state). Enter it
+                // ONLY when the step has an assigned clip (ComboStep.clip) — with no clip the
+                // EMPTY state would freeze the pose, so the visual is skipped and the opener
+                // renders with whatever locomotion pose is live (no pose freeze).
+                if (def.clip != null)
+                    animatorVisual.PlayDashAttack(Mathf.Max(0f, crossFadeDuration));
+                return;
             }
+
+            // attackStateIndex > 0 overrides the auto index+1 so a 1-step
+            // combo can play a deeper clip (Combo_H -> Attack_P3).
+            int state = def.attackStateIndex > 0 ? def.attackStateIndex : step;
+            animatorVisual.PlayAttack(state, Mathf.Max(0f, crossFadeDuration));
+            animatorVisual.SetAttackSpeed(state, def.speedMultiplier);
         }
 
         // ------------------------------------------------------------------

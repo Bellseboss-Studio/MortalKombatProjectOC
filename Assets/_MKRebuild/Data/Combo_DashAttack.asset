@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4012df37171106e41b45de212bb2aef1, type: 3}
+  m_Name: Combo_DashAttack
+  m_EditorClassIdentifier: 
+  steps:
+  - input: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 0}
+    duracion: 1.2
+    hitNorm: {x: 0.15, y: 0.4}
+    dano: 6
+    knockback: 0.6
+    hitstopMs: 40
+    hitboxRadius: 1.5
+    hitboxOffset: {x: 0, y: 0.1, z: 1.5}
+    cancelNorm: {x: 0.4, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 0
+      paso: 0
+    speedMultiplier: 6
+    moveLock: 1
+    lunge: 1
+    attackStateIndex: 0
+  dashCancelsAll: 1

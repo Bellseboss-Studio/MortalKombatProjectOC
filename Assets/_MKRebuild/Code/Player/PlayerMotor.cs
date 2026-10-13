@@ -32,6 +32,7 @@ namespace MK.Rebuild
         private PlayerInput input;
 
         private Vector2 moveInput;
+        private Vector3 wishDir; // cached camera-relative input direction (XZ unit, zero = no input)
         private Vector3 smoothVel;
         private float verticalVel;
         private float bufferTimer;
@@ -90,6 +91,13 @@ namespace MK.Rebuild
 
         /// <summary>World-space direction the character should face this step (XZ). Zero = keep.</summary>
         public Vector3 DesiredFacing => desiredFacing;
+
+        /// <summary>
+        /// Camera-relative INPUT direction on XZ (UNIT vector; zero when there is no
+        /// move input). Read-only seam (slice 3octies): the DASH reuses the SAME input
+        /// direction the walk uses, so a dash follows the stick, not the facing.
+        /// </summary>
+        public Vector3 WishDirection => wishDir;
 
         private void Awake()
         {
@@ -337,7 +345,9 @@ namespace MK.Rebuild
 
             // Camera-relative wish direction on XZ (UNIT vector: the stick magnitude
             // is handled separately by the fixed input zones below, never scaling speed).
-            Vector3 wishDir = CameraRelative(moveInput);
+            // Cached on a field: the read-only seam PlayerDash reads at dash start so the
+            // dash follows the INPUT (slice 3octies), not the facing.
+            wishDir = CameraRelative(moveInput);
 
             // Fixed DISCRETE target speed by input zone: deadzone / walk / run.
             // NOT analog-scaled by how far the stick is pushed.
@@ -449,14 +459,8 @@ namespace MK.Rebuild
 
         private Vector3 CameraRelative(Vector2 stick)
         {
-            if (stick.sqrMagnitude < 0.000001f) return Vector3.zero;
-            Vector3 forward = cameraTransform != null ? cameraTransform.forward : Vector3.forward;
-            forward.y = 0f;
-            if (forward.sqrMagnitude < 0.000001f) forward = Vector3.forward;
-            forward.Normalize();
-            Vector3 right = new Vector3(forward.z, 0f, -forward.x);
-            Vector3 dir = forward * stick.y + right * stick.x;
-            return dir.sqrMagnitude > 0.000001f ? dir.normalized : Vector3.zero;
+            // Shared with the DASH (slice 3octies): one stick-to-world mapping.
+            return CameraRelativeMotion.WishDirection(cameraTransform, stick);
         }
 
         private bool CheckGrounded()

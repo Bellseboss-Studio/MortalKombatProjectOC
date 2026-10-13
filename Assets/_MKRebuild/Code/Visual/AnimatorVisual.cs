@@ -32,6 +32,7 @@ namespace MK.Rebuild
         private static readonly int FlipMidAirSpeedHash = Animator.StringToHash("FlipMidAirSpeed");
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
+        private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
         private static readonly int AttackP1SpeedHash = Animator.StringToHash("AttackP1Speed");
         private static readonly int AttackP2SpeedHash = Animator.StringToHash("AttackP2Speed");
         private static readonly int AttackP3SpeedHash = Animator.StringToHash("AttackP3Speed");
@@ -159,6 +160,28 @@ namespace MK.Rebuild
         public void ReleaseDash()
         {
             if (animator != null) animator.SetInteger(DashStateHash, 0);
+        }
+
+        /// <summary>
+        /// DORMANT dash-attack slot (slice 3octies): mirrors <see cref="PlayAttack"/> for the
+        /// EMPTY <c>Attack_Dash</c> state (the dash-attack OPENER's own clip slot). Called by
+        /// <see cref="PlayerCombat"/> ONLY when the opener step has an assigned clip
+        /// (<c>ComboStep.clip</c>) — entering the motion-less state with no clip would freezes
+        /// the pose, so until the animation exists the visual is skipped entirely. Pushing
+        /// DashAttackState = 1 lets the controller's mirror exits (gated <c>DashAttackState == 0</c>)
+        /// return to locomotion.
+        /// </summary>
+        public void PlayDashAttack(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            animator.CrossFade("Attack_Dash", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+            animator.SetInteger(DashAttackStateHash, 1);
+        }
+
+        /// <summary>DORMANT: sets DashAttackState back to 0 (none) so the mirror exits return to locomotion.</summary>
+        public void ReleaseDashAttack()
+        {
+            if (animator != null) animator.SetInteger(DashAttackStateHash, 0);
         }
 
         /// <summary>

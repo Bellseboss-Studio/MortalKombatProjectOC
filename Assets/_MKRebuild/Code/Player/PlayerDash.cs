@@ -28,15 +28,25 @@ namespace MK.Rebuild
     /// (the pre-additive feel). Legacy pure-burst replay is kept via <see cref="additive"/>
     /// = false (A/B toggle, data-driven).
     ///
+    /// DASH DIRECTION follows the INPUT (slice 3octies): the dash goes where the
+    /// camera-relative MOVE input points (the same wish direction the motor uses,
+    /// <see cref="PlayerMotor.WishDirection"/> / shared <see cref="CameraRelativeMotion"/>),
+    /// NOT where the character is facing. No move input -> fall back to the current facing.
+    /// The aim-assist below then corrects that direction within the frontal cone.
+    ///
     /// AIM-ASSIST on the dash direction (slice 3sexies): at dash start its OWN
     /// <see cref="AimAssistDefinition"/> (<see cref="dashAimAssist"/>, tuned independently
     /// from the attack's — e.g. a more generous range) runs the shared selection
     /// (<see cref="AimAssist"/>, cone + range, nearest alive <see cref="HitReceiver"/>)
     /// against the intended dash direction. A target inside the frontal cone SNAPS the dash
     /// toward it (OFFENSIVE gap-close); dashing AWAY (target behind/outside the cone) finds
-    /// nothing and the dash stays straight (DEFENSIVE/mobility, unaffected). The additive
+    /// nothing and the dash stays as intended (DEFENSIVE/mobility, unaffected). The additive
     /// model, curve, cooldown, iframes, hitstop gate and combo-cancel are untouched — only
     /// the direction is corrected.
+    ///
+    /// DASH RECENCY (slice 3octies): <see cref="SecondsSinceDash"/> tracks the unscaled
+    /// seconds since the dash started (0 while dashing, counting up after) so PlayerCombat
+    /// can treat the first attack during/shortly after a dash as the dash-attack OPENER.
     ///
     /// ATTACK CANCEL (slice 3septies): an attack pressed during the dash CANCELS it early
     /// (dash-cancel into attack) — but only once the dash has run <see cref="minCancelTime"/>
@@ -86,6 +96,9 @@ namespace MK.Rebuild
         private float cooldownTimer;  // unscaled seconds left until the dash is ready
         private Vector3 dashDir;      // locked facing/direction of the impulse
         private Vector3 baseVelocity; // horizontal velocity captured at dash start (additive mode, direction locked)
+        private float sinceDash = RecencyCap; // unscaled seconds since the dash started (0 while dashing; large until the first dash)
+
+        private const float RecencyCap = 1000f; // "never dashed" sentinel for sinceDash
 
         /// <summary>True while the dash impulse is running (read-only seam).</summary>
         public bool IsDashing => isDashing;
@@ -98,6 +111,15 @@ namespace MK.Rebuild
 
         /// <summary>Minimum unscaled seconds the dash must run before an attack can cancel it (read-only debug seam).</summary>
         public float MinCancelTime => minCancelTime;
+
+        /// <summary>
+        /// Unscaled seconds since the dash started: 0 while the dash runs, counting up
+        /// once it ends, and a large sentinel until the first dash. Read-only seam for the
+        /// DASH-ATTACK OPENER window (slice 3octies): PlayerCombat treats an attack as the
+        /// opener while this is inside its <c>dashAttackWindow</c> (during or shortly after
+        /// a dash).
+        /// </summary>
+        public float SecondsSinceDash => sinceDash;
 
         private void Awake()
         {
@@ -112,6 +134,12 @@ namespace MK.Rebuild
             // Unscaled timers: cooldown/invuln survive hitstop timeScale = 0.
             if (cooldownTimer > 0f) cooldownTimer = Mathf.Max(0f, cooldownTimer - Time.unscaledDeltaTime);
             if (invulnTimer > 0f) invulnTimer = Mathf.Max(0f, invulnTimer - Time.unscaledDeltaTime);
+
+            // Dash recency (slice 3octies): 0 while the dash runs, counts up once it ends.
+            // PlayerCombat reads SecondsSinceDash to decide whether an attack is the
+            // dash-attack opener (during or shortly after a dash).
+            if (isDashing) sinceDash = 0f;
+            else if (sinceDash < RecencyCap) sinceDash = Mathf.Min(sinceDash + Time.unscaledDeltaTime, RecencyCap);
 
             if (isDashing)
             {
@@ -164,19 +192,28 @@ namespace MK.Rebuild
             isDashing = true;
             dashTimer = Mathf.Max(0.001f, dashDuration);
             dashElapsed = 0f;
+            sinceDash = 0f;
             if (!CurveMotion.IsUsable(dashCurve)) dashCurve = CurveMotion.DefaultEaseOut();
             invulnTimer = Mathf.Max(0f, invulnDuration);
             cooldownTimer = Mathf.Max(0f, cooldown);
 
-            // Facing locked along the dash direction (motor.InputLocked keeps it:
-            // input cannot rotate mid-dash). Fallback to transform.forward for
-            // proxy/visual-less setups — same pattern as PlayerCombat.
+            // Dash direction follows the INPUT (slice 3octies): the camera-relative wish
+            // direction the motor is using this step — the dash goes where the STICK
+            // points, NOT where the character is facing. No move input (WishDirection
+            // zero) -> fall back to the current facing, so a neutral dash still moves
+            // forward. FacingNow also covers proxy/visual-less setups (transform.forward).
             dashDir = FacingNow();
+            if (motor != null)
+            {
+                Vector3 inputDir = motor.WishDirection;
+                inputDir.y = 0f;
+                if (inputDir.sqrMagnitude > 0.0001f) dashDir = inputDir.normalized;
+            }
 
-            // Aim-assist on dash START (slice 3sexies): the dash's OWN definition. If a
-            // target sits inside the frontal cone + range, SNAP the dash direction toward it
-            // (OFFENSIVE gap-close). Dashing AWAY — target behind or outside the cone —
-            // finds nothing, so dashDir stays forward (DEFENSIVE).
+            // Aim-assist ON TOP of the intended direction (slice 3sexies): the dash's OWN
+            // definition. If a target sits inside the frontal cone + range, SNAP the dash
+            // direction toward it (OFFENSIVE gap-close). Dashing AWAY — target behind or
+            // outside the cone — finds nothing, so dashDir stays as intended (DEFENSIVE).
             if (AimAssist.TryFindAimDir(transform.position, rb, dashDir, dashAimAssist, out Vector3 aim))
                 dashDir = aim;
 
