@@ -27,6 +27,21 @@ namespace MK.Rebuild
     /// at ~run speed (the run CONTINUES, no dip to 0); stand + dash is a burst from ~0
     /// (the pre-additive feel). Legacy pure-burst replay is kept via <see cref="additive"/>
     /// = false (A/B toggle, data-driven).
+    ///
+    /// AIM-ASSIST on the dash direction (slice 3sexies): at dash start its OWN
+    /// <see cref="AimAssistDefinition"/> (<see cref="dashAimAssist"/>, tuned independently
+    /// from the attack's — e.g. a more generous range) runs the shared selection
+    /// (<see cref="AimAssist"/>, cone + range, nearest alive <see cref="HitReceiver"/>)
+    /// against the intended dash direction. A target inside the frontal cone SNAPS the dash
+    /// toward it (OFFENSIVE gap-close); dashing AWAY (target behind/outside the cone) finds
+    /// nothing and the dash stays straight (DEFENSIVE/mobility, unaffected). The additive
+    /// model, curve, cooldown, iframes, hitstop gate and combo-cancel are untouched — only
+    /// the direction is corrected.
+    ///
+    /// ATTACK HANDOFF (slice 3sexies): while the dash holds
+    /// <see cref="PlayerMotor.InputLocked"/> the attack pressed mid-dash is buffered by
+    /// <see cref="PlayerCombat"/> (held, not decayed) and fires when this component releases
+    /// the lock at dash end — dash -> attack -> combo.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody))]
@@ -49,6 +64,9 @@ namespace MK.Rebuild
 
         [Tooltip("ADDITIVE dash (default true, slice 3ter): the velocity during the dash = the BASE horizontal velocity captured at dash start (direction locked) + the curve impulse. Run + dash = burst ON TOP and the run continues afterwards at ~base speed; stand + dash = burst from ~0. false = legacy pure-burst: the curve REPLACES the velocity (run stops then resumes). A/B toggle — data-driven, everything else stays in data.")]
         [SerializeField] private bool additive = true;
+
+        [Tooltip("Aim-assist config for the DASH direction — its OWN definition, tunable independently from PlayerCombat's attack corrector (cone / range / turn). E.g. a more generous range so the dash gap-closes farther than an attack. Null / disabled = the dash stays straight.")]
+        [SerializeField] private AimAssistDefinition dashAimAssist;
 
         private Rigidbody rb;
         private PlayerMotor motor;
@@ -90,6 +108,11 @@ namespace MK.Rebuild
             {
                 dashElapsed += Time.unscaledDeltaTime;
                 dashTimer -= Time.unscaledDeltaTime;
+                // Keep facing on the (possibly aim-corrected) dash direction: SetFacing
+                // is incremental (~12°/frame), so a corrected direction converges over
+                // the dash opening instead of lagging a single step. No-op when the dash
+                // is uncorrected (dashDir already equals the current facing).
+                if (visual != null) visual.SetFacing(dashDir);
                 if (dashTimer <= 0f) EndDash();
                 return; // no new dash while one runs
             }
@@ -140,6 +163,14 @@ namespace MK.Rebuild
             // input cannot rotate mid-dash). Fallback to transform.forward for
             // proxy/visual-less setups — same pattern as PlayerCombat.
             dashDir = FacingNow();
+
+            // Aim-assist on dash START (slice 3sexies): the dash's OWN definition. If a
+            // target sits inside the frontal cone + range, SNAP the dash direction toward it
+            // (OFFENSIVE gap-close). Dashing AWAY — target behind or outside the cone —
+            // finds nothing, so dashDir stays forward (DEFENSIVE).
+            if (AimAssist.TryFindAimDir(transform.position, rb, dashDir, dashAimAssist, out Vector3 aim))
+                dashDir = aim;
+
             if (visual != null) visual.SetFacing(dashDir);
 
             // ADDITIVE seam: capture the horizontal velocity at the dash MOMENT as a
@@ -158,6 +189,8 @@ namespace MK.Rebuild
         {
             isDashing = false;
             dashTimer = 0f;
+            // Release the lock -> PlayerCombat's attack buffer (fed/held during the dash)
+            // fires this frame or next and starts the combo: dash -> attack -> combo.
             if (motor != null) motor.InputLocked = false; // rigorous release: control returns
         }
 

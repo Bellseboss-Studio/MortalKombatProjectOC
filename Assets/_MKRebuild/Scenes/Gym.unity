@@ -119,19 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!134 &103837938
-PhysicsMaterial:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: ' (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)'
-  serializedVersion: 2
-  m_DynamicFriction: 0.6
-  m_StaticFriction: 0.6
-  m_Bounciness: 0
-  m_FrictionCombine: 0
-  m_BounceCombine: 0
 --- !u!1 &125029139
 GameObject:
   m_ObjectHideFlags: 0
@@ -258,19 +245,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d789f82fb2654047b2f01f9cd029e7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.Grabbable
---- !u!134 &276840317
-PhysicsMaterial:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: ' (Instance)'
-  serializedVersion: 2
-  m_DynamicFriction: 0.6
-  m_StaticFriction: 0.6
-  m_Bounciness: 0
-  m_FrictionCombine: 0
-  m_BounceCombine: 0
 --- !u!1 &312964266
 GameObject:
   m_ObjectHideFlags: 0
@@ -567,6 +541,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d789f82fb2654047b2f01f9cd029e7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.Grabbable
+--- !u!134 &391615611
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1001 &459002690
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -983,6 +971,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!134 &1502265910
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance) (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &1536710935
 GameObject:
   m_ObjectHideFlags: 0
@@ -1291,7 +1292,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1837699311}
-  m_Material: {fileID: 103837938}
+  m_Material: {fileID: 391615611}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1442,6 +1443,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   additive: 1
+  dashAimAssist: {fileID: 11400000, guid: 3f7c1a9e5b2d406e8a1c7f9d0b3e5a21, type: 2}
 --- !u!1 &2013586933
 GameObject:
   m_ObjectHideFlags: 0
@@ -1518,7 +1520,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2013586933}
-  m_Material: {fileID: 276840317}
+  m_Material: {fileID: 1502265910}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0

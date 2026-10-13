@@ -108,6 +108,13 @@ namespace MK.Rebuild
         /// </summary>
         public bool IsHitstopped => hitstopRemaining > 0f;
 
+        /// <summary>
+        /// Aim-assist tuning used by the ATTACK entry (read-only debug seam). The dash
+        /// has its OWN definition now (<c>PlayerDash.dashAimAssist</c>), so the attack and
+        /// the dash tune their range/cone independently. Null / disabled = forward-only.
+        /// </summary>
+        public AimAssistDefinition AimAssistDef => aimAssist;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody>();
@@ -150,8 +157,16 @@ namespace MK.Rebuild
             }
 
             // Unscaled buffer decay (jumpBuffer pattern): a tap survives ~0.15 s.
-            if (lightBuffer > 0f) lightBuffer = Mathf.Max(0f, lightBuffer - Time.unscaledDeltaTime);
-            if (heavyBuffer > 0f) heavyBuffer = Mathf.Max(0f, heavyBuffer - Time.unscaledDeltaTime);
+            // EXCEPT while the DASH holds the movement lock (idle + InputLocked + no combo):
+            // the attack pressed mid-dash is HELD (no decay) so it fires the instant the dash
+            // ends — dash -> attack -> combo. Combo steps are UNAFFECTED: their own 0.15 s
+            // step buffer keeps decaying (comboActive skips this hold).
+            bool dashHoldsInput = motor != null && motor.InputLocked && !comboActive;
+            if (!dashHoldsInput)
+            {
+                if (lightBuffer > 0f) lightBuffer = Mathf.Max(0f, lightBuffer - Time.unscaledDeltaTime);
+                if (heavyBuffer > 0f) heavyBuffer = Mathf.Max(0f, heavyBuffer - Time.unscaledDeltaTime);
+            }
 
             UpdateAimCorrection();
 
@@ -186,13 +201,22 @@ namespace MK.Rebuild
                 return;
             }
 
-            // While the dash owns the movement lock, combat defers: no new combo may
-            // start mid-dash (its lunge would fight the dash velocity). The lock is
-            // released by PlayerDash at dash end — control returns to normal entry.
-            if (motor != null && motor.InputLocked) return;
+            // While the dash owns the movement lock, combat cannot START an attack (its
+            // lunge would fight the dash velocity). But the press must NOT be LOST: feed
+            // the unscaled buffer here (same 0.15 s pattern as the combo) so the entry
+            // below fires the moment PlayerDash releases the lock — dash -> attack -> combo.
+            if (motor != null && motor.InputLocked)
+            {
+                if (LightPressedThisFrame()) lightBuffer = inputBufferSeconds;
+                if (HeavyPressedThisFrame()) heavyBuffer = inputBufferSeconds;
+                return;
+            }
 
-            bool light = LightPressedThisFrame();
-            bool heavy = HeavyPressedThisFrame();
+            // Consume either the direct press THIS frame OR a tap buffered during the dash.
+            bool light = LightPressedThisFrame() || lightBuffer > 0f;
+            bool heavy = HeavyPressedThisFrame() || heavyBuffer > 0f;
+            if (light) lightBuffer = 0f;
+            if (heavy) heavyBuffer = 0f;
 
             // Combo entry (multi-root): pick the longest chain whose root matches
             // the pressed input; a lone press ends that chain's single step cleanly
@@ -468,48 +492,14 @@ namespace MK.Rebuild
         private void ApplyAimAssist()
         {
             ClearAimAssist();
-            if (aimAssist == null || !aimAssist.enabled || visual == null) return;
+            if (visual == null) return;
 
-            float range = Mathf.Max(0.01f, aimAssist.maxRangeMeters);
-            Collider[] cols = Physics.OverlapSphere(
-                transform.position, range, Physics.AllLayers, QueryTriggerInteraction.Ignore);
+            // Shared selection (slice 3quinquies, Code/Combat/AimAssist.cs): the dash
+            // direction uses the EXACT same cone + range + nearest-alive-target math.
+            if (!AimAssist.TryFindAimDir(transform.position, rb, FacingVector(), aimAssist, out Vector3 aim))
+                return;
 
-            Vector3 self = transform.position;
-            Vector3 facing = FacingVector();
-            float cosLimit = Mathf.Cos(Mathf.Clamp(aimAssist.coneHalfAngleDeg, 0f, 180f) * Mathf.Deg2Rad);
-            float minRange = Mathf.Max(0f, aimAssist.minRangeMeters);
-            float minSqr = minRange * minRange;
-
-            HitReceiver best = null;
-            float bestSqr = float.MaxValue;
-            for (int i = 0; i < cols.Length; i++)
-            {
-                var col = cols[i];
-                if (col == null) continue;
-                if (col.attachedRigidbody == rb) continue; // own capsule / Face trigger
-
-                var receiver = col.GetComponentInParent<HitReceiver>();
-                if (receiver == null || !receiver.IsAlive) continue;
-
-                Vector3 to = receiver.transform.position - self;
-                to.y = 0f;
-                float sqr = to.sqrMagnitude;
-                if (sqr < 0.0001f || sqr < minSqr) continue; // no direction / dead-zone
-                if (sqr >= bestSqr) continue;                // not nearer than the best
-
-                Vector3 dir = to / Mathf.Sqrt(sqr);
-                if (Vector3.Dot(facing, dir) < cosLimit) continue; // outside the frontal cone
-
-                bestSqr = sqr;
-                best = receiver;
-            }
-
-            if (best == null) return;
-
-            Vector3 aim = best.transform.position - self;
-            aim.y = 0f;
-            if (aim.sqrMagnitude < 0.0001f) return;
-            aimDir = aim.normalized;
+            aimDir = aim;
 
             // SetFacing is incremental (~12°/frame at 720°/s): a single call cannot
             // align. Iterate over the swing opening — window sized to the worst-case
