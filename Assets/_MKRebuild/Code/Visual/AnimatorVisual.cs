@@ -31,6 +31,7 @@ namespace MK.Rebuild
         private static readonly int JumpStartSpeedHash = Animator.StringToHash("JumpStartSpeed");
         private static readonly int FlipMidAirSpeedHash = Animator.StringToHash("FlipMidAirSpeed");
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
+        private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int AttackP1SpeedHash = Animator.StringToHash("AttackP1Speed");
         private static readonly int AttackP2SpeedHash = Animator.StringToHash("AttackP2Speed");
         private static readonly int AttackP3SpeedHash = Animator.StringToHash("AttackP3Speed");
@@ -137,6 +138,27 @@ namespace MK.Rebuild
         public void ReleaseAttack()
         {
             if (animator != null) animator.SetInteger(AttackStepHash, 0);
+        }
+
+        /// <summary>
+        /// DORMANT dash-state hook (m1-aim-assist, decision f): mirrors
+        /// <see cref="PlayAttack"/> for the EMPTY <c>Dash</c> state. NOT called by
+        /// <see cref="PlayerDash"/> yet — entering the motion-less state FREEZES the
+        /// pose, so this waits until a dash clip exists (then: set m_Motion + call
+        /// this from StartDash/EndDash). Pushing DashState = 1 lets the controller's
+        /// mirror exits (gated <c>DashState == 0</c>) return to locomotion.
+        /// </summary>
+        public void PlayDash(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            animator.CrossFade("Dash", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+            animator.SetInteger(DashStateHash, 1);
+        }
+
+        /// <summary>DORMANT: sets DashState back to 0 (none) so the mirror exits return to locomotion.</summary>
+        public void ReleaseDash()
+        {
+            if (animator != null) animator.SetInteger(DashStateHash, 0);
         }
 
         /// <summary>

@@ -39,6 +39,9 @@ namespace MK.Rebuild
         [Tooltip("Combo chains (data-driven, multi-root). Each combo's root is its step 0 input; when several combos match a press, the LONGEST chain wins (input-prefix rule): L→Combo_1 (L→L→P), P→Combo_H, etc. Any combo can be tested alone by assigning only it.")]
         [SerializeField] private ComboDefinition[] combos = new ComboDefinition[0];
 
+        [Tooltip("Soft trajectory corrector (aim-assist): at attack entry, turn the facing toward the nearest alive target inside the frontal cone + range. Drags lunge + hitbox (single point: visual.Facing). Null/disabled = forward-only (current behavior).")]
+        [SerializeField] private AimAssistDefinition aimAssist;
+
         // Active combo (the one currently running), resolved by SelectRoot at entry.
         private ComboDefinition activeCombo;
 
@@ -63,6 +66,13 @@ namespace MK.Rebuild
         private AttackDefinition current;
         private float swingTime;                 // scaled seconds into the swing
         private readonly HashSet<HitReceiver> hitThisSwing = new HashSet<HitReceiver>();
+
+        // Aim-assist runtime (m1-aim-assist): the XZ direction to turn toward at
+        // attack entry + the seconds left of the entry correction window. Zero
+        // direction = no active correction. SetFacing is incremental, so the
+        // corrector ITERATES over the swing opening instead of one snap.
+        private Vector3 aimDir;
+        private float aimCorrectRemaining;
 
         // Combo state (decision b: one combo at a time).
         private bool comboActive;
@@ -142,6 +152,8 @@ namespace MK.Rebuild
             // Unscaled buffer decay (jumpBuffer pattern): a tap survives ~0.15 s.
             if (lightBuffer > 0f) lightBuffer = Mathf.Max(0f, lightBuffer - Time.unscaledDeltaTime);
             if (heavyBuffer > 0f) heavyBuffer = Mathf.Max(0f, heavyBuffer - Time.unscaledDeltaTime);
+
+            UpdateAimCorrection();
 
             if (comboActive) UpdateCombo();
             else UpdateIdle();
@@ -350,6 +362,7 @@ namespace MK.Rebuild
             connectedThisStep = false;
             hitThisStep.Clear();
             hitThisSwing.Clear();
+            ApplyAimAssist();
             ApplyStepLock(first);
             PlayAttackVisual(1, first);
         }
@@ -366,6 +379,7 @@ namespace MK.Rebuild
             stepTime = 0f;
             connectedThisStep = false;
             hitThisStep.Clear();
+            ApplyAimAssist();
             ApplyStepLock(next);
             PlayAttackVisual(index + 1, next);
         }
@@ -379,6 +393,7 @@ namespace MK.Rebuild
             stepTime = 0f;
             connectedThisStep = false;
             hitThisStep.Clear();
+            ClearAimAssist();
             if (motor != null) motor.InputLocked = false; // release the attack lock -> wish control returns
             if (visual is AnimatorVisual animatorVisual) animatorVisual.ReleaseAttack();
         }
@@ -433,6 +448,93 @@ namespace MK.Rebuild
                 animatorVisual.PlayAttack(state, Mathf.Max(0f, crossFadeDuration));
                 animatorVisual.SetAttackSpeed(state, def.speedMultiplier);
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Aim-assist (m1-aim-assist, decisions a/b/e): soft trajectory corrector.
+        // At attack entry, pick the nearest alive HitReceiver inside the frontal
+        // cone + range and turn visual.Facing toward it over the swing opening.
+        // Facing is the SINGLE point: ApplyLunge (reads FacingVector) and
+        // HitboxOrigin both follow -> lunge + hitbox redirect with NO motor change.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Computes the aim direction ONCE at attack entry (NOT continuous homing):
+        /// nearest alive target inside the ±coneHalfAngle frontal cone and within
+        /// [minRange, maxRange] METERS. On a hit, stores the direction and starts the
+        /// entry correction window (worst-case cone error / turnSpeed). No target or
+        /// disabled -> no-op (forward-only behavior intact). Applies in air/wall too.
+        /// </summary>
+        private void ApplyAimAssist()
+        {
+            ClearAimAssist();
+            if (aimAssist == null || !aimAssist.enabled || visual == null) return;
+
+            float range = Mathf.Max(0.01f, aimAssist.maxRangeMeters);
+            Collider[] cols = Physics.OverlapSphere(
+                transform.position, range, Physics.AllLayers, QueryTriggerInteraction.Ignore);
+
+            Vector3 self = transform.position;
+            Vector3 facing = FacingVector();
+            float cosLimit = Mathf.Cos(Mathf.Clamp(aimAssist.coneHalfAngleDeg, 0f, 180f) * Mathf.Deg2Rad);
+            float minRange = Mathf.Max(0f, aimAssist.minRangeMeters);
+            float minSqr = minRange * minRange;
+
+            HitReceiver best = null;
+            float bestSqr = float.MaxValue;
+            for (int i = 0; i < cols.Length; i++)
+            {
+                var col = cols[i];
+                if (col == null) continue;
+                if (col.attachedRigidbody == rb) continue; // own capsule / Face trigger
+
+                var receiver = col.GetComponentInParent<HitReceiver>();
+                if (receiver == null || !receiver.IsAlive) continue;
+
+                Vector3 to = receiver.transform.position - self;
+                to.y = 0f;
+                float sqr = to.sqrMagnitude;
+                if (sqr < 0.0001f || sqr < minSqr) continue; // no direction / dead-zone
+                if (sqr >= bestSqr) continue;                // not nearer than the best
+
+                Vector3 dir = to / Mathf.Sqrt(sqr);
+                if (Vector3.Dot(facing, dir) < cosLimit) continue; // outside the frontal cone
+
+                bestSqr = sqr;
+                best = receiver;
+            }
+
+            if (best == null) return;
+
+            Vector3 aim = best.transform.position - self;
+            aim.y = 0f;
+            if (aim.sqrMagnitude < 0.0001f) return;
+            aimDir = aim.normalized;
+
+            // SetFacing is incremental (~12°/frame at 720°/s): a single call cannot
+            // align. Iterate over the swing opening — window sized to the worst-case
+            // cone error at the configured turn speed.
+            aimCorrectRemaining = Mathf.Clamp(aimAssist.coneHalfAngleDeg, 0f, 180f)
+                / Mathf.Max(1f, aimAssist.turnSpeedDegPerSec);
+            visual.SetFacing(aimDir);
+        }
+
+        /// <summary>
+        /// Iterates <c>visual.SetFacing</c> toward the stored aim direction during the
+        /// swing OPENING (a smooth turn), then stops — NOT continuous homing. Scaled
+        /// time: hitstop freezes the correction with the rest of the swing.
+        /// </summary>
+        private void UpdateAimCorrection()
+        {
+            if (aimCorrectRemaining <= 0f) return;
+            aimCorrectRemaining -= Time.deltaTime;
+            if (visual != null) visual.SetFacing(aimDir);
+        }
+
+        private void ClearAimAssist()
+        {
+            aimDir = Vector3.zero;
+            aimCorrectRemaining = 0f;
         }
 
         // ------------------------------------------------------------------
@@ -523,6 +625,7 @@ namespace MK.Rebuild
             current = def;
             swingTime = 0f;
             hitThisSwing.Clear();
+            ApplyAimAssist();
         }
 
         private void EndSwing()
@@ -530,6 +633,7 @@ namespace MK.Rebuild
             current = null;
             swingTime = 0f;
             hitThisSwing.Clear();
+            ClearAimAssist();
         }
 
         private void BeginHitstop(float hitstopMs)
