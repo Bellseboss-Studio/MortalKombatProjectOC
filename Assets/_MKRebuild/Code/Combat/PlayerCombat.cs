@@ -25,6 +25,12 @@ namespace MK.Rebuild
     /// restores the CURRENT <c>Time.timeScale</c>, never hardcodes 1 (debug F4).
     /// Swing timing is SCALED (hitstop freezes the swing); the hitstop countdown,
     /// the input buffer and the victim feedback run UNSCALED.
+    ///
+    /// Dash-cancel (slice 3septies): an attack pressed while the DASH holds the movement
+    /// lock does NOT wait for the dash to end. Past <c>PlayerDash.minCancelTime</c> it calls
+    /// <see cref="PlayerDash.TryCancelByAttack"/>, cuts the dash short and starts the attack
+    /// the SAME frame (dash-cancel into attack). Before that window the press is buffered
+    /// (held while the lock) and fires at the dash-end handoff — the 3sexies path is the fallback.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody))]
@@ -55,6 +61,7 @@ namespace MK.Rebuild
         private Rigidbody rb;
         private ICharacterVisual visual;
         private PlayerMotor motor;
+        private PlayerDash dash;
 
         // One-shot taps submitted out-of-band (editor smoke driver / future
         // menu or demo hooks). Consumed by the next Update as if pressed this frame.
@@ -120,6 +127,7 @@ namespace MK.Rebuild
             rb = GetComponent<Rigidbody>();
             visual = GetComponent<ICharacterVisual>();
             motor = GetComponent<PlayerMotor>();
+            dash = GetComponent<PlayerDash>();
             input = new PlayerInput();
         }
 
@@ -201,14 +209,25 @@ namespace MK.Rebuild
                 return;
             }
 
-            // While the dash owns the movement lock, combat cannot START an attack (its
-            // lunge would fight the dash velocity). But the press must NOT be LOST: feed
-            // the unscaled buffer here (same 0.15 s pattern as the combo) so the entry
-            // below fires the moment PlayerDash releases the lock — dash -> attack -> combo.
+            // While the dash owns the movement lock, combat cannot normally START an attack
+            // (its lunge would fight the dash velocity). Two paths (slice 3septies):
+            //   1. EARLY CANCEL: an attack pressed past the dash's min cancel window CUTS the
+            //      dash short (PlayerDash.TryCancelByAttack) and starts the attack this SAME
+            //      frame — no waiting for the dash to end (dash-cancel into attack).
+            //   2. FALLBACK: before that window (or with no dash) the press is BUFFERED (held,
+            //      not decayed) and fires when PlayerDash releases the lock at dash end.
             if (motor != null && motor.InputLocked)
             {
-                if (LightPressedThisFrame()) lightBuffer = inputBufferSeconds;
-                if (HeavyPressedThisFrame()) heavyBuffer = inputBufferSeconds;
+                bool lightPressed = LightPressedThisFrame();
+                bool heavyPressed = HeavyPressedThisFrame();
+
+                if ((lightPressed || heavyPressed) && dash != null && dash.TryCancelByAttack())
+                {
+                    if (TryStartAttack(lightPressed, heavyPressed)) return;
+                }
+
+                if (lightPressed) lightBuffer = inputBufferSeconds;
+                if (heavyPressed) heavyBuffer = inputBufferSeconds;
                 return;
             }
 
@@ -218,28 +237,42 @@ namespace MK.Rebuild
             if (light) lightBuffer = 0f;
             if (heavy) heavyBuffer = 0f;
 
+            TryStartAttack(light, heavy);
+        }
+
+        /// <summary>
+        /// Starts whatever the pressed input resolves to: the LONGEST matching combo root
+        /// (L→Combo_1 (L→L→P), P→Combo_H…), else the standalone grey-box swing, else the
+        /// missing-definition warning. Shared by the idle entry and the dash early-cancel
+        /// (slice 3septies) so both start the attack identically. Returns true when an
+        /// attack actually started.
+        /// </summary>
+        private bool TryStartAttack(bool light, bool heavy)
+        {
             // Combo entry (multi-root): pick the longest chain whose root matches
             // the pressed input; a lone press ends that chain's single step cleanly
             // while a continuation chains. No match -> grey-box standalone swing.
             if (light)
             {
                 ComboDefinition c = SelectRoot(ComboInput.Ligero);
-                if (c != null) { StartCombo(c); return; }
+                if (c != null) { StartCombo(c); return true; }
             }
             if (heavy)
             {
                 ComboDefinition c = SelectRoot(ComboInput.Pesado);
-                if (c != null) { StartCombo(c); return; }
+                if (c != null) { StartCombo(c); return true; }
             }
 
-            if (light && lightAttack != null) StartSwing(lightAttack);
-            else if (heavy && heavyAttack != null) StartSwing(heavyAttack);
-            else if ((light || heavy) && !warnedMissingDefinition)
+            if (light && lightAttack != null) { StartSwing(lightAttack); return true; }
+            if (heavy && heavyAttack != null) { StartSwing(heavyAttack); return true; }
+
+            if ((light || heavy) && !warnedMissingDefinition)
             {
                 warnedMissingDefinition = true;
                 Debug.LogWarning(
                     $"{name}: attack pressed but no AttackDefinition assigned in the inspector.", this);
             }
+            return false;
         }
 
         private void UpdateCombo()

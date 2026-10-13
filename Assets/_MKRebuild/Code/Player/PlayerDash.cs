@@ -38,10 +38,13 @@ namespace MK.Rebuild
     /// model, curve, cooldown, iframes, hitstop gate and combo-cancel are untouched — only
     /// the direction is corrected.
     ///
-    /// ATTACK HANDOFF (slice 3sexies): while the dash holds
-    /// <see cref="PlayerMotor.InputLocked"/> the attack pressed mid-dash is buffered by
-    /// <see cref="PlayerCombat"/> (held, not decayed) and fires when this component releases
-    /// the lock at dash end — dash -> attack -> combo.
+    /// ATTACK CANCEL (slice 3septies): an attack pressed during the dash CANCELS it early
+    /// (dash-cancel into attack) — but only once the dash has run <see cref="minCancelTime"/>
+    /// unscaled seconds, so the dash stays readable and cannot be cut at t=0.
+    /// <see cref="TryCancelByAttack"/> ends the dash and releases
+    /// <see cref="PlayerMotor.InputLocked"/>; <see cref="PlayerCombat"/> starts the attack the
+    /// same frame. Before the window (or with no attack) the fallback is the 3sexies buffer:
+    /// the press is held and fires when the dash ends on its own.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody))]
@@ -49,6 +52,9 @@ namespace MK.Rebuild
     {
         [Tooltip("Dash impulse duration in SECONDS (doc 05: 0.35).")]
         [SerializeField] private float dashDuration = 0.35f;
+
+        [Tooltip("MINIMUM unscaled seconds the dash must run before an ATTACK can cancel it early (slice 3septies: dash-cancel into attack). Keeps the dash readable — it cannot be cut at t=0. 0 = cancel immediately. Movement/iframes/cooldown stay untouched: the cooldown is armed at dash START, so a cancelled dash still pays it.")]
+        [SerializeField] private float minCancelTime = 0.05f;
 
         [Tooltip("Invulnerability window in SECONDS after the dash starts (doc 05: 0.25). Grey-box flag — no damage system consumes it yet.")]
         [SerializeField] private float invulnDuration = 0.25f;
@@ -89,6 +95,9 @@ namespace MK.Rebuild
 
         /// <summary>Unscaled seconds left until the dash is ready again (0 = ready).</summary>
         public float CooldownRemaining => cooldownTimer;
+
+        /// <summary>Minimum unscaled seconds the dash must run before an attack can cancel it (read-only debug seam).</summary>
+        public float MinCancelTime => minCancelTime;
 
         private void Awake()
         {
@@ -183,6 +192,24 @@ namespace MK.Rebuild
                 baseVelocity = Vector3.zero;
 
             if (motor != null) motor.InputLocked = true;
+        }
+
+        /// <summary>
+        /// Attack-cancel seam (slice 3septies): an attack pressed during the dash cuts it
+        /// SHORT — but only once the dash has run at least <see cref="minCancelTime"/>
+        /// (unscaled), so the dash stays readable and cannot be cancelled at t=0. Returns
+        /// true when the dash was actually cut (the caller starts the attack this same
+        /// frame); false when no dash is running or the min window has not elapsed.
+        /// Movement/iframes/cooldown are untouched: the cooldown was armed at dash START, so
+        /// a cancelled dash still pays it. The released <see cref="PlayerMotor.InputLocked"/>
+        /// lets PlayerCombat's attack entry take over immediately.
+        /// </summary>
+        public bool TryCancelByAttack()
+        {
+            if (!isDashing) return false;
+            if (dashElapsed < minCancelTime) return false;
+            EndDash();
+            return true;
         }
 
         private void EndDash()
