@@ -5,14 +5,29 @@ using UnityEngine;
 namespace MK.Rebuild
 {
     /// <summary>
-    /// Input that triggers/advances a combo step. Slice 2 only needs the two
-    /// existing buttons (gamepad X = LightAttack, Y = HeavyAttack); H1/H2/launcher
-    /// are deferred (rename-ready enum).
+    /// Input that triggers/advances a combo step. APPEND ONLY — the int values are
+    /// serialized in the combo assets (Combo_1.asset: Ligero=0, Pesado=1) and must
+    /// stay stable forever. H1/H2/Launcher/Dash were appended on 2026-10-13 (slice 3)
+    /// for the dash-cancel + ability PREPARE.
     /// </summary>
     public enum ComboInput
     {
         Ligero = 0,
-        Pesado = 1
+        Pesado = 1,
+        H1 = 2,
+        H2 = 3,
+        Launcher = 4,
+        Dash = 5
+    }
+
+    /// <summary>
+    /// What a <see cref="ComboStep"/> executes: a direct attack (same hitbox seam as
+    /// slice 2) or an ability, owned by its <see cref="AbilityDefinition"/>. Append-only.
+    /// </summary>
+    public enum ComboStepType
+    {
+        Attack = 0,
+        Ability = 1
     }
 
     /// <summary>Continuation of a step: the input that advances and the target step index.</summary>
@@ -37,8 +52,14 @@ namespace MK.Rebuild
     [Serializable]
     public struct ComboStep
     {
-        [Tooltip("Input that enters/advances into this step (Ligero = gamepad X / click izq, Pesado = Y / click der).")]
+        [Tooltip("Input that enters/advances into this step (Ligero = gamepad X / click izq, Pesado = Y / click der, H1/H2/Launcher/Dash = PREPARE-only, sin behavior).")]
         public ComboInput input;
+
+        [Tooltip("What this step executes: Attack = the generic hitbox seam, Ability = delegates to the abilityRef (no generic probe). Default Attack.")]
+        public ComboStepType stepType;
+
+        [Tooltip("Ability definition used when stepType == Ability. PREPARE-only in slice 3: no projectile/spin/multi-hit behavior yet (H2 12x2 deferred — the AbilityDefinition owns the hit pattern).")]
+        public AbilityDefinition abilityRef;
 
         [Tooltip("Real attack clip (Generic rig, no root motion, no Animation Events).")]
         public AnimationClip clip;
@@ -81,6 +102,12 @@ namespace MK.Rebuild
 
         [Tooltip("Forward advance in METERS along the swing facing over the whole step (H&S step-into-the-strike). 0 = full stop. Applied only while moveLock is true.")]
         public float lunge;
+
+        [Tooltip("Forward-advance speed SHAPE over the step (normalized 1 -> 0): the impulse decays from strong to zero. Empty = default ease-out. Total advance is still 'lunge' (the code integrates the curve).")]
+        public AnimationCurve lungeCurve;
+
+        [Tooltip("Animator Attack_P{n} state index for this step (1..N). 0 = auto (step index + 1). Set > 0 to make a 1-step combo play a deeper clip (e.g. Combo_H -> 3 = quick_P3).")]
+        public int attackStateIndex;
     }
 
     /// <summary>
@@ -95,8 +122,31 @@ namespace MK.Rebuild
         [Tooltip("Ordered combo steps. The first step is entered by its own input; later steps by the previous step's 'siguiente'.")]
         public List<ComboStep> steps = new List<ComboStep>();
 
+        [Tooltip("Dash CANCELS this combo entirely (doc: 'dash cancela TODO salvo hitstop propio' — the dash is the defense, not a chain link). Default ON.")]
+        public bool dashCancelsAll = true;
+
         /// <summary>Number of steps (0 when the list is null).</summary>
         public int Length => steps != null ? steps.Count : 0;
+
+        /// <summary>
+        /// Editor-time defaulting: every step without an authored lunge curve gets
+        /// the shared ease-out shape so the inspector is honest and existing assets
+        /// (authored before the curve existed) behave as intended. Runtime has the
+        /// same fallback in <see cref="CurveMotion.OrDefault"/>.
+        /// </summary>
+        private void OnValidate()
+        {
+            if (steps == null) return;
+            for (int i = 0; i < steps.Count; i++)
+            {
+                ComboStep s = steps[i];
+                if (!CurveMotion.IsUsable(s.lungeCurve))
+                {
+                    s.lungeCurve = CurveMotion.DefaultEaseOut();
+                    steps[i] = s;
+                }
+            }
+        }
 
         /// <summary>Bounds-checked accessor; false when the index is out of range.</summary>
         public bool TryGetStep(int index, out ComboStep step)

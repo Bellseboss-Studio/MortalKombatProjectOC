@@ -119,6 +119,19 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!134 &103837938
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &125029139
 GameObject:
   m_ObjectHideFlags: 0
@@ -1197,6 +1210,7 @@ GameObject:
   - component: {fileID: 1837699317}
   - component: {fileID: 1837699319}
   - component: {fileID: 1837699320}
+  - component: {fileID: 1837699321}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1277,7 +1291,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1837699311}
-  m_Material: {fileID: 2053963101}
+  m_Material: {fileID: 103837938}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1372,9 +1386,60 @@ MonoBehaviour:
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerCombat
   lightAttack: {fileID: 11400000, guid: 45529e462004ef24e80cf8d9c3f1dfaa, type: 2}
   heavyAttack: {fileID: 11400000, guid: d9d7b645ef9f3104795f485625b72bba, type: 2}
-  combo: {fileID: 11400000, guid: 2adea1b23fae815459426f877712c708, type: 2}
+  combos:
+  - {fileID: 11400000, guid: 2adea1b23fae815459426f877712c708, type: 2}
+  - {fileID: 11400000, guid: f1e2d3c4b5a69788796a5b4c3d2e1f01, type: 2}
   crossFadeDuration: 0.1
   inputBufferSeconds: 0.15
+--- !u!114 &1837699321
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1837699311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c9332830c3ab7849931c02ffa5e883f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerDash
+  dashDuration: 0.35
+  invulnDuration: 0.25
+  cooldown: 1.2
+  dashDistance: 3.5
+  dashCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: -1.1
+      outSlope: -1.1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.5
+      value: 0.45
+      inSlope: -1
+      outSlope: -1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -0.9
+      outSlope: -0.9
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &2013586933
 GameObject:
   m_ObjectHideFlags: 0
@@ -1507,19 +1572,6 @@ MonoBehaviour:
   flashTint: {r: 1, g: 0.35, b: 0.35, a: 1}
   knockbackSpeed: 6
   knockbackDamping: 18
---- !u!134 &2053963101
-PhysicsMaterial:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: ' (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)'
-  serializedVersion: 2
-  m_DynamicFriction: 0.6
-  m_StaticFriction: 0.6
-  m_Bounciness: 0
-  m_FrictionCombine: 0
-  m_BounceCombine: 0
 --- !u!1 &2070183346
 GameObject:
   m_ObjectHideFlags: 0

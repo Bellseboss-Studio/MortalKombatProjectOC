@@ -36,8 +36,11 @@ namespace MK.Rebuild
         [Tooltip("Heavy attack definition (gamepad Y / mouse right). Fallback when no combo or the combo does not start on heavy.")]
         [SerializeField] private AttackDefinition heavyAttack;
 
-        [Tooltip("Optional combo chain. When assigned, the first step REPLACES the grey-box swing for its input (doc: L→L→P).")]
-        [SerializeField] private ComboDefinition combo;
+        [Tooltip("Combo chains (data-driven, multi-root). Each combo's root is its step 0 input; when several combos match a press, the LONGEST chain wins (input-prefix rule): L→Combo_1 (L→L→P), P→Combo_H, etc. Any combo can be tested alone by assigning only it.")]
+        [SerializeField] private ComboDefinition[] combos = new ComboDefinition[0];
+
+        // Active combo (the one currently running), resolved by SelectRoot at entry.
+        private ComboDefinition activeCombo;
 
         [Tooltip("CrossFade duration (seconds) used to enter every attack state (decision b, ~0.1).")]
         [SerializeField] private float crossFadeDuration = 0.1f;
@@ -54,6 +57,7 @@ namespace MK.Rebuild
         // menu or demo hooks). Consumed by the next Update as if pressed this frame.
         private bool queuedLightTap;
         private bool queuedHeavyTap;
+        private bool queuedDashTap;
 
         // Grey-box fallback swing (slice 1, one at a time).
         private AttackDefinition current;
@@ -86,6 +90,13 @@ namespace MK.Rebuild
 
         /// <summary>Index of the active combo step, -1 when not in a combo (read-only debug seam).</summary>
         public int CurrentStepIndex => stepIndex;
+
+        /// <summary>
+        /// True while the hitstop freeze is active (timeScale = 0). Seam for the dash:
+        /// "dash cancela TODO salvo hitstop propio" — the dash must NOT fire during the
+        /// freeze (decision f guard).
+        /// </summary>
+        public bool IsHitstopped => hitstopRemaining > 0f;
 
         private void Awake()
         {
@@ -163,19 +174,26 @@ namespace MK.Rebuild
                 return;
             }
 
+            // While the dash owns the movement lock, combat defers: no new combo may
+            // start mid-dash (its lunge would fight the dash velocity). The lock is
+            // released by PlayerDash at dash end — control returns to normal entry.
+            if (motor != null && motor.InputLocked) return;
+
             bool light = LightPressedThisFrame();
             bool heavy = HeavyPressedThisFrame();
 
-            // Combo entry replaces the grey-box swing for the first step's input.
-            if (combo != null && combo.TryGetStep(0, out ComboStep first))
+            // Combo entry (multi-root): pick the longest chain whose root matches
+            // the pressed input; a lone press ends that chain's single step cleanly
+            // while a continuation chains. No match -> grey-box standalone swing.
+            if (light)
             {
-                bool startsOnLight = first.input == ComboInput.Ligero && light;
-                bool startsOnHeavy = first.input == ComboInput.Pesado && heavy;
-                if (startsOnLight || startsOnHeavy)
-                {
-                    StartCombo();
-                    return;
-                }
+                ComboDefinition c = SelectRoot(ComboInput.Ligero);
+                if (c != null) { StartCombo(c); return; }
+            }
+            if (heavy)
+            {
+                ComboDefinition c = SelectRoot(ComboInput.Pesado);
+                if (c != null) { StartCombo(c); return; }
             }
 
             if (light && lightAttack != null) StartSwing(lightAttack);
@@ -214,6 +232,52 @@ namespace MK.Rebuild
         /// <summary>Public tap seam for HeavyAttack (gamepad Y / mouse right).</summary>
         public void SubmitHeavyAttack() => queuedHeavyTap = true;
 
+        /// <summary>
+        /// Public tap seam for Dash (decision e): the next <see cref="ConsumeDashTap"/>
+        /// read treats it exactly like a Dash press. <see cref="PlayerDash"/> owns the
+        /// dash logic and reads through this pipeline so editor/menu/demo taps and the
+        /// real action share one path.
+        /// </summary>
+        public void SubmitDash() => queuedDashTap = true;
+
+        /// <summary>
+        /// Dash press reader shared with <see cref="PlayerDash"/>: real Dash action OR
+        /// the queued <see cref="SubmitDash"/> tap. The queued tap is consumed exactly
+        /// once (one consumer — the dash component).
+        /// </summary>
+        public bool ConsumeDashTap()
+        {
+            bool tap = queuedDashTap;
+            queuedDashTap = false;
+            return tap || (input != null && input.Player.Dash.WasPressedThisFrame());
+        }
+
+        /// <summary>
+        /// Ability input seam (decision b/e): entry point for H1/H2/Launcher as combo
+        /// step inputs. PREPARE-only in slice 3 (abilities deferred): no projectile,
+        /// no spin, no multi-hit — the seam exists so the future AbilitySystem plugs
+        /// in without touching the input layer.
+        /// </summary>
+        public void SubmitAbility(ComboInput ability)
+        {
+            // Deliberately empty in this slice: ability behavior is deferred by scope.
+        }
+
+        /// <summary>
+        /// Aborts the active combo/swing and releases the attack lock (dash-cancel
+        /// seam, decision a: "dash cancela TODO salvo hitstop propio"). No-op when
+        /// idle. Does NOT touch hitstop state — the caller decides whether the dash
+        /// may fire (<see cref="PlayerDash"/> gates on <see cref="IsHitstopped"/>).
+        /// </summary>
+        public void CancelCombo()
+        {
+            if (comboActive) EndCombo();
+            if (current != null) EndSwing();
+            if (motor != null) motor.InputLocked = false; // belt-and-braces: never leave a stale lock
+            lightBuffer = 0f;
+            heavyBuffer = 0f;
+        }
+
         private bool LightPressedThisFrame()
         {
             bool tap = queuedLightTap;
@@ -235,7 +299,7 @@ namespace MK.Rebuild
         /// </summary>
         private void TryAdvanceOnBuffer()
         {
-            if (combo == null || currentStep.siguiente.paso < 0) return;
+            if (activeCombo == null || currentStep.siguiente.paso < 0) return;
 
             Vector2 window = connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm;
             float duration = EffectiveDuration(currentStep);
@@ -252,9 +316,32 @@ namespace MK.Rebuild
             AdvanceCombo(currentStep.siguiente.paso);
         }
 
-        private void StartCombo()
+        /// <summary>
+        /// Root resolution (input-prefix rule, multi-combo): among
+        /// <see cref="combos"/> whose first step input matches
+        /// <paramref name="pressed"/>, pick the LONGEST chain (most steps) so a
+        /// lone press still ends cleanly at step 0 while a continuation chains;
+        /// ties keep the first in the array. Null when nothing matches.
+        /// </summary>
+        private ComboDefinition SelectRoot(ComboInput pressed)
         {
-            if (combo == null || !combo.TryGetStep(0, out ComboStep first)) return;
+            ComboDefinition best = null;
+            int bestLen = -1;
+            if (combos == null) return null;
+            for (int i = 0; i < combos.Length; i++)
+            {
+                ComboDefinition c = combos[i];
+                if (c == null || !c.TryGetStep(0, out ComboStep s0)) continue;
+                if (s0.input != pressed) continue;
+                if (c.Length > bestLen) { bestLen = c.Length; best = c; }
+            }
+            return best;
+        }
+
+        private void StartCombo(ComboDefinition definition)
+        {
+            if (definition == null || !definition.TryGetStep(0, out ComboStep first)) return;
+            activeCombo = definition;
             current = null;
             comboActive = true;
             stepIndex = 0;
@@ -269,7 +356,7 @@ namespace MK.Rebuild
 
         private void AdvanceCombo(int index)
         {
-            if (combo == null || !combo.TryGetStep(index, out ComboStep next))
+            if (activeCombo == null || !activeCombo.TryGetStep(index, out ComboStep next))
             {
                 EndCombo();
                 return;
@@ -287,6 +374,7 @@ namespace MK.Rebuild
         {
             comboActive = false;
             stepIndex = -1;
+            activeCombo = null;
             currentStep = default;
             stepTime = 0f;
             connectedThisStep = false;
@@ -307,10 +395,13 @@ namespace MK.Rebuild
 
         /// <summary>
         /// Advances the character FORWARD along the current swing facing during a
-        /// locked step: forward speed = <c>lunge / effective window</c>, so the
-        /// total advance over the step ≈ <c>lunge</c> meters (H&S step-into-the-
-        /// strike). The motor's <see cref="PlayerMotor.InputLocked"/> preserves this
-        /// velocity. A locked step with lunge = 0 is a full stop (no drift).
+        /// locked step, using the CURVED motion model: speed(t) decays over the
+        /// step per <c>lungeCurve</c> (normalized 1 -> 0), and the integral of the
+        /// speed over the effective window equals the total advance (≈
+        /// <c>lunge</c> meters; strong impulse at the start, decaying). An empty
+        /// curve defaults to the shared ease-out (<see cref="CurveMotion"/>). The
+        /// motor's <see cref="PlayerMotor.InputLocked"/> preserves this velocity.
+        /// A locked step with lunge = 0 is a full stop (no drift).
         /// </summary>
         private void ApplyLunge(in ComboStep step)
         {
@@ -319,7 +410,8 @@ namespace MK.Rebuild
             if (window <= 0f) return;
 
             Vector3 facing = FacingVector();
-            float speed = Mathf.Max(0f, step.lunge) / window;
+            float advance = Mathf.Max(0f, step.lunge);
+            float speed = Mathf.Max(0f, CurveMotion.Speed(step.lungeCurve, advance, window, stepTime));
             Vector3 v = rb.linearVelocity;
             v.x = facing.x * speed;
             v.z = facing.z * speed;
@@ -335,8 +427,11 @@ namespace MK.Rebuild
         {
             if (visual is AnimatorVisual animatorVisual)
             {
-                animatorVisual.PlayAttack(step, Mathf.Max(0f, crossFadeDuration));
-                animatorVisual.SetAttackSpeed(step, def.speedMultiplier);
+                // attackStateIndex > 0 overrides the auto index+1 so a 1-step
+                // combo can play a deeper clip (Combo_H -> Attack_P3).
+                int state = def.attackStateIndex > 0 ? def.attackStateIndex : step;
+                animatorVisual.PlayAttack(state, Mathf.Max(0f, crossFadeDuration));
+                animatorVisual.SetAttackSpeed(state, def.speedMultiplier);
             }
         }
 
