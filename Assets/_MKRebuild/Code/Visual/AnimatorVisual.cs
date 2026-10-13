@@ -30,6 +30,10 @@ namespace MK.Rebuild
         private static readonly int RunningHash = Animator.StringToHash("Running");
         private static readonly int JumpStartSpeedHash = Animator.StringToHash("JumpStartSpeed");
         private static readonly int FlipMidAirSpeedHash = Animator.StringToHash("FlipMidAirSpeed");
+        private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
+        private static readonly int AttackP1SpeedHash = Animator.StringToHash("AttackP1Speed");
+        private static readonly int AttackP2SpeedHash = Animator.StringToHash("AttackP2Speed");
+        private static readonly int AttackP3SpeedHash = Animator.StringToHash("AttackP3Speed");
 
         private PlayerParams paramsRef;
         private MoveState moveState = MoveState.Free;
@@ -109,6 +113,46 @@ namespace MK.Rebuild
         public void SetRunning(bool running)
         {
             if (animator != null) animator.SetBool(RunningHash, running);
+        }
+
+        /// <summary>
+        /// Code-driven entry to the Attack_P{n} states (m1-combos, decision b):
+        /// CrossFade into the state and push the dedicated AttackStep param so the
+        /// per-state exits stay gated until <see cref="ReleaseAttack"/>. The
+        /// presentation layer owns the Animator — the combat logic only asks.
+        /// </summary>
+        public void PlayAttack(int step, float crossFadeDuration)
+        {
+            if (animator == null) return;
+            if (step < 1)
+            {
+                ReleaseAttack();
+                return;
+            }
+            animator.CrossFade("Attack_P" + step, Mathf.Max(0f, crossFadeDuration), 0, 0f);
+            animator.SetInteger(AttackStepHash, step);
+        }
+
+        /// <summary>Sets AttackStep to 0 (none) so the landing-mirror exits return to locomotion.</summary>
+        public void ReleaseAttack()
+        {
+            if (animator != null) animator.SetInteger(AttackStepHash, 0);
+        }
+
+        /// <summary>
+        /// Per-step clip speed multiplier mapped to the state's speed parameter
+        /// (decision c, 1 = normal playback). Static: set when a step starts.
+        /// </summary>
+        public void SetAttackSpeed(int step, float multiplier)
+        {
+            if (animator == null) return;
+            float speed = Mathf.Max(0.01f, multiplier);
+            switch (step)
+            {
+                case 1: animator.SetFloat(AttackP1SpeedHash, speed); break;
+                case 2: animator.SetFloat(AttackP2SpeedHash, speed); break;
+                case 3: animator.SetFloat(AttackP3SpeedHash, speed); break;
+            }
         }
     }
 }

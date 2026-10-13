@@ -73,6 +73,15 @@ namespace MK.Rebuild
         public bool FacingLocked => facingLocked;
 
         /// <summary>
+        /// Attack movement lock (combat seam, default false). While true the motor
+        /// IGNORES the horizontal wish input and PRESERVES the current horizontal
+        /// velocity, so <see cref="PlayerCombat"/> can drive the per-step lunge;
+        /// the facing stops following the input. Gravity / jump / wall state are
+        /// untouched — the motor stays the movement owner.
+        /// </summary>
+        public bool InputLocked { get; set; }
+
+        /// <summary>
         /// True when the ground probe found a floor collider on the latest step.
         /// Read-only, no setter: exposed so the isolated debug module can observe
         /// the motor without any game→debug coupling.
@@ -357,6 +366,14 @@ namespace MK.Rebuild
                 horizontal = lockHoriz;
                 smoothVel = lockHoriz;
             }
+            else if (InputLocked)
+            {
+                // Attack lock (combat seam): skip the wish and preserve the
+                // horizontal velocity PlayerCombat is applying (the lunge).
+                // Gravity / jump / wall state are untouched.
+                horizontal = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+                smoothVel = horizontal;
+            }
             else
             {
                 Vector3 target = wishDir * targetSpeed;
@@ -388,6 +405,12 @@ namespace MK.Rebuild
                 // Wall grab / ledge hang: LOCKED into the surface/edge. Input ignored.
                 locked = true;
                 faceDir = HangIntoDir();
+            }
+            else if (InputLocked)
+            {
+                // Attack lock: hold the swing facing. faceDir stays zero so the
+                // visual keeps its last facing — input cannot rotate mid-swing.
+                locked = true;
             }
             else if (wishDir.sqrMagnitude > 0.000001f && moving)
             {
