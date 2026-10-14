@@ -27,13 +27,6 @@ MonoBehaviour:
     siguiente:
       input: 0
       paso: 1
-    branches:
-    - input: 0
-      direction: 3
-      paso: 3
-    - input: 1
-      direction: 3
-      paso: 3
     speedMultiplier: 7
     moveLock: 1
     lunge: 1.2
@@ -51,13 +44,6 @@ MonoBehaviour:
     siguiente:
       input: 1
       paso: 2
-    branches:
-    - input: 0
-      direction: 3
-      paso: 3
-    - input: 1
-      direction: 3
-      paso: 3
     speedMultiplier: 6
     moveLock: 1
     lunge: 1.2
@@ -78,26 +64,4 @@ MonoBehaviour:
     speedMultiplier: 7
     moveLock: 1
     lunge: 2
-  - input: 1
-    stepType: 0
-    abilityRef: {fileID: 0}
-    clip: {fileID: 0}
-    duracion: 1.2
-    hitNorm: {x: 0.15, y: 0.4}
-    dano: 10
-    knockback: 0.5
-    hitstopMs: 90
-    hitboxRadius: 1.7
-    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
-    cancelNorm: {x: 0.55, y: 0.85}
-    cancelHitNorm: {x: 0.15, y: 0.85}
-    siguiente:
-      input: 1
-      paso: -1
-    speedMultiplier: 6
-    moveLock: 1
-    lunge: 1.2
-    attackStateIndex: 3
-    launch: 1
-    launchImpulse: 6.5
   dashCancelsAll: 1
