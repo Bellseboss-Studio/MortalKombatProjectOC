@@ -100,6 +100,12 @@ namespace MK.Rebuild
         private Vector3 aimDir;
         private float aimCorrectRemaining;
 
+        // Within-step lunge COMMIT (target-switch iteration): the world XZ direction the
+        // active step's lunge was committed to at step entry (the soft-locked target, or
+        // the facing when there was none). ApplyLunge uses THIS instead of the live facing
+        // so the body can re-orient between steps without the lunge drifting mid-step.
+        private Vector3 lungeDir;
+
         // Combo state (decision b: one combo at a time).
         private bool comboActive;
         private int stepIndex = -1;             // index into combo.steps
@@ -355,6 +361,7 @@ namespace MK.Rebuild
 
             // Scaled time: hitstop (timeScale = 0) freezes the step mid-window.
             stepTime += Time.deltaTime;
+            UpdateMidComboFacing();
             TryAdvanceOnBuffer();
             if (stepTime >= EffectiveDuration(currentStep)) EndCombo(); // whiff end / finisher end
         }
@@ -442,10 +449,7 @@ namespace MK.Rebuild
         {
             if (activeCombo == null) return;
 
-            Vector2 window = connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm;
-            float duration = EffectiveDuration(currentStep);
-            float c0 = Mathf.Clamp01(window.x) * duration;
-            float c1 = Mathf.Clamp01(window.y) * duration;
+            CancelWindowBounds(out float c0, out float c1);
             if (stepTime < c0 || stepTime > c1) return;
 
             // Continuation keyed by (input, direction): the scalar 'siguiente' plus any
@@ -647,12 +651,14 @@ namespace MK.Rebuild
             float window = EffectiveDuration(step);
             if (window <= 0f) return;
 
-            Vector3 facing = FacingVector();
+            // Committed direction (captured at step entry): re-orienting the facing between
+            // steps must NOT drag the lunge of the step already running.
+            Vector3 dir = lungeDir.sqrMagnitude > 0.0001f ? lungeDir : FacingVector();
             float advance = Mathf.Max(0f, step.lunge);
             float speed = Mathf.Max(0f, CurveMotion.Speed(step.lungeCurve, advance, window, stepTime));
             Vector3 v = rb.linearVelocity;
-            v.x = facing.x * speed;
-            v.z = facing.z * speed;
+            v.x = dir.x * speed;
+            v.z = dir.z * speed;
             rb.linearVelocity = v;
         }
 
@@ -711,11 +717,18 @@ namespace MK.Rebuild
         private void ApplyAimAssist()
         {
             ClearAimAssist();
+            // Default lunge commit: the facing this step starts on. Overridden below with
+            // the soft-locked target direction when one is found.
+            lungeDir = FacingVector();
             if (visual == null) return;
 
             // Shared selection (slice 3quinquies, Code/Combat/AimAssist.cs): the dash
             // direction uses the EXACT same cone + range + nearest-alive-target math.
-            if (!AimAssist.TryFindAimDir(transform.position, rb, FacingVector(), aimAssist, out Vector3 aim))
+            // CONE AXIS = the player's AIM (target-switch iteration): the cone is centered
+            // where the player POINTS (camera-relative stick), so pointing at another enemy
+            // selects it (the nearest enemy inside THAT cone). Neutral stick = the current
+            // facing, i.e. the pre-existing behavior.
+            if (!AimAssist.TryFindAimDir(transform.position, rb, AimAxis(), aimAssist, out Vector3 aim))
                 return;
 
             aimDir = aim;
@@ -725,6 +738,9 @@ namespace MK.Rebuild
             // cone error at the configured turn speed.
             aimCorrectRemaining = Mathf.Clamp(aimAssist.coneHalfAngleDeg, 0f, 180f)
                 / Mathf.Max(1f, aimAssist.turnSpeedDegPerSec);
+            // The lunge is COMMITTED to the chosen target for the whole step, so the
+            // between-steps re-orientation below never drags it mid-step.
+            lungeDir = aim;
             visual.SetFacing(aimDir);
         }
 
@@ -746,6 +762,31 @@ namespace MK.Rebuild
             aimCorrectRemaining = 0f;
         }
 
+        /// <summary>
+        /// MID-COMBO facing re-orientation (target-switch, DMC/Bayonetta feel): while the
+        /// active step is PAST its strike (hit window closed) and inside its cancel window,
+        /// keep turning the facing toward the player's AIM + soft-lock — the nearest alive
+        /// enemy inside the cone centered on the stick. This is what lets the player swing
+        /// the body toward ANOTHER enemy mid-combo so the NEXT step's hit goes there. The
+        /// lunge stays committed (<see cref="ApplyLunge"/> uses <see cref="lungeDir"/>), so
+        /// the body pivots without drifting. It only turns when an enemy is soft-locked:
+        /// free-facing the raw stick would rotate the facing under the player's own "Back"
+        /// input and break the facing-relative launcher. SetFacing is incremental, so
+        /// calling it every frame converges over the window.
+        /// </summary>
+        private void UpdateMidComboFacing()
+        {
+            if (visual == null) return;
+            if (aimCorrectRemaining > 0f) return; // the entry correction owns the opening
+            if (IsInsideStepWindow()) return;     // committed through the strike
+            if (!IsInCancelWindow()) return;      // only between steps / in the chain tail
+
+            if (!AimAssist.TryFindAimDir(transform.position, rb, AimAxis(), aimAssist, out Vector3 lockDir))
+                return; // no enemy in the aim cone -> keep the committed facing
+
+            visual.SetFacing(lockDir);
+        }
+
         // ------------------------------------------------------------------
         // Shared hitbox probe (slice-1 seam extended 1:1 to combo steps)
         // ------------------------------------------------------------------
@@ -756,6 +797,25 @@ namespace MK.Rebuild
             float t0 = Mathf.Clamp01(currentStep.hitNorm.x) * duration;
             float t1 = Mathf.Clamp01(currentStep.hitNorm.y) * duration;
             return stepTime >= t0 && stepTime <= t1;
+        }
+
+        /// <summary>
+        /// The active step's cancel window in SCALED seconds (wider when the step
+        /// connected). Shared by the buffered advance and the mid-combo facing re-orient.
+        /// </summary>
+        private void CancelWindowBounds(out float c0, out float c1)
+        {
+            Vector2 window = connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm;
+            float duration = EffectiveDuration(currentStep);
+            c0 = Mathf.Clamp01(window.x) * duration;
+            c1 = Mathf.Clamp01(window.y) * duration;
+        }
+
+        /// <summary>True while the active step is inside its cancel window (scaled time).</summary>
+        private bool IsInCancelWindow()
+        {
+            CancelWindowBounds(out float c0, out float c1);
+            return stepTime >= c0 && stepTime <= c1;
         }
 
         /// <summary>
@@ -878,6 +938,26 @@ namespace MK.Rebuild
             facing.y = 0f;
             if (facing.sqrMagnitude < 0.0001f) facing = Vector3.forward;
             return facing.normalized;
+        }
+
+        /// <summary>
+        /// World-space AIM direction on XZ (unit) used as the soft-lock CONE AXIS: the
+        /// camera-relative MOVE stick direction when the stick is past its deadzone (the
+        /// player is pointing somewhere), else the current facing (keep the cone where the
+        /// body already looks). Uses the SAME stick-to-world mapping the walk/dash use
+        /// (<see cref="CameraRelativeMotion"/>) and the SAME deadzone as the facing-relative
+        /// classifier (<see cref="AttackDirectionClassifier"/>), so the aim is consistent
+        /// across the combat model.
+        /// </summary>
+        private Vector3 AimAxis()
+        {
+            Vector3 facing = FacingVector();
+            if (input == null) return facing;
+            if (cameraTransform == null) RefreshCamera();
+            Vector2 stick = input.Player.Move.ReadValue<Vector2>();
+            if (stick.magnitude < AttackDirectionClassifier.DefaultDeadzone) return facing;
+            Vector3 dir = CameraRelativeMotion.WishDirection(cameraTransform, stick);
+            return dir.sqrMagnitude > 0.000001f ? dir : facing;
         }
 
         /// <summary>
