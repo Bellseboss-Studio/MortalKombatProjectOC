@@ -97,6 +97,11 @@ namespace MK.Rebuild
                  "fall past a lip (~0.5 s) with margin.")]
         public float ledgeReGrabDelay = 0.6f;
 
+        [Tooltip("Wall grab only fires when facing the wall: dot(facing, -wallNormal) " +
+                  "must exceed this. Back-to-wall contact slides/falls instead of grabbing.")]
+        [Range(0f, 1f)]
+        public float facingDotThreshold = 0.5f;
+
         [Tooltip("Grace time to chain a wall-jump after losing wall contact.")]
         public float wallCoyoteTime = 0.12f;
 
@@ -107,6 +112,15 @@ namespace MK.Rebuild
         public float wallReleaseThreshold = -0.5f;
 
         [Header("Ledge (mantle)")]
+        [Tooltip("Snap-to-grip: how far below the lip top the root hangs on grab " +
+                  "(root Y = lipTop - gripDepth, same XZ). Hands read at the lip.")]
+        public float gripDepth = 1.1f;
+
+        [Tooltip("Hand-context: height above the body center of the hands/chest band. " +
+                  "The ledge trigger must overlap THIS band (not just any part of the " +
+                  "body) to hang — feet/head-level passes do not grab.")]
+        public float hangGripHeight = 0.5f;
+
         [Tooltip("True = auto-mantle the top on contact; false = hang + Jump to mantle (default).")]
         public bool autoMantle = false;
 

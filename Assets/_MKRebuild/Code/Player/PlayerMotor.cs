@@ -231,8 +231,10 @@ namespace MK.Rebuild
             // A wall is grabbable only while airborne and not in a jump/mantle
             // lockout. Gating with !grounded stops the ground jump from being
             // clamped by the hang slide later in this same FixedUpdate.
+            // Facing-gated: no grabbing with the back to the wall (slides/falls).
             bool wallGrab = !grounded
                 && wallContact
+                && FacingTowardWall()
                 && wallReGrabTimer <= 0f
                 && wallJumpLockTimer <= 0f
                 && !mantling;
@@ -349,6 +351,14 @@ namespace MK.Rebuild
                 ExposeMantleState();
                 return;
             }
+
+            // Snap-to-grip: on ledge-grab start, settle the root to the authored
+            // hang pose (same XZ, Y = lip top - gripDepth) so every hang reads
+            // identical instead of the variable physics overlap position. Instant
+            // (industry standard) — no visible slide. Skipped when a mantle or
+            // release fired this frame (the warp/impulse owns the root there).
+            if (ledgeHang && !wasLedgeHang && ledgeCollider != null)
+                SnapToGrip();
 
             if (grounded)
             {
@@ -559,6 +569,25 @@ namespace MK.Rebuild
         }
 
         /// <summary>
+        /// Facing gate for the wall grab: true when the character faces INTO the
+        /// wall (dot(facing, -wallNormal) above threshold). Back-to-wall contact
+        /// slides/falls instead of grabbing. An established grab persists (sticky):
+        /// while held the facing is locked into the wall, so the gate stays true.
+        /// The wall-jump chain still works: the scripted flight facing points at
+        /// the destination wall, so the next grab passes the gate.
+        /// </summary>
+        private bool FacingTowardWall()
+        {
+            Vector3 facing = visual != null ? visual.Facing : transform.forward;
+            facing.y = 0f;
+            if (facing.sqrMagnitude < 0.000001f) return false;
+            Vector3 into = -wallNormal;
+            into.y = 0f;
+            if (into.sqrMagnitude < 0.000001f) return false;
+            return Vector3.Dot(facing.normalized, into.normalized) > paramsAsset.facingDotThreshold;
+        }
+
+        /// <summary>
         /// Starts the animation-driven mantle warp: capture the hang pose and the exact
         /// stand pose (wall top + half height), then let FixedUpdate interpolate. Shared
         /// by the opt-in auto path (<c>autoMantle</c>) and the manual Jump path.
@@ -672,8 +701,9 @@ namespace MK.Rebuild
 
         /// <summary>
         /// Ledge detection via the <see cref="Ledge"/> marker trigger: true when the
-        /// player's body overlaps a Ledge zone while airborne. The wall we just
-        /// jumped from is ignored (its ledge too) until grounded/other contact.
+        /// player's HANDS band overlaps a Ledge zone while airborne — not just any
+        /// part of the body. The wall we just jumped from is ignored (its ledge
+        /// too) until grounded/other contact.
         /// NOTE: overlap alone does NOT hang — the hang gate additionally requires
         /// falling (verticalVel &lt; 0) plus the re-grab timers (see FixedUpdate).
         /// </summary>
@@ -695,6 +725,13 @@ namespace MK.Rebuild
                 if (col == ledgeBanCollider) continue; // drop-through ban: ignore THAT ledge
                 if (lastWallJumpedFrom != null
                     && ledge.transform.root == lastWallJumpedFrom.transform.root) continue;
+                // Hand-context: the trigger must overlap the HANDS band (chest
+                // height), not feet/head — passing the lip at other heights does
+                // NOT hang. First body touch happens with the feet, so the hang
+                // fires as the fall brings the hands down to the lip. Skipped for
+                // an ESTABLISHED hang (latch): the snap settles the root below the
+                // band, but the body still overlaps — the latch owns stability.
+                if (!wasLedgeHang && !OverlapsHandsBand(col)) continue;
                 ledgeContact = true;
                 ledgeCollider = col;
                 return true;
@@ -703,6 +740,37 @@ namespace MK.Rebuild
             // across teleports — a fresh overlap always starts falling, never latched).
             wasLedgeHang = false;
             return false;
+        }
+
+        /// <summary>
+        /// True when the ledge trigger overlaps the hands band: a body-wide slice
+        /// at <c>hangGripHeight</c> above the body center, as thick as the trigger
+        /// itself. Feet/head-level passes miss the band and do not hang.
+        /// </summary>
+        private bool OverlapsHandsBand(Collider ledgeCol)
+        {
+            Vector3 hands = body.bounds.center + Vector3.up * paramsAsset.hangGripHeight;
+            Vector3 half = body.bounds.extents;
+            half.y = ledgeCol.bounds.extents.y;
+            var cols = Physics.OverlapBox(hands, half, Quaternion.identity,
+                Physics.AllLayers, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < cols.Length; i++)
+                if (cols[i] == ledgeCol) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Authored grip pose: hands at the lip (lip top edge), body hanging below
+        /// at <c>gripDepth</c>, same line (XZ untouched — never yanks sideways),
+        /// facing locked by the existing hang contract. Instant on grab.
+        /// </summary>
+        private void SnapToGrip()
+        {
+            float lipTop = ledgeCollider.bounds.max.y;
+            rb.position = new Vector3(
+                rb.position.x,
+                lipTop - paramsAsset.gripDepth,
+                rb.position.z);
         }
 
         /// <summary>Direction from the hang point INTO the surface/edge (over the top).</summary>
