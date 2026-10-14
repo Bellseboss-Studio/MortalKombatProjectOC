@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -154,6 +155,15 @@ namespace MK.Rebuild
         /// the dash tune their range/cone independently. Null / disabled = forward-only.
         /// </summary>
         public AimAssistDefinition AimAssistDef => aimAssist;
+
+        /// <summary>
+        /// Style-meter seam (slice style-meter): fired ONCE per newly connected
+        /// receiver with the move-key <c>comboAssetName#stepIndex</c> (e.g.
+        /// <c>Combo_1#2</c>, opener <c>Combo_DashAttack#0</c>, grey-box fallback
+        /// <c>Attack_Light#0</c>). Additive — no behavior change; nobody listening
+        /// means nobody notices.
+        /// </summary>
+        public event Action<string> OnStepConnected;
 
         private void Awake()
         {
@@ -842,8 +852,10 @@ namespace MK.Rebuild
         /// player's own Rigidbody (Face child collider shares it). Forward-only:
         /// the origin is offset along the facing, so a target behind never counts.
         /// Returns true when at least one target was hit.
+        /// <paramref name="moveKey"/> (style-meter seam): when non-null, every NEWLY
+        /// hit receiver fires <see cref="OnStepConnected"/> once with it.
         /// </summary>
-        private bool ProbeAt(Vector3 origin, float radius, int damage, float knockback, float launchImpulse)
+        private bool ProbeAt(Vector3 origin, float radius, int damage, float knockback, float launchImpulse, string moveKey = null)
         {
             Collider[] cols = Physics.OverlapSphere(
                 origin, radius, Physics.AllLayers, QueryTriggerInteraction.Ignore);
@@ -868,6 +880,7 @@ namespace MK.Rebuild
                 // (not baked into the XZ push) so HitReceiver can drive the juggle-lite
                 // arc (rise -> fall -> land) with its own gravity. 0 = normal hit.
                 receiver.TakeHit(damage, to * knockback, launchImpulse);
+                if (moveKey != null) OnStepConnected?.Invoke(moveKey);
                 connected = true;
             }
             return connected;
@@ -876,8 +889,9 @@ namespace MK.Rebuild
         private void ProbeHitboxStep()
         {
             float launch = currentStep.launch ? Mathf.Max(0f, currentStep.launchImpulse) : 0f;
+            string moveKey = activeCombo != null ? activeCombo.name + "#" + stepIndex : null;
             if (ProbeAt(HitboxOrigin(currentStep.hitboxRadius, currentStep.hitboxOffset),
-                    currentStep.hitboxRadius, currentStep.dano, currentStep.knockback, launch))
+                    currentStep.hitboxRadius, currentStep.dano, currentStep.knockback, launch, moveKey))
             {
                 connectedThisStep = true; // wider cancel window (hit-cancel)
                 BeginHitstop(currentStep.hitstopMs);
@@ -886,8 +900,9 @@ namespace MK.Rebuild
 
         private void ProbeHitbox()
         {
+            string moveKey = current != null ? current.name + "#0" : null;
             if (ProbeAt(HitboxOrigin(current.hitboxRadius, current.hitboxOffset),
-                    current.hitboxRadius, current.damage, current.knockback, 0f))
+                    current.hitboxRadius, current.damage, current.knockback, 0f, moveKey))
             {
                 BeginHitstop(current.hitstopMs);
             }

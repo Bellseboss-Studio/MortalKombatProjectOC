@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4012df37171106e41b45de212bb2aef1, type: 3}
+  m_Name: Combo_SideStrike
+  m_EditorClassIdentifier: 
+  steps:
+  - input: 1
+    direction: 4
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 8
+    knockback: 1
+    hitstopMs: 90
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 0
+      direction: 0
+      paso: 1
+    speedMultiplier: 7
+    moveLock: 1
+    lunge: 1.8
+    attackStateIndex: 0
+  - input: 0
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 0814d9be54a045f48990c3c889b989f9, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.15, y: 0.35}
+    dano: 6
+    knockback: 0.5
+    hitstopMs: 40
+    hitboxRadius: 1.5
+    hitboxOffset: {x: 0, y: 0.1, z: 1.5}
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 0
+      direction: 0
+      paso: -1
+    speedMultiplier: 7
+    moveLock: 1
+    lunge: 1
+    attackStateIndex: 0
+  dashCancelsAll: 1

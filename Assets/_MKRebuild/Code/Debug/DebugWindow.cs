@@ -39,6 +39,7 @@ namespace MK.Rebuild.Debugging
         private PlayerMotor motor;
         private AnimatorVisual visual;
         private Rigidbody body;
+        private StyleMeter styleMeter;
         private Material greyMaterial;
         private readonly List<GameObject> spawned = new List<GameObject>();
 
@@ -188,6 +189,22 @@ namespace MK.Rebuild.Debugging
                 Vector3 v = body.linearVelocity;
                 GUILayout.Label($"speed XZ:      {new Vector2(v.x, v.z).magnitude:0.00} m/s", labelStyle);
                 GUILayout.Label($"vertical:      {v.y:0.00} m/s", labelStyle);
+            }
+
+            // Style meter (slice style-meter): ONE line — rank + points + charge
+            // pips. No real HUD; the observer lives on the Player (Gym wiring).
+            if (styleMeter == null) styleMeter = FindFirstObjectByType<StyleMeter>();
+            if (styleMeter != null)
+            {
+                int pts = Mathf.FloorToInt(styleMeter.Points);
+                int max = Mathf.Max(0, styleMeter.MaxCharges);
+                int n = Mathf.Clamp(styleMeter.Charges, 0, max);
+                string pips = new string('●', n) + new string('○', max - n);
+                GUILayout.Label($"ESTILO {styleMeter.Rank} {pts} [{pips}]", labelStyle);
+            }
+            else
+            {
+                GUILayout.Label("ESTILO -- (sin medidor)", labelStyle);
             }
         }
 

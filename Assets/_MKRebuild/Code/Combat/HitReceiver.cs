@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -50,6 +51,18 @@ namespace MK.Rebuild
 
         /// <summary>True while HP is above zero.</summary>
         public bool IsAlive => hp > 0;
+
+        /// <summary>
+        /// Style-meter seam (slice style-meter): fired in <see cref="Die"/> BEFORE
+        /// <c>Destroy</c> so the +25 kill bonus can still observe the death.
+        /// </summary>
+        public event Action OnDied;
+
+        /// <summary>
+        /// Static echo of <see cref="OnDied"/> for observers that cannot track
+        /// dynamically spawned receivers (debug dummies). Same timing: pre-Destroy.
+        /// </summary>
+        public static event Action AnyDied;
 
         private void OnEnable()
         {
@@ -132,9 +145,12 @@ namespace MK.Rebuild
         /// <summary>
         /// INSTANT destroy (no death anim/delay) — M1 placeholder; real enemy
         /// death is M3. Destroy (not Deactivate) so respawn/spawn counts are honest.
+        /// The death events fire BEFORE Destroy (a destroyed object notifies nobody).
         /// </summary>
         private void Die()
         {
+            OnDied?.Invoke();
+            AnyDied?.Invoke();
             Destroy(gameObject);
         }
 

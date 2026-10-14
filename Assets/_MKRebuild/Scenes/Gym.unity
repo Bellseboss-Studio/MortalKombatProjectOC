@@ -1212,6 +1212,7 @@ GameObject:
   - component: {fileID: 1837699319}
   - component: {fileID: 1837699320}
   - component: {fileID: 1837699321}
+  - component: {fileID: 1837699322}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1390,6 +1391,8 @@ MonoBehaviour:
   combos:
   - {fileID: 11400000, guid: 2adea1b23fae815459426f877712c708, type: 2}
   - {fileID: 11400000, guid: f1e2d3c4b5a69788796a5b4c3d2e1f01, type: 2}
+  - {fileID: 11400000, guid: 135bd7268421461787b7a59066888b5d, type: 2}
+  - {fileID: 11400000, guid: b07196b12c1f4cd4b8c8b75d3cb61571, type: 2}
   dashAttack: {fileID: 11400000, guid: 7b3f9c2a1d4e48f0a6b8c5d7e9f01234, type: 2}
   dashAttackWindow: 0.35
   aimAssist: {fileID: 11400000, guid: 9791715ece54f894d9f7b0d76508fd97, type: 2}
@@ -1408,6 +1411,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerDash
   dashDuration: 0.35
+  minCancelTime: 0.05
   invulnDuration: 0.25
   cooldown: 1.2
   dashDistance: 3.5
@@ -1446,6 +1450,20 @@ MonoBehaviour:
     m_RotationOrder: 4
   additive: 1
   dashAimAssist: {fileID: 11400000, guid: 3f7c1a9e5b2d406e8a1c7f9d0b3e5a21, type: 2}
+--- !u!114 &1837699322
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1837699311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aba432f078c34288b9efc233f7a9ac40, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.StyleMeter
+  definition: {fileID: 11400000, guid: c3a30b620a1c473f9c77fba55c8a5676, type: 2}
+  combat: {fileID: 0}
 --- !u!1 &2013586933
 GameObject:
   m_ObjectHideFlags: 0
@@ -1578,6 +1596,7 @@ MonoBehaviour:
   flashTint: {r: 1, g: 0.35, b: 0.35, a: 1}
   knockbackSpeed: 6
   knockbackDamping: 18
+  launchGravity: 18
 --- !u!1 &2070183346
 GameObject:
   m_ObjectHideFlags: 0
