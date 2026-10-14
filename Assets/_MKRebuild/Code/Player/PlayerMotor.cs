@@ -546,8 +546,8 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Exact stand pose over a ledge: wall top + half height, XZ = slab center +
-        /// inward offset (offset = body radius; tune if the capsule clips the lip).
+        /// Exact stand pose over a ledge: wall top + half height, XZ = the player's
+        /// own XZ at mantle start (same-line climb, NOT the slab center).
         /// With no Grabbable wall the top is not derivable — Ledge-based derivation is
         /// deferred, so fall back to a body-sized climb that always releases control
         /// instead of crashing.
@@ -558,15 +558,13 @@ namespace MK.Rebuild
             if (wallCollider != null)
             {
                 Bounds wall = wallCollider.bounds;
-                // Inward offset from the slab center to clear the lip. Tuned to 0:
-                // with this 0.5-wide slab, center + body.radius (0.5) landed past the
-                // top footprint (x=2.0 > 1.75) and the capsule fell off the far side.
-                // The slab center is the stand, so the offset stays 0 here.
-                float offset = 0f;
+                // Same-line climb: land at the player's own XZ (warpStart), only the
+                // Y comes from the wall top. Using the slab center teleported the
+                // character sideways on off-center hangs.
                 return new Vector3(
-                    wall.center.x + into.x * offset,
+                    warpStart.x,
                     wall.max.y + body.height * 0.5f,
-                    wall.center.z + into.z * offset);
+                    warpStart.z);
             }
 
             return new Vector3(
