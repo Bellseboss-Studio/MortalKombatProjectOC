@@ -50,6 +50,10 @@ namespace MK.Rebuild
         private Vector3 lockHoriz;
         private float wallJumpLockTimer;
         private float wallReGrabTimer;
+        private float ledgeReGrabTimer; // drop-through ban after a Down-release from a ledge
+        private Collider ledgeBanCollider; // THAT ledge only: ignored until the ban expires
+        private Collider ledgeCollider;   // ledge trigger overlapped this frame (if any)
+        private bool wasLedgeHang; // previous frame's ledge hang: latches the hang while sliding (slide zeroes verticalVel, so the fall gate alone would flicker)
         private float wallCoyoteTimer;
 
         // Mantle: animation-driven timed warp (A2: direct root set, no kinematic switch).
@@ -198,6 +202,9 @@ namespace MK.Rebuild
             {
                 lastWallJumpedFrom = null;
                 lastWallContacted = null;
+                ledgeBanCollider = null; // landed: the drop-through ban is spent
+                ledgeReGrabTimer = 0f;
+                wasLedgeHang = false; // landed: a walk-off starts falling fresh, never latched
                 holdingWallJumpFacing = false; // land -> facing is free again
             }
 
@@ -215,9 +222,11 @@ namespace MK.Rebuild
             if (ledgeContact)
                 lastWallJumpedFrom = null; // same-root ledges were already ignored
 
-            // Wall timers.
+            // Wall timers. An expired ledge ban releases its collider.
             wallJumpLockTimer = Mathf.Max(0f, wallJumpLockTimer - dt);
             wallReGrabTimer = Mathf.Max(0f, wallReGrabTimer - dt);
+            ledgeReGrabTimer = Mathf.Max(0f, ledgeReGrabTimer - dt);
+            if (ledgeReGrabTimer <= 0f) ledgeBanCollider = null;
 
             // A wall is grabbable only while airborne and not in a jump/mantle
             // lockout. Gating with !grounded stops the ground jump from being
@@ -228,10 +237,15 @@ namespace MK.Rebuild
                 && wallJumpLockTimer <= 0f
                 && !mantling;
 
-            // Ledge hang: overlapping a Ledge trigger while airborne (works with
-            // or without a Grabbable wall underneath).
+            // Ledge hang: overlapping a Ledge trigger while FALLING onto the lip
+            // (works with or without a Grabbable wall underneath). The fall-only
+            // gate stops a rising jump from auto-hanging when it passes the lip;
+            // the wasLedgeHang latch keeps an ESTABLISHED hang stable (the hang
+            // slide zeroes verticalVel, so the fall gate alone would flicker).
+            // The latch is ledge-only: a wall-jump rising past a lip does NOT hang.
             bool ledgeHang = !grounded
                 && ledgeContact
+                && (verticalVel < 0f || wasLedgeHang)
                 && wallReGrabTimer <= 0f
                 && wallJumpLockTimer <= 0f
                 && !mantling;
@@ -262,6 +276,13 @@ namespace MK.Rebuild
                 lockHoriz = HangAwayDir() * paramsAsset.wallReleaseHop;
                 wallJumpLockTimer = paramsAsset.wallJumpLockTime;
                 wallReGrabTimer = paramsAsset.wallReGrabDelay;
+                if (ledgeHang && ledgeCollider != null)
+                {
+                    // Drop-through: ignore THAT ledge until the ban expires, so
+                    // the player falls past without re-hanging. Other lips stay live.
+                    ledgeBanCollider = ledgeCollider;
+                    ledgeReGrabTimer = paramsAsset.ledgeReGrabDelay;
+                }
                 wallCoyoteTimer = 0f;
                 wallContact = false;
                 wallGrab = false;
@@ -459,6 +480,9 @@ namespace MK.Rebuild
             // Sticky grab: persist while airborne on a grabbable wall, so contact
             // no longer depends on holding a direction toward the wall.
             wallGrabHeld = wallGrab;
+            // Latch the ledge hang for next frame's gate. `&& hanging` (not just
+            // ledgeHang) so a release/mantle/wall-jump this frame unlatches.
+            wasLedgeHang = ledgeHang && hanging;
         }
 
         private Vector3 CameraRelative(Vector2 stick)
@@ -550,6 +574,7 @@ namespace MK.Rebuild
             mantleDir = mantleDir.sqrMagnitude > 0.000001f ? mantleDir.normalized : Vector3.zero;
             warpT = 0f;
             mantling = true;
+            wasLedgeHang = false; // mantle owns the edge now; the early-return warp frames skip the latch update
             wallCoyoteTimer = 0f;
             wallContact = false;
         }
@@ -649,10 +674,13 @@ namespace MK.Rebuild
         /// Ledge detection via the <see cref="Ledge"/> marker trigger: true when the
         /// player's body overlaps a Ledge zone while airborne. The wall we just
         /// jumped from is ignored (its ledge too) until grounded/other contact.
+        /// NOTE: overlap alone does NOT hang — the hang gate additionally requires
+        /// falling (verticalVel &lt; 0) plus the re-grab timers (see FixedUpdate).
         /// </summary>
         private bool CheckLedge()
         {
             ledgeContact = false;
+            ledgeCollider = null;
             Vector3 center = body.bounds.center;
             Vector3 half = body.bounds.extents;
             var cols = Physics.OverlapBox(center, half, Quaternion.identity,
@@ -664,11 +692,16 @@ namespace MK.Rebuild
                 if (col.attachedRigidbody == rb) continue; // own Face trigger / capsule
                 var ledge = col.GetComponentInParent<Ledge>();
                 if (ledge == null) continue;
+                if (col == ledgeBanCollider) continue; // drop-through ban: ignore THAT ledge
                 if (lastWallJumpedFrom != null
                     && ledge.transform.root == lastWallJumpedFrom.transform.root) continue;
                 ledgeContact = true;
+                ledgeCollider = col;
                 return true;
             }
+            // No overlap: the latch dies with the contact (also clears stale state
+            // across teleports — a fresh overlap always starts falling, never latched).
+            wasLedgeHang = false;
             return false;
         }
 

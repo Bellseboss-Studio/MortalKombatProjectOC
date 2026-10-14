@@ -91,6 +91,12 @@ namespace MK.Rebuild
         [Tooltip("Seconds after a wall-jump before the same wall can be re-grabbed.")]
         public float wallReGrabDelay = 0.20f;
 
+        [Tooltip("Seconds after a Down-release from a ledge before THAT ledge can " +
+                 "hang again (drop-through: the player falls past without re-hanging). " +
+                 "Per-ledge, so other lips stay live. Sized above the longest track " +
+                 "fall past a lip (~0.5 s) with margin.")]
+        public float ledgeReGrabDelay = 0.6f;
+
         [Tooltip("Grace time to chain a wall-jump after losing wall contact.")]
         public float wallCoyoteTime = 0.12f;
 
