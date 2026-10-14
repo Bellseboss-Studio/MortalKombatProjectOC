@@ -743,20 +743,54 @@ namespace MK.Rebuild
         }
 
         /// <summary>
+        /// Shared hands-band volume math (dev visualization + <see cref="OverlapsHandsBand"/>):
+        /// a body-wide slice at <c>hangGripHeight</c> above the body center, as thick
+        /// as the ledge trigger itself (<paramref name="triggerHalfY"/> varies per ledge).
+        /// Behavior-identical extraction — no logic change.
+        /// </summary>
+        private void GetHandsBandVolume(CapsuleCollider capsule, float triggerHalfY, out Vector3 hands, out Vector3 half)
+        {
+            hands = capsule.bounds.center + Vector3.up * paramsAsset.hangGripHeight;
+            half = capsule.bounds.extents;
+            half.y = triggerHalfY;
+        }
+
+        /// <summary>
         /// True when the ledge trigger overlaps the hands band: a body-wide slice
         /// at <c>hangGripHeight</c> above the body center, as thick as the trigger
         /// itself. Feet/head-level passes miss the band and do not hang.
         /// </summary>
         private bool OverlapsHandsBand(Collider ledgeCol)
         {
-            Vector3 hands = body.bounds.center + Vector3.up * paramsAsset.hangGripHeight;
-            Vector3 half = body.bounds.extents;
-            half.y = ledgeCol.bounds.extents.y;
+            GetHandsBandVolume(body, ledgeCol.bounds.extents.y, out Vector3 hands, out Vector3 half);
             var cols = Physics.OverlapBox(hands, half, Quaternion.identity,
                 Physics.AllLayers, QueryTriggerInteraction.Collide);
             for (int i = 0; i < cols.Length; i++)
                 if (cols[i] == ledgeCol) return true;
             return false;
+        }
+
+        /// <summary>
+        /// Dev-only visualization of the invisible ledge hand-check (Scene view only,
+        /// zero build cost): draws EXACTLY the hands-band OverlapBox queried by
+        /// <see cref="OverlapsHandsBand"/> (same offset, same extents). Cyan normally,
+        /// green while the band overlaps a ledge trigger (hang armed).
+        /// Visualization only — no behavior.
+        /// </summary>
+        private void OnDrawGizmos()
+        {
+            CapsuleCollider capsule = body != null ? body : GetComponent<CapsuleCollider>();
+            if (capsule == null || paramsAsset == null) return;
+            float triggerHalfY = ledgeCollider != null
+                ? ledgeCollider.bounds.extents.y
+                : capsule.bounds.extents.y;
+            GetHandsBandVolume(capsule, triggerHalfY, out Vector3 hands, out Vector3 half);
+            Gizmos.color = ledgeContact ? Color.green : Color.cyan;
+            Gizmos.DrawWireCube(hands, half * 2f);
+            Color fill = Gizmos.color;
+            fill.a = 0.15f;
+            Gizmos.color = fill;
+            Gizmos.DrawCube(hands, half * 2f);
         }
 
         /// <summary>
