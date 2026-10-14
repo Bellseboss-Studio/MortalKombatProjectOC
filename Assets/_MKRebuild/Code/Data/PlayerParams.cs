@@ -111,5 +111,10 @@ namespace MK.Rebuild
                  "climbFlip 0.83 s over the 0.3 s warp ≈ 2.78x). TEMPORARY retiming — set to 1 " +
                  "once the clip is retimed to x1. >3x reads frantic.")]
         public float mantleClipSpeed = 2.78f;
+
+        [Tooltip("Forward step in meters taken after the mantle warp lands, along the mantle " +
+                 "direction (over the edge). Clears the ledge trigger overlap so the next frame " +
+                 "reads grounded Free (idle/walk) instead of hanging. Keeps the landing height.")]
+        public float mantleStepForward = 0.8f;
     }
 }

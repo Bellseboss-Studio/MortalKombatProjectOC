@@ -56,6 +56,7 @@ namespace MK.Rebuild
         private bool mantling;
         private Vector3 warpStart;
         private Vector3 warpEnd;
+        private Vector3 mantleDir; // captured at ApplyMantle: into/over the edge (XZ unit)
         private float warpT;
 
         // Last ground-probe result (cached for the read-only debug seam).
@@ -174,7 +175,10 @@ namespace MK.Rebuild
                 rb.linearVelocity = Vector3.zero;
                 if (warpT >= 1f)
                 {
-                    rb.position = warpEnd; // snap exact — no overshoot
+                    // Snap exact — no overshoot — then ONE step forward past the edge:
+                    // the warp lands inside the ledge trigger's overhang, so without
+                    // the step the next frame would hang again instead of going Free.
+                    rb.position = StepPastLedge(warpEnd);
                     mantling = false;
                     verticalVel = 0f;
                     smoothVel = Vector3.zero;
@@ -539,6 +543,11 @@ namespace MK.Rebuild
         {
             warpStart = rb.position;
             warpEnd = ComputeWarpEnd();
+            // Capture the climb direction NOW: the warp frames skip the wall probe,
+            // so HangIntoDir would be stale by landing time.
+            mantleDir = HangIntoDir();
+            mantleDir.y = 0f;
+            mantleDir = mantleDir.sqrMagnitude > 0.000001f ? mantleDir.normalized : Vector3.zero;
             warpT = 0f;
             mantling = true;
             wallCoyoteTimer = 0f;
@@ -571,6 +580,46 @@ namespace MK.Rebuild
                 warpStart.x + into.x * body.radius,
                 warpStart.y + body.height,
                 warpStart.z + into.z * body.radius);
+        }
+
+        /// <summary>
+        /// One step forward from the mantle landing, along the captured mantle
+        /// direction (<c>mantleStepForward</c> meters). The warp lands at the same
+        /// XZ, still inside the ledge trigger's overhang — the step puts solid top
+        /// under the character so the next frame reads grounded (Free/idle) instead
+        /// of hanging. Same height as the warp end: never drops or floats. When the
+        /// full step would leave the top (thin geometry) it shrinks until solid top
+        /// is beneath, down to standing exactly on the warp end.
+        /// </summary>
+        private Vector3 StepPastLedge(Vector3 land)
+        {
+            if (mantleDir.sqrMagnitude < 0.000001f) return land;
+            float step = paramsAsset != null ? Mathf.Max(0f, paramsAsset.mantleStepForward) : 0f;
+            float fraction = 1f;
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 candidate = land + mantleDir * (step * fraction);
+                candidate.y = land.y;
+                if (HasTopBeneath(candidate)) return candidate;
+                fraction *= 0.5f;
+            }
+            return land;
+        }
+
+        /// <summary>True when solid (non-trigger) geometry sits within ground-snap below the pose.</summary>
+        private bool HasTopBeneath(Vector3 center)
+        {
+            float maxDist = body.height * 0.5f + groundSnap;
+            var hits = Physics.RaycastAll(center, Vector3.down, maxDist,
+                Physics.AllLayers, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var hit = hits[i];
+                if (hit.collider == null || hit.collider == body) continue;
+                if (hit.rigidbody == rb) continue; // own Face / children
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
