@@ -121,6 +121,11 @@ namespace MK.Rebuild
                   "body) to hang — feet/head-level passes do not grab.")]
         public float hangGripHeight = 0.5f;
 
+        [Tooltip("Hands-band volume full size in meters (XYZ). The ledge hang check " +
+                  "queries exactly this box at hangGripHeight above the body center — " +
+                  "small and chest-sized, NOT the body extents.")]
+        public Vector3 hangBandSize = new Vector3(0.6f, 0.3f, 0.6f);
+
         [Tooltip("True = auto-mantle the top on contact; false = hang + Jump to mantle (default).")]
         public bool autoMantle = false;
 

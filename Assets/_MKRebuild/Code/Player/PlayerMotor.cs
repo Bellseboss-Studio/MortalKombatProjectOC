@@ -744,25 +744,25 @@ namespace MK.Rebuild
 
         /// <summary>
         /// Shared hands-band volume math (dev visualization + <see cref="OverlapsHandsBand"/>):
-        /// a body-wide slice at <c>hangGripHeight</c> above the body center, as thick
-        /// as the ledge trigger itself (<paramref name="triggerHalfY"/> varies per ledge).
-        /// Behavior-identical extraction — no logic change.
+        /// a small explicit chest-sized box (<c>hangBandSize</c>) at
+        /// <c>hangGripHeight</c> above the body center. Fully data-driven —
+        /// ignores the body extents and the ledge trigger size.
+        /// Behavior-identical flow, smaller volume.
         /// </summary>
-        private void GetHandsBandVolume(CapsuleCollider capsule, float triggerHalfY, out Vector3 hands, out Vector3 half)
+        private void GetHandsBandVolume(CapsuleCollider capsule, out Vector3 hands, out Vector3 half)
         {
             hands = capsule.bounds.center + Vector3.up * paramsAsset.hangGripHeight;
-            half = capsule.bounds.extents;
-            half.y = triggerHalfY;
+            half = paramsAsset.hangBandSize * 0.5f;
         }
 
         /// <summary>
-        /// True when the ledge trigger overlaps the hands band: a body-wide slice
-        /// at <c>hangGripHeight</c> above the body center, as thick as the trigger
-        /// itself. Feet/head-level passes miss the band and do not hang.
+        /// True when the ledge trigger overlaps the hands band: a small explicit
+        /// box at <c>hangGripHeight</c> above the body center. Feet/head-level
+        /// passes miss the band and do not hang.
         /// </summary>
         private bool OverlapsHandsBand(Collider ledgeCol)
         {
-            GetHandsBandVolume(body, ledgeCol.bounds.extents.y, out Vector3 hands, out Vector3 half);
+            GetHandsBandVolume(body, out Vector3 hands, out Vector3 half);
             var cols = Physics.OverlapBox(hands, half, Quaternion.identity,
                 Physics.AllLayers, QueryTriggerInteraction.Collide);
             for (int i = 0; i < cols.Length; i++)
@@ -781,10 +781,7 @@ namespace MK.Rebuild
         {
             CapsuleCollider capsule = body != null ? body : GetComponent<CapsuleCollider>();
             if (capsule == null || paramsAsset == null) return;
-            float triggerHalfY = ledgeCollider != null
-                ? ledgeCollider.bounds.extents.y
-                : capsule.bounds.extents.y;
-            GetHandsBandVolume(capsule, triggerHalfY, out Vector3 hands, out Vector3 half);
+            GetHandsBandVolume(capsule, out Vector3 hands, out Vector3 half);
             Gizmos.color = ledgeContact ? Color.green : Color.cyan;
             Gizmos.DrawWireCube(hands, half * 2f);
             Color fill = Gizmos.color;
