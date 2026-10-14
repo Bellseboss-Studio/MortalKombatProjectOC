@@ -30,6 +30,7 @@ namespace MK.Rebuild
         private static readonly int RunningHash = Animator.StringToHash("Running");
         private static readonly int JumpStartSpeedHash = Animator.StringToHash("JumpStartSpeed");
         private static readonly int FlipMidAirSpeedHash = Animator.StringToHash("FlipMidAirSpeed");
+        private static readonly int MantleClipSpeedHash = Animator.StringToHash("MantleClipSpeed");
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
@@ -50,19 +51,20 @@ namespace MK.Rebuild
         public void Bind(PlayerParams paramsAsset)
         {
             paramsRef = paramsAsset;
-            ApplyJumpClipSpeeds();
+            ApplyClipSpeeds();
         }
 
         /// <summary>
-        /// Pushes the SO jump-clip speed multipliers into the Animator state speed
+        /// Pushes the SO clip speed multipliers into the Animator state speed
         /// parameters (TEMPORARY retiming — 1 means normal playback). Static values:
         /// set once, not per frame. Easy revert: set the SO fields back to 1.
         /// </summary>
-        private void ApplyJumpClipSpeeds()
+        private void ApplyClipSpeeds()
         {
             if (animator == null || paramsRef == null) return;
             animator.SetFloat(JumpStartSpeedHash, paramsRef.jumpStartSpeed);
             animator.SetFloat(FlipMidAirSpeedHash, paramsRef.flipMidAirSpeed);
+            animator.SetFloat(MantleClipSpeedHash, paramsRef.mantleClipSpeed);
         }
 
         private void Awake()
@@ -78,8 +80,8 @@ namespace MK.Rebuild
             }
             // No root motion in this rig (clips have none baked); enforce it anyway.
             if (animator != null) animator.applyRootMotion = false;
-            // In case Bind ran before Awake (component order), apply the jump speeds.
-            ApplyJumpClipSpeeds();
+            // In case Bind ran before Awake (component order), apply the clip speeds.
+            ApplyClipSpeeds();
         }
 
         public void SetFacing(Vector3 worldDirection)
@@ -99,8 +101,15 @@ namespace MK.Rebuild
 
         public void SetMoveState(MoveState state)
         {
+            // Ledge-grab entry (ledge-anim-integration, decision b): code-driven
+            // CrossFade into LedgeGrab on the rising edge, mirroring PlayAttack —
+            // the presentation layer owns the Animator. The controller then flows
+            // LedgeGrab → LedgeHang on exit time while MoveState stays 3.
+            bool grabEdge = state == MoveState.LedgeHang && moveState != MoveState.LedgeHang;
             moveState = state;
-            if (animator != null) animator.SetInteger(MoveStateHash, (int)state);
+            if (animator == null) return;
+            if (grabEdge) animator.CrossFade("LedgeGrab", 0.1f, 0, 0f);
+            animator.SetInteger(MoveStateHash, (int)state);
         }
 
         public void SetSpeed(float metersPerSecond)

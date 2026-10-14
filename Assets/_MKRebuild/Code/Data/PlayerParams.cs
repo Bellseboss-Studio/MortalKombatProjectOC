@@ -106,5 +106,10 @@ namespace MK.Rebuild
 
         [Tooltip("Seconds the animation-driven mantle warp lasts (SmoothStep from hang to stand).")]
         public float mantleDuration = 0.3f;
+
+        [Tooltip("Animator state speed multiplier for Mantle (~ clipLength / mantleDuration; " +
+                 "climbFlip 0.83 s over the 0.3 s warp ≈ 2.78x). TEMPORARY retiming — set to 1 " +
+                 "once the clip is retimed to x1. >3x reads frantic.")]
+        public float mantleClipSpeed = 2.78f;
     }
 }
