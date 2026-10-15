@@ -29,6 +29,7 @@ MonoBehaviour:
   decelTime: 0.1
   airControlFactor: 0.66
   turnSpeed: 1500
+  groundRayOffset: 0.4
   wallCheckDistance: 0.7
   wallNormalThreshold: 0.5
   wallSlideSpeed: 0
@@ -36,14 +37,15 @@ MonoBehaviour:
   wallJumpPushOff: 6
   wallJumpLockTime: 0.15
   wallReGrabDelay: 0.2
+  ledgeReGrabDelay: 0.6
+  facingDotThreshold: 0.5
   wallCoyoteTime: 0.12
   wallReleaseHop: 3
   wallReleaseThreshold: -0.5
-  facingDotThreshold: 0.5
+  gripDepth: 1.3
+  hangGripHeight: 0.4
+  hangBandSize: {x: 0.4, y: 0.3, z: 0.7}
   autoMantle: 0
   mantleDuration: 0.3
   mantleClipSpeed: 2.78
-  mantleStepForward: 0.8
-  gripDepth: 1.1
-  hangGripHeight: 0.5
-  hangBandSize: {x: 0.6, y: 0.3, z: 0.6}
+  mantleStepForward: 1.5

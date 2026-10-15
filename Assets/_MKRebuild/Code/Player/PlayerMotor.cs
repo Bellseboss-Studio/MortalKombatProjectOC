@@ -67,6 +67,12 @@ namespace MK.Rebuild
         // Updated every FixedUpdate by CheckGrounded().
         private bool grounded;
 
+        // 4 cardinal ground-probe origins (+X, -X, +Z, -Z around the base footprint).
+        // Reused buffer — no per-frame allocation. Shared by CheckGrounded and the gizmo.
+        private readonly Vector3[] groundRayOrigins = new Vector3[4];
+        // Tiny upward nudge so each ray starts just above the feet surface level.
+        private const float GroundRayStartEpsilon = 0.02f;
+
         // State-driven facing contract (animation readiness): facing is LOCKED while
         // on a wall/ledge or during a scripted wall-jump turn, and FREE (input) otherwise.
         private bool facingLocked;
@@ -501,18 +507,64 @@ namespace MK.Rebuild
             return CameraRelativeMotion.WishDirection(cameraTransform, stick);
         }
 
+        /// <summary>
+        /// Ground probe: 4 cardinal rays cast DOWN from the body's base footprint
+        /// (±<c>groundRayOffset</c> in X and Z, at feet height) over <c>groundSnap</c>.
+        /// ANY ray hitting a solid non-trigger collider that is not the player's own
+        /// body => grounded. Replaces the old single center ray, which slipped over a
+        /// gap when the player stood on an edge/tip (e.g. right after a mantle) and
+        /// read as "falling". Fully data-driven (offset + distance).
+        /// </summary>
         private bool CheckGrounded()
         {
-            Vector3 origin = body.bounds.center;
-            float maxDist = body.height * 0.5f + groundSnap;
+            if (paramsAsset == null || body == null) return false;
+            Vector3[] origins = groundRayOrigins;
+            GetGroundRays(body, origins);
+            for (int i = 0; i < origins.Length; i++)
+                if (GroundRayHits(body, origins[i], out _)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// The 4 cardinal ground-probe origins: body base footprint at feet height,
+        /// offset ±<c>groundRayOffset</c> around the center XZ — one per cardinal
+        /// direction (+X, -X, +Z, -Z). All cast DOWN. Shared by
+        /// <see cref="CheckGrounded"/> and the Scene-view gizmo so they never diverge.
+        /// </summary>
+        private void GetGroundRays(CapsuleCollider capsule, Vector3[] origins)
+        {
+            Vector3 center = capsule.bounds.center;
+            float feetY = capsule.bounds.min.y + GroundRayStartEpsilon;
+            float o = paramsAsset.groundRayOffset;
+            origins[0] = new Vector3(center.x + o, feetY, center.z);
+            origins[1] = new Vector3(center.x - o, feetY, center.z);
+            origins[2] = new Vector3(center.x, feetY, center.z + o);
+            origins[3] = new Vector3(center.x, feetY, center.z - o);
+        }
+
+        /// <summary>
+        /// Casts one ground ray down <c>groundSnap</c> from <paramref name="origin"/>.
+        /// True when it hits a solid (non-trigger) collider that is neither the given
+        /// capsule nor the player's own rigidbody; <paramref name="endpoint"/> is the
+        /// hit distance (or the full ray length on a miss) for the gizmo.
+        /// </summary>
+        private bool GroundRayHits(CapsuleCollider capsule, Vector3 origin, out Vector3 endpoint)
+        {
+            float maxDist = groundSnap;
+            endpoint = origin + Vector3.down * maxDist;
             var hits = Physics.RaycastAll(origin, Vector3.down, maxDist,
                 Physics.AllLayers, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            bool any = false;
             for (int i = 0; i < hits.Length; i++)
             {
-                if (hits[i].collider != null && hits[i].collider != body)
-                    return true;
+                var c = hits[i].collider;
+                if (c == null || c == capsule) continue;
+                if (hits[i].rigidbody == rb) continue; // own Face / children
+                if (hits[i].distance < best) { best = hits[i].distance; any = true; }
             }
-            return false;
+            if (any) endpoint = origin + Vector3.down * best;
+            return any;
         }
 
         /// <summary>
@@ -788,6 +840,19 @@ namespace MK.Rebuild
             fill.a = 0.15f;
             Gizmos.color = fill;
             Gizmos.DrawCube(hands, half * 2f);
+
+            // Ground check: the 4 cardinal rays queried by CheckGrounded (same
+            // origins, same length). GREEN = that ray HITS (feeds grounded),
+            // faint red = miss — shows exactly why grounding triggers or not.
+            Vector3[] origins = groundRayOrigins;
+            GetGroundRays(capsule, origins);
+            for (int i = 0; i < origins.Length; i++)
+            {
+                bool hit = GroundRayHits(capsule, origins[i], out Vector3 end);
+                Gizmos.color = hit ? Color.green : new Color(1f, 0.3f, 0.3f, 0.4f);
+                Gizmos.DrawLine(origins[i], end);
+                Gizmos.DrawWireSphere(origins[i], 0.04f);
+            }
         }
 
         /// <summary>

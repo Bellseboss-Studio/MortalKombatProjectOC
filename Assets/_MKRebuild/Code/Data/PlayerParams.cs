@@ -68,6 +68,12 @@ namespace MK.Rebuild
         [Tooltip("Visual facing rotation speed (deg/s).")]
         public float turnSpeed = 720f;
 
+        [Header("Grounding")]
+        [Tooltip("Radius (m) of the 4 cardinal ground rays cast DOWN from the body's base " +
+                  "footprint (±offset in X and ±offset in Z around the center). Near the " +
+                  "capsule radius; tune if the rays sit too far from or too close to the center.")]
+        public float groundRayOffset = 0.4f;
+
         [Header("Wall motion (M0)")]
         [Tooltip("Forward probe distance for wall contact (m).")]
         public float wallCheckDistance = 0.7f;
