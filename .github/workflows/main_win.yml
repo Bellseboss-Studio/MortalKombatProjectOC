@@ -34,6 +34,7 @@ jobs:
         with:
           name: build-Windows
           path: build
+          retention-days: 2
 
   create_release_and_upload_file:
     name: Create Release and Upload file
