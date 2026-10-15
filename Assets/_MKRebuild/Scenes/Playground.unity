@@ -4610,6 +4610,7 @@ GameObject:
   - component: {fileID: 1837699321}
   - component: {fileID: 1837699322}
   - component: {fileID: 1837699323}
+  - component: {fileID: 1837699324}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -4790,6 +4791,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: f1e2d3c4b5a69788796a5b4c3d2e1f01, type: 2}
   - {fileID: 11400000, guid: 135bd7268421461787b7a59066888b5d, type: 2}
   - {fileID: 11400000, guid: b07196b12c1f4cd4b8c8b75d3cb61571, type: 2}
+  - {fileID: 11400000, guid: 66fcb3c6b4c064241a4f4d3d40821716, type: 2}
   dashAttack: {fileID: 11400000, guid: 7b3f9c2a1d4e48f0a6b8c5d7e9f01234, type: 2}
   dashAttackWindow: 0.35
   aimAssist: {fileID: 11400000, guid: 9791715ece54f894d9f7b0d76508fd97, type: 2}
@@ -4875,6 +4877,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerDamage
   maxHp: 20
   crossFadeDuration: 0.1
+--- !u!114 &1837699324
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1837699311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74598d48596ffb2438d5450f2476a0a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerAbilities
+  h1: {fileID: 11400000, guid: 9575ea92e6cdcee46879edfe6be339ea, type: 2}
+  h2: {fileID: 11400000, guid: 431477b27ae1ba14983bf67fa54d0d2b, type: 2}
+  crossFadeDuration: 0.08
+  fallbackDuration: 0.5
+  hitstopMs: 60
+  knockback: 0.5
+  projectileAimAssist: {fileID: 11400000, guid: b4e1c7a2d9f34a0b8e6c2f1a7d5b3c90, type: 2}
 --- !u!1 &2088531365
 GameObject:
   m_ObjectHideFlags: 0

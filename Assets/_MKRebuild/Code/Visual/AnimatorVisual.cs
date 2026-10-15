@@ -39,6 +39,8 @@ namespace MK.Rebuild
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
         private static readonly int LauncherStateHash = Animator.StringToHash("LauncherState");
+        private static readonly int AbilityStateHash = Animator.StringToHash("AbilityState");
+        private static readonly int AbilitySpeedHash = Animator.StringToHash("AbilitySpeed");
         private static readonly int AttackP1SpeedHash = Animator.StringToHash("AttackP1Speed");
         private static readonly int AttackP2SpeedHash = Animator.StringToHash("AttackP2Speed");
         private static readonly int AttackP3SpeedHash = Animator.StringToHash("AttackP3Speed");
@@ -226,6 +228,35 @@ namespace MK.Rebuild
         public void ReleaseLauncher()
         {
             if (animator != null) animator.SetInteger(LauncherStateHash, 0);
+        }
+
+        /// <summary>
+        /// Ability slot (m1-abilities; clips wired via anim_tarkatan_shoot / anim_spinEdge):
+        /// mirrors <see cref="PlayLauncher"/> for the <c>Attack_H1</c> / <c>Attack_H2</c>
+        /// states. <paramref name="kind"/> maps to the state (1 = H1 projectile, 2 = H2 area)
+        /// and is pushed into the dedicated <c>AbilityState</c> int so the controller's mirror
+        /// exits (gated <c>AbilityState == 0</c>) return to locomotion. A DEDICATED param (NOT
+        /// MoveState) is required: the AnyState <c>MoveState != 0</c> would hijack it.
+        /// Called by <see cref="PlayerAbilities"/>; the state exists only because a clip was
+        /// assigned (never enters a clip-less state that would freeze the pose).
+        /// The ability's <paramref name="clipSpeed"/> (AbilityDefinition.clipSpeedMultiplier)
+        /// is the SINGLE retime source: pushed into the dedicated <c>AbilitySpeed</c> float
+        /// BEFORE the CrossFade (mirrors <see cref="PlayLauncher"/>).
+        /// </summary>
+        public void PlayAbility(int kind, float crossFadeDuration, float clipSpeed)
+        {
+            if (animator == null) return;
+            if (kind < 1) { ReleaseAbility(); return; }
+            animator.SetFloat(AbilitySpeedHash, Mathf.Max(0.01f, clipSpeed));
+            animator.CrossFade(kind == 1 ? "Attack_H1" : "Attack_H2",
+                Mathf.Max(0f, crossFadeDuration), 0, 0f);
+            animator.SetInteger(AbilityStateHash, kind);
+        }
+
+        /// <summary>Sets AbilityState back to 0 (none) so the mirror exits return to locomotion.</summary>
+        public void ReleaseAbility()
+        {
+            if (animator != null) animator.SetInteger(AbilityStateHash, 0);
         }
 
         /// <summary>

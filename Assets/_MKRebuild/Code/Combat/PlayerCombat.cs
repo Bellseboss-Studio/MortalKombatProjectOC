@@ -88,6 +88,12 @@ namespace MK.Rebuild
         private bool queuedLightTap;
         private bool queuedHeavyTap;
         private bool queuedDashTap;
+        // Ability input seam (m1-abilities): one-shot Skill taps queued out-of-band
+        // (editor smoke driver) + the sibling ability runner. ConsumeSkillTap is the
+        // SINGLE consumer, so PlayerAbilities stays the ability owner.
+        private bool queuedSkill1Tap;
+        private bool queuedSkill2Tap;
+        private PlayerAbilities abilities;
 
         // Grey-box fallback swing (slice 1, one at a time).
         private AttackDefinition current;
@@ -171,6 +177,7 @@ namespace MK.Rebuild
             visual = GetComponent<ICharacterVisual>();
             motor = GetComponent<PlayerMotor>();
             dash = GetComponent<PlayerDash>();
+            abilities = GetComponent<PlayerAbilities>(); // sibling ability runner (m1-abilities)
             input = new PlayerInput();
             RefreshCamera();
         }
@@ -238,7 +245,9 @@ namespace MK.Rebuild
             if (comboActive)
             {
                 ApplyLunge(currentStep);
-                if (IsInsideStepWindow()) ProbeHitboxStep();
+                // Ability steps deal their own damage (PlayerAbilities); the generic
+                // hitbox probe is skipped so H1/H2 never double-hits (m1-abilities).
+                if (IsInsideStepWindow() && currentStep.stepType != ComboStepType.Ability) ProbeHitboxStep();
                 return;
             }
             if (current == null) return;
@@ -418,8 +427,37 @@ namespace MK.Rebuild
         /// </summary>
         public void SubmitAbility(ComboInput ability)
         {
-            // Deliberately empty in this slice: ability behavior is deferred by scope.
+            // m1-abilities: route the seam to the same pipeline the real skill reads.
+            if (ability == ComboInput.H1) queuedSkill1Tap = true;
+            else if (ability == ComboInput.H2) queuedSkill2Tap = true;
         }
+
+        /// <summary>Public tap seam for Skill1 (H1 projectile). Mirrors <see cref="SubmitLightAttack"/>.</summary>
+        public void SubmitSkill1() => queuedSkill1Tap = true;
+
+        /// <summary>Public tap seam for Skill2 (H2 area).</summary>
+        public void SubmitSkill2() => queuedSkill2Tap = true;
+
+        /// <summary>
+        /// Skill press reader shared with <see cref="PlayerAbilities"/> (m1-abilities):
+        /// the real Skill1/Skill2 actions OR the queued SubmitSkill1/2 taps. Returns true
+        /// once per press; <paramref name="ability"/> is H1 for Skill1, H2 for Skill2.
+        /// </summary>
+        public bool ConsumeSkillTap(out ComboInput ability)
+        {
+            if (queuedSkill1Tap) { queuedSkill1Tap = false; ability = ComboInput.H1; return true; }
+            if (queuedSkill2Tap) { queuedSkill2Tap = false; ability = ComboInput.H2; return true; }
+            if (input != null && input.Player.Skill1.WasPressedThisFrame()) { ability = ComboInput.H1; return true; }
+            if (input != null && input.Player.Skill2.WasPressedThisFrame()) { ability = ComboInput.H2; return true; }
+            ability = ComboInput.H1;
+            return false;
+        }
+
+        /// <summary>
+        /// Hitstop seam for abilities (m1-abilities): <see cref="PlayerAbilities"/> owns the
+        /// ability hit but the freeze lives here (same save/restore contract as the combo probes).
+        /// </summary>
+        public void RequestHitstop(int milliseconds) => BeginHitstop(milliseconds);
 
         /// <summary>
         /// Aborts the active combo/swing and releases the attack lock (dash-cancel
@@ -583,6 +621,7 @@ namespace MK.Rebuild
         private void StartCombo(ComboDefinition definition, bool dashOpener = false)
         {
             if (definition == null || !definition.TryGetStep(0, out ComboStep first)) return;
+            if (abilities != null) abilities.Stop(); // leaving any standalone ability (m1-abilities)
             activeCombo = definition;
             current = null;
             comboActive = true;
@@ -605,6 +644,7 @@ namespace MK.Rebuild
                 EndCombo();
                 return;
             }
+            if (abilities != null) abilities.Stop(); // release a previous ability step (m1-abilities)
             stepIndex = index;
             currentStep = next;
             stepTime = 0f;
@@ -633,6 +673,7 @@ namespace MK.Rebuild
                 animatorVisual.ReleaseDashAttack(); // dormant opener slot never stays gated
                 animatorVisual.ReleaseLauncher();   // dormant launcher slot never stays gated
             }
+            if (abilities != null) abilities.Stop(); // release the ability slot (m1-abilities)
         }
 
         /// <summary>
@@ -680,6 +721,14 @@ namespace MK.Rebuild
         private void PlayAttackVisual(int step, ComboStep def)
         {
             if (!(visual is AnimatorVisual animatorVisual)) return;
+
+            // ABILITY STEP (m1-abilities): the step delegates to PlayerAbilities (its own
+            // Attack_H1/H2 state + hitbox). No Attack_P entry — the ability owns the visual.
+            if (def.stepType == ComboStepType.Ability)
+            {
+                if (abilities != null && def.abilityRef != null) abilities.PlayFromCombo(def.abilityRef);
+                return;
+            }
 
             if (dashAttackActive)
             {
