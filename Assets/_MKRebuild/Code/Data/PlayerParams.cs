@@ -60,6 +60,12 @@ namespace MK.Rebuild
                  "jumpStartSpeed; drives the Dash state's DashSpeed parameter.")]
         public float dashClipSpeed = 2.29f;
 
+        [Header("Death clip retiming (TEMPORARY — set to 1 once the clip is retimed to x1)")]
+        [Tooltip("Animator state speed multiplier for the Death state (anim_dizzy_death is 12.667 s). " +
+                 "Default 1.0 = natural playback: evaluate the full death animation first, THEN tune. " +
+                 "Same retiming home as dashClipSpeed; drives the Death state's DeathSpeed parameter.")]
+        public float deathClipSpeed = 1.0f;
+
         [Header("Feel (tunables)")]
         [Tooltip("Seconds to reach full speed (ground).")]
         public float accelTime = 0.08f;

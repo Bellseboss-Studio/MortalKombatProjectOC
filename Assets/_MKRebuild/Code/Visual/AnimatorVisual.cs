@@ -34,6 +34,7 @@ namespace MK.Rebuild
         private static readonly int DashSpeedHash = Animator.StringToHash("DashSpeed");
         private static readonly int AttackDashSpeedHash = Animator.StringToHash("AttackDashSpeed");
         private static readonly int LauncherSpeedHash = Animator.StringToHash("LauncherSpeed");
+        private static readonly int DeathSpeedHash = Animator.StringToHash("DeathSpeed");
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
@@ -69,6 +70,7 @@ namespace MK.Rebuild
             animator.SetFloat(FlipMidAirSpeedHash, paramsRef.flipMidAirSpeed);
             animator.SetFloat(MantleClipSpeedHash, paramsRef.mantleClipSpeed);
             animator.SetFloat(DashSpeedHash, paramsRef.dashClipSpeed);
+            animator.SetFloat(DeathSpeedHash, paramsRef.deathClipSpeed);
         }
 
         private void Awake()
@@ -224,6 +226,33 @@ namespace MK.Rebuild
         public void ReleaseLauncher()
         {
             if (animator != null) animator.SetInteger(LauncherStateHash, 0);
+        }
+
+        /// <summary>
+        /// Player HURT seam (anim-packs-integration slice 3): code-driven CrossFade into
+        /// the <c>HitReaction</c> state — the same pattern as <see cref="PlayAttack"/>.
+        /// NO new Animator params: the state's own exit-time transition returns to
+        /// locomotion when the one-shot ends. Called by <see cref="PlayerDamage"/>.
+        /// </summary>
+        public void PlayHitReaction(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            animator.CrossFade("HitReaction", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+        }
+
+        /// <summary>
+        /// Player DEATH seam (anim-packs-integration slice 3): code-driven CrossFade into
+        /// the <c>Death</c> state. The state has NO outgoing transition, so the clip plays
+        /// once and HOLDS its final pose (no T-pose, no snap). Called by
+        /// <see cref="PlayerDamage"/>. The state's playback rate is the dedicated
+        /// <c>DeathSpeed</c> float param — a STATIC value set once in
+        /// <see cref="ApplyClipSpeeds"/> from <c>PlayerParams.deathClipSpeed</c> (data, not
+        /// code), same retiming home as <c>DashSpeed</c>.
+        /// </summary>
+        public void PlayDeath(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            animator.CrossFade("Death", Mathf.Max(0f, crossFadeDuration), 0, 0f);
         }
 
         /// <summary>
