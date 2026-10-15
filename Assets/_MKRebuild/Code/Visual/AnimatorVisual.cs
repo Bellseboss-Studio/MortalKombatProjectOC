@@ -31,6 +31,7 @@ namespace MK.Rebuild
         private static readonly int JumpStartSpeedHash = Animator.StringToHash("JumpStartSpeed");
         private static readonly int FlipMidAirSpeedHash = Animator.StringToHash("FlipMidAirSpeed");
         private static readonly int MantleClipSpeedHash = Animator.StringToHash("MantleClipSpeed");
+        private static readonly int DashSpeedHash = Animator.StringToHash("DashSpeed");
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
@@ -65,6 +66,7 @@ namespace MK.Rebuild
             animator.SetFloat(JumpStartSpeedHash, paramsRef.jumpStartSpeed);
             animator.SetFloat(FlipMidAirSpeedHash, paramsRef.flipMidAirSpeed);
             animator.SetFloat(MantleClipSpeedHash, paramsRef.mantleClipSpeed);
+            animator.SetFloat(DashSpeedHash, paramsRef.dashClipSpeed);
         }
 
         private void Awake()

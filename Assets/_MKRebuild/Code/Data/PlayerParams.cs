@@ -54,6 +54,12 @@ namespace MK.Rebuild
                  "flip = mid-ascent to touchdown, ~0.49 s). Somersault-on-ascent iteration.")]
         public float flipMidAirSpeed = 3.5f;
 
+        [Header("Dash clip retiming (TEMPORARY — set to 1 once clips are retimed to x1)")]
+        [Tooltip("Animator state speed multiplier for the Dash state (~ clipLength / dashWindow; " +
+                 "anim_dash2_north 0.80 s over the 0.35 s dash ≈ 2.29x). Same retiming home as " +
+                 "jumpStartSpeed; drives the Dash state's DashSpeed parameter.")]
+        public float dashClipSpeed = 2.29f;
+
         [Header("Feel (tunables)")]
         [Tooltip("Seconds to reach full speed (ground).")]
         public float accelTime = 0.08f;

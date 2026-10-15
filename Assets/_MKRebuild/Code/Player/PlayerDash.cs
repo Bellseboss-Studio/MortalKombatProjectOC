@@ -88,6 +88,7 @@ namespace MK.Rebuild
         private PlayerMotor motor;
         private PlayerCombat combat;
         private ICharacterVisual visual;
+        private AnimatorVisual animatorVisual;
 
         private bool isDashing;
         private float dashTimer;      // unscaled seconds left of the impulse
@@ -127,6 +128,10 @@ namespace MK.Rebuild
             motor = GetComponent<PlayerMotor>();
             combat = GetComponent<PlayerCombat>();
             visual = GetComponent<ICharacterVisual>();
+            // Real-art dash clip seam (anim-packs-integration slice 1): the Dash
+            // state now has a clip (anim_dash2_north). Cache the concrete driver
+            // so PlayDash/ReleaseDash can drive it — null on the proxy fallback.
+            animatorVisual = GetComponent<AnimatorVisual>();
         }
 
         private void Update()
@@ -229,6 +234,10 @@ namespace MK.Rebuild
                 baseVelocity = Vector3.zero;
 
             if (motor != null) motor.InputLocked = true;
+
+            // Real dash clip (slice 1): CrossFade into the Dash state + raise
+            // DashState so the mirror exits stay gated until EndDash releases it.
+            if (animatorVisual != null) animatorVisual.PlayDash(0.05f);
         }
 
         /// <summary>
@@ -256,6 +265,9 @@ namespace MK.Rebuild
             // Release the lock -> PlayerCombat's attack buffer (fed/held during the dash)
             // fires this frame or next and starts the combo: dash -> attack -> combo.
             if (motor != null) motor.InputLocked = false; // rigorous release: control returns
+            // Drop DashState to 0 -> the controller's mirror exits return to locomotion
+            // exactly when the 0.35 s window closes (exit is param-gated, not exit-time).
+            if (animatorVisual != null) animatorVisual.ReleaseDash();
         }
 
         private void OnDisable()
@@ -264,6 +276,7 @@ namespace MK.Rebuild
             isDashing = false;
             dashTimer = 0f;
             if (motor != null) motor.InputLocked = false;
+            if (animatorVisual != null) animatorVisual.ReleaseDash();
         }
 
         /// <summary>Editor defaulting: an empty dashCurve shows as the shared ease-out.</summary>
