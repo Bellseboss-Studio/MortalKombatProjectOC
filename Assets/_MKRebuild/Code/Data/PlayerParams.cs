@@ -75,8 +75,20 @@ namespace MK.Rebuild
         public float groundRayOffset = 0.4f;
 
         [Header("Wall motion (M0)")]
-        [Tooltip("Forward probe distance for wall contact (m).")]
+        [Tooltip("Forward probe distance for wall contact (m). Used as the SHORT ray " +
+                  "length toward the wall to recover the surface normal.")]
         public float wallCheckDistance = 0.7f;
+
+        [Tooltip("Wall-grab band volume full size in meters (XYZ). The wall check " +
+                  "queries exactly this box at wallBandHeight above the body center — a " +
+                  "body-width slice, NOT a single center ray. Should span at least " +
+                  "wallCheckDistance so the band reaches the wall.")]
+        public Vector3 wallBandSize = new Vector3(1.2f, 0.6f, 1.2f);
+
+        [Tooltip("Height above the body center of the wall-grab band. Mirrors " +
+                  "hangGripHeight so the wall and ledge checks sit at the same chest " +
+                  "height — consistent reads at a corner.")]
+        public float wallBandHeight = 0.4f;
 
         [Tooltip("Max |normal.y| that still counts as a wall (floor/ceiling rejected).")]
         [Range(0f, 1f)]
@@ -147,5 +159,12 @@ namespace MK.Rebuild
                  "direction (over the edge). Clears the ledge trigger overlap so the next frame " +
                  "reads grounded Free (idle/walk) instead of hanging. Keeps the landing height.")]
         public float mantleStepForward = 0.8f;
+
+        [Tooltip("Mantle arc bulge as a MULTIPLIER of the body radius (capsule radius). The warp " +
+                  "path is a quadratic Bezier whose control point sits at the lip corner pushed UP " +
+                  "+ OUTWARD (away from the wall) by body.radius x this. Higher = the curve bulges " +
+                  "more over the lip (clears the corner with more margin); 0 = straight line. " +
+                  "Default ~1.5 x body radius (0.5 m) clears the lip.")]
+        public float mantleArcRadius = 1.5f;
     }
 }

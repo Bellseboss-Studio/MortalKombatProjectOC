@@ -60,6 +60,7 @@ namespace MK.Rebuild
         private bool mantling;
         private Vector3 warpStart;
         private Vector3 warpEnd;
+        private Vector3 warpControl; // Bezier control: lip corner pushed up + outward (arcs over the lip)
         private Vector3 mantleDir; // captured at ApplyMantle: into/over the edge (XZ unit)
         private float warpT;
 
@@ -185,10 +186,12 @@ namespace MK.Rebuild
                 rb.linearVelocity = Vector3.zero;
                 if (warpT >= 1f)
                 {
-                    // Snap exact — no overshoot — then ONE step forward past the edge:
-                    // the warp lands inside the ledge trigger's overhang, so without
-                    // the step the next frame would hang again instead of going Free.
-                    rb.position = StepPastLedge(warpEnd);
+                    // Snap exact — no overshoot. warpEnd already includes the step
+                    // past the edge (folded in at mantle start), so landing here puts
+                    // solid top under the character and the next frame reads grounded
+                    // (Free/idle) instead of hanging. No post-warp step: the forward
+                    // advance happened smoothly DURING the warp.
+                    rb.position = warpEnd;
                     mantling = false;
                     verticalVel = 0f;
                     smoothVel = Vector3.zero;
@@ -196,7 +199,12 @@ namespace MK.Rebuild
                 }
                 else
                 {
-                    rb.position = Vector3.Lerp(warpStart, warpEnd, Mathf.SmoothStep(0f, 1f, warpT));
+                    // Curved warp: a quadratic Bezier around the lip instead of a straight
+                    // line. The control point sits at the lip corner pushed up + outward,
+                    // so the body rises along the wall and ARCS OVER the corner instead of
+                    // cutting through it. SmoothStep on t keeps the eased in/out feel.
+                    float t = Mathf.SmoothStep(0f, 1f, warpT);
+                    rb.position = QuadraticBezier(warpStart, warpControl, warpEnd, t);
                 }
                 ExposeMantleState();
                 return;
@@ -568,8 +576,15 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Horizontal wall probe. Accepts only near-vertical faces belonging to a
-        /// different rigidbody (ignores the Player's own Face child collider).
+        /// Wall probe by VOLUME (consistent with the ledge hands band): an
+        /// <see cref="Physics.OverlapBox"/> band of <c>wallBandSize</c> at
+        /// <c>wallBandHeight</c> above the body center catches Grabbable sides
+        /// across the whole body width, not just the exact center line — so a
+        /// corner no longer fires on the wall face before the ledge can take the
+        /// lip. Because the box yields WHICH collider but not the surface normal,
+        /// a SHORT ray toward the wall recovers the normal (sticky grab + wall-jump
+        /// direction). Accepts only near-vertical Grabbable faces from a different
+        /// rigidbody (ignores the Player's own Face child and the last wall-jumped-from).
         /// </summary>
         private void CheckWall()
         {
@@ -598,26 +613,116 @@ namespace MK.Rebuild
             probe.y = 0f;
             probe.Normalize();
 
-            Vector3 origin = body.bounds.center;
-            var hits = Physics.RaycastAll(origin, probe, paramsAsset.wallCheckDistance,
+            GetWallBandVolume(body, out Vector3 bandCenter, out Vector3 half);
+            var cols = Physics.OverlapBox(bandCenter, half, Quaternion.identity,
                 Physics.AllLayers, QueryTriggerInteraction.Ignore);
             float best = float.MaxValue;
+            for (int i = 0; i < cols.Length; i++)
+            {
+                var col = cols[i];
+                if (col == null || col == body) continue;
+                if (col.attachedRigidbody == rb) continue; // Face / own children
+                // Re-grab ban: ignore the exact wall we just wall-jumped from until
+                // grounded or a different wall/ledge is grabbed.
+                if (col == lastWallJumpedFrom) continue;
+                if (col.GetComponentInParent<Grabbable>() == null) continue; // only Grabbable sides
+                // The box gives WHICH collider, not the surface normal: recover it
+                // with a short ray into the wall, then keep the horizontal test.
+                if (!TryGetWallNormal(bandCenter, probe, col, out Vector3 normal, out float dist)) continue;
+                // Directionality preserved from the old ray: the collider only counts
+                // while probing INTO it (probe points against the face normal). A box
+                // has no intrinsic direction, so this explicit test keeps the
+                // move-into-wall semantics the center ray had (band catches sideways
+                // overlap, not backpedal-by-a-wall).
+                if (Vector3.Dot(probe, normal) >= 0f) continue;
+                if (Mathf.Abs(normal.y) >= paramsAsset.wallNormalThreshold) continue; // floor/ceiling
+                if (dist >= best) continue;
+                best = dist;
+                wallContact = true;
+                wallNormal = normal;
+                wallCollider = col;
+            }
+        }
+
+        /// <summary>
+        /// Shared wall-band volume math (dev visualization + <see cref="CheckWall"/>):
+        /// a body-width slice (<c>wallBandSize</c>) at <c>wallBandHeight</c> above the
+        /// body center. Fully data-driven — mirrors the ledge hands band
+        /// (<see cref="GetHandsBandVolume"/>).
+        /// </summary>
+        private void GetWallBandVolume(CapsuleCollider capsule, out Vector3 center, out Vector3 half)
+        {
+            center = capsule.bounds.center + Vector3.up * paramsAsset.wallBandHeight;
+            half = paramsAsset.wallBandSize * 0.5f;
+        }
+
+        /// <summary>
+        /// Recovers the surface NORMAL for a collider caught by the wall band. The
+        /// box tells WHICH collider but not the face orientation, so cast a short ray
+        /// toward the wall: first along the probe (move/sticky direction), then — as a
+        /// robust fallback for corners, where the probe is tangential to the face the
+        /// band overlaps — straight at the collider's closest point. <paramref name="distance"/>
+        /// is the ray hit distance, used to pick the nearest Grabbable.
+        /// </summary>
+        private bool TryGetWallNormal(Vector3 origin, Vector3 probe, Collider col,
+            out Vector3 normal, out float distance)
+        {
+            if (CastWallNormal(origin, probe, paramsAsset.wallCheckDistance, col, out normal, out distance))
+                return true;
+            Vector3 target = col.ClosestPoint(origin);
+            Vector3 dir = target - origin;
+            float dist = dir.magnitude;
+            if (dist <= 0.0001f)
+            {
+                normal = Vector3.zero;
+                distance = float.MaxValue;
+                return false;
+            }
+            return CastWallNormal(origin, dir / dist, dist + 0.1f, col, out normal, out distance);
+        }
+
+        /// <summary>
+        /// Short ray that returns the normal of a SPECIFIC collider's face, skipping the
+        /// Player's own colliders. True only when it hits <paramref name="target"/>.
+        /// </summary>
+        private bool CastWallNormal(Vector3 origin, Vector3 dir, float maxDist, Collider target,
+            out Vector3 normal, out float distance)
+        {
+            normal = Vector3.zero;
+            distance = float.MaxValue;
+            var hits = Physics.RaycastAll(origin, dir, maxDist,
+                Physics.AllLayers, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < hits.Length; i++)
             {
                 var hit = hits[i];
                 if (hit.collider == null || hit.collider == body) continue;
-                if (hit.rigidbody == rb) continue; // Face / own children
-                // Re-grab ban: ignore the exact wall we just wall-jumped from until
-                // grounded or a different wall/ledge is grabbed.
-                if (hit.collider == lastWallJumpedFrom) continue;
-                if (hit.collider.GetComponentInParent<Grabbable>() == null) continue; // only Grabbable sides
-                if (Mathf.Abs(hit.normal.y) >= paramsAsset.wallNormalThreshold) continue; // floor/ceiling
-                if (hit.distance >= best) continue;
-                best = hit.distance;
-                wallContact = true;
-                wallNormal = hit.normal;
-                wallCollider = hit.collider;
+                if (hit.rigidbody == rb) continue; // own Face / children
+                if (hit.collider != target) continue;
+                normal = hit.normal;
+                distance = hit.distance;
+                return true;
             }
+            return false;
+        }
+
+        /// <summary>
+        /// Dev visualization probe: true when the wall band (as queried by
+        /// <see cref="CheckWall"/>) overlaps a Grabbable collider. Direction- and
+        /// probe-independent (that is the forgiving part) — used only by the gizmo.
+        /// </summary>
+        private bool WallBandCatchesGrabbable(CapsuleCollider capsule)
+        {
+            GetWallBandVolume(capsule, out Vector3 center, out Vector3 half);
+            var cols = Physics.OverlapBox(center, half, Quaternion.identity,
+                Physics.AllLayers, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < cols.Length; i++)
+            {
+                var col = cols[i];
+                if (col == null || col == capsule) continue;
+                if (col.GetComponentInParent<Grabbable>() == null) continue;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -647,12 +752,21 @@ namespace MK.Rebuild
         private void ApplyMantle()
         {
             warpStart = rb.position;
-            warpEnd = ComputeWarpEnd();
             // Capture the climb direction NOW: the warp frames skip the wall probe,
-            // so HangIntoDir would be stale by landing time.
+            // so HangIntoDir would be stale by landing time. Captured BEFORE the
+            // destination so the step-inclusive end can use it.
             mantleDir = HangIntoDir();
             mantleDir.y = 0f;
             mantleDir = mantleDir.sqrMagnitude > 0.000001f ? mantleDir.normalized : Vector3.zero;
+            // Fold the step INTO the warp: the destination is the FINAL pose past the
+            // ledge (StepPastLedge probes HasTopBeneath at that final pose), so the
+            // whole climb interpolates start -> final target as ONE smooth motion
+            // with NO instantaneous snap at the end.
+            warpEnd = StepPastLedge(ComputeWarpEnd());
+            // Shape the warp path: a Bezier control point over the lip so the body arcs
+            // AROUND the corner (straight lerp clipped the edge). Same start, same exact
+            // end — only the mid-path bulges.
+            warpControl = ComputeMantleControl();
             warpT = 0f;
             mantling = true;
             wasLedgeHang = false; // mantle owns the edge now; the early-return warp frames skip the latch update
@@ -670,22 +784,62 @@ namespace MK.Rebuild
         private Vector3 ComputeWarpEnd()
         {
             Vector3 into = HangIntoDir();
-            if (wallCollider != null)
-            {
-                Bounds wall = wallCollider.bounds;
-                // Same-line climb: land at the player's own XZ (warpStart), only the
-                // Y comes from the wall top. Using the slab center teleported the
-                // character sideways on off-center hangs.
+            // Landing height comes from the EDGE, not the wall: the Ledge marker's
+            // OWN top (its bounds max.y) IS the lip = the walkable surface, so the
+            // stand pose is lip + half height. The Grabbable wall is only a fallback
+            // (no Ledge trigger present). Both are marker-owned references, so moving
+            // a marker moves the landing with it.
+            float topY;
+            if (ledgeCollider != null)
+                topY = ledgeCollider.bounds.max.y;
+            else if (wallCollider != null)
+                topY = wallCollider.bounds.max.y;
+            else
                 return new Vector3(
-                    warpStart.x,
-                    wall.max.y + body.height * 0.5f,
-                    warpStart.z);
-            }
+                    warpStart.x + into.x * body.radius,
+                    warpStart.y + body.height,
+                    warpStart.z + into.z * body.radius);
 
+            // Same-line climb: land at the player's own XZ (warpStart), only the
+            // Y comes from the top. Using the slab center teleported the character
+            // sideways on off-center hangs.
             return new Vector3(
-                warpStart.x + into.x * body.radius,
-                warpStart.y + body.height,
-                warpStart.z + into.z * body.radius);
+                warpStart.x,
+                topY + body.height * 0.5f,
+                warpStart.z);
+        }
+
+        /// <summary>
+        /// Bezier control point for the mantle warp: the lip corner (wall/ledge top on the
+        /// player's own vertical line) pushed UP and OUTWARD (away from the wall) by the body
+        /// radius times <c>mantleArcRadius</c>. This bulges the path over the lip so the
+        /// capsule ARCS AROUND the corner instead of clipping through it. Lip top comes from
+        /// the ledge trigger (present on every ledge hang), then the grabbable wall bounds,
+        /// then a body-sized fallback. XZ stays on the player's own line (same-line climb).
+        /// </summary>
+        private Vector3 ComputeMantleControl()
+        {
+            float lipY;
+            if (ledgeCollider != null)
+                lipY = ledgeCollider.bounds.max.y;
+            else if (wallCollider != null)
+                lipY = wallCollider.bounds.max.y;
+            else
+                lipY = warpStart.y + body.height * 0.5f;
+
+            Vector3 lip = new Vector3(warpStart.x, lipY, warpStart.z);
+            // Outward = away from the wall (opposite the into/over direction), so the
+            // curve swings clear of the wall face on its way up to the lip.
+            Vector3 outward = mantleDir.sqrMagnitude > 0.000001f ? -mantleDir : Vector3.zero;
+            float bulge = body.radius * Mathf.Max(0f, paramsAsset.mantleArcRadius);
+            return lip + Vector3.up * bulge + outward * bulge;
+        }
+
+        /// <summary>Point on the quadratic Bezier (p0, p1, p2) at parameter t in [0, 1].</summary>
+        private static Vector3 QuadraticBezier(Vector3 p0, Vector3 p1, Vector3 p2, float t)
+        {
+            float u = 1f - t;
+            return u * u * p0 + 2f * u * t * p1 + t * t * p2;
         }
 
         /// <summary>
@@ -823,11 +977,12 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Dev-only visualization of the invisible ledge hand-check (Scene view only,
-        /// zero build cost): draws EXACTLY the hands-band OverlapBox queried by
-        /// <see cref="OverlapsHandsBand"/> (same offset, same extents). Cyan normally,
-        /// green while the band overlaps a ledge trigger (hang armed).
-        /// Visualization only — no behavior.
+        /// Dev-only visualization of the invisible hand/wall checks (Scene view only,
+        /// zero build cost). Draws EXACTLY the two OverlapBox volumes used by the
+        /// grab logic, same style: cyan/faint normally, green while the band overlaps
+        /// its target (hang/grab armed). Visualization only — no behavior.
+        /// - LEDGE hands band: <see cref="OverlapsHandsBand"/> (green on a Ledge trigger).
+        /// - WALL grab band: <see cref="CheckWall"/> (green on a Grabbable).
         /// </summary>
         private void OnDrawGizmos()
         {
@@ -840,6 +995,19 @@ namespace MK.Rebuild
             fill.a = 0.15f;
             Gizmos.color = fill;
             Gizmos.DrawCube(hands, half * 2f);
+
+            // Wall-grab band: exactly the OverlapBox queried by CheckWall (same
+            // offset, same extents). Green while the band catches a Grabbable
+            // (grab armed), faint orange otherwise.
+            GetWallBandVolume(capsule, out Vector3 wallBand, out Vector3 wallHalf);
+            Gizmos.color = WallBandCatchesGrabbable(capsule)
+                ? Color.green
+                : new Color(1f, 0.6f, 0.1f, 0.4f);
+            Gizmos.DrawWireCube(wallBand, wallHalf * 2f);
+            Color wallFill = Gizmos.color;
+            wallFill.a = 0.15f;
+            Gizmos.color = wallFill;
+            Gizmos.DrawCube(wallBand, wallHalf * 2f);
 
             // Ground check: the 4 cardinal rays queried by CheckGrounded (same
             // origins, same length). GREEN = that ray HITS (feeds grounded),

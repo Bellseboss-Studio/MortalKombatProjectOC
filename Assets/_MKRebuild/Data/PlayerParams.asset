@@ -31,6 +31,8 @@ MonoBehaviour:
   turnSpeed: 1500
   groundRayOffset: 0.4
   wallCheckDistance: 0.7
+  wallBandSize: {x: 1.2, y: 0.6, z: 1.2}
+  wallBandHeight: 0.4
   wallNormalThreshold: 0.5
   wallSlideSpeed: 0
   wallJumpVelocity: 8
@@ -42,10 +44,11 @@ MonoBehaviour:
   wallCoyoteTime: 0.12
   wallReleaseHop: 3
   wallReleaseThreshold: -0.5
-  gripDepth: 1.5
+  gripDepth: 0.6
   hangGripHeight: 0.4
-  hangBandSize: {x: 0.4, y: 0.3, z: 0.7}
+  hangBandSize: {x: 1.2, y: 0.3, z: 0.7}
   autoMantle: 0
   mantleDuration: 0.4
   mantleClipSpeed: 2.78
-  mantleStepForward: 1.5
+  mantleStepForward: 1
+  mantleArcRadius: 1.5
