@@ -683,22 +683,23 @@ namespace MK.Rebuild
 
             if (dashAttackActive)
             {
-                // DASH-ATTACK opener: its OWN clip slot (dormant Attack_Dash state). Enter it
+                // DASH-ATTACK opener: its OWN clip slot (Attack_Dash state). Enter it
                 // ONLY when the step has an assigned clip (ComboStep.clip) — with no clip the
-                // EMPTY state would freeze the pose, so the visual is skipped and the opener
+                // state would freeze the pose, so the visual is skipped and the opener
                 // renders with whatever locomotion pose is live (no pose freeze).
+                // The step's speedMultiplier rides in as the state's retime (slice 2).
                 if (def.clip != null)
-                    animatorVisual.PlayDashAttack(Mathf.Max(0f, crossFadeDuration));
+                    animatorVisual.PlayDashAttack(Mathf.Max(0f, crossFadeDuration), def.speedMultiplier);
                 return;
             }
 
-            // LAUNCHER variant (slice 3nonies): its OWN dormant clip slot (Attack_Launcher),
+            // LAUNCHER variant (slice 3nonies): its OWN clip slot (Attack_Launcher),
             // entered ONLY when the step has an assigned clip. With no clip it falls through to
-            // the grey-box Attack_P mapping below (attackStateIndex) — never enters the EMPTY
-            // state (no pose freeze).
+            // the grey-box Attack_P mapping below (attackStateIndex) — never enters a
+            // clip-less state (no pose freeze). speedMultiplier rides in as the retime (slice 2).
             if (def.launch && def.clip != null)
             {
-                animatorVisual.PlayLauncher(Mathf.Max(0f, crossFadeDuration));
+                animatorVisual.PlayLauncher(Mathf.Max(0f, crossFadeDuration), def.speedMultiplier);
                 return;
             }
 

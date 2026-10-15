@@ -32,6 +32,8 @@ namespace MK.Rebuild
         private static readonly int FlipMidAirSpeedHash = Animator.StringToHash("FlipMidAirSpeed");
         private static readonly int MantleClipSpeedHash = Animator.StringToHash("MantleClipSpeed");
         private static readonly int DashSpeedHash = Animator.StringToHash("DashSpeed");
+        private static readonly int AttackDashSpeedHash = Animator.StringToHash("AttackDashSpeed");
+        private static readonly int LauncherSpeedHash = Animator.StringToHash("LauncherSpeed");
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
@@ -175,17 +177,20 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// DORMANT dash-attack slot (slice 3octies): mirrors <see cref="PlayAttack"/> for the
-        /// EMPTY <c>Attack_Dash</c> state (the dash-attack OPENER's own clip slot). Called by
-        /// <see cref="PlayerCombat"/> ONLY when the opener step has an assigned clip
-        /// (<c>ComboStep.clip</c>) — entering the motion-less state with no clip would freezes
-        /// the pose, so until the animation exists the visual is skipped entirely. Pushing
-        /// DashAttackState = 1 lets the controller's mirror exits (gated <c>DashAttackState == 0</c>)
-        /// return to locomotion.
+        /// Dash-attack opener slot (slice 3octies; clip wired in anim-packs slice 2):
+        /// mirrors <see cref="PlayAttack"/> for the <c>Attack_Dash</c> state (the
+        /// dash-attack OPENER's own clip slot). Called by <see cref="PlayerCombat"/>
+        /// ONLY when the opener step has an assigned clip (<c>ComboStep.clip</c>).
+        /// The step's <paramref name="clipSpeed"/> (ComboStep.speedMultiplier) is the
+        /// SINGLE retime source: it is pushed into the state's dedicated
+        /// <c>AttackDashSpeed</c> float BEFORE the CrossFade. Pushing DashAttackState = 1
+        /// lets the controller's mirror exits (gated <c>DashAttackState == 0</c>) return
+        /// to locomotion.
         /// </summary>
-        public void PlayDashAttack(float crossFadeDuration)
+        public void PlayDashAttack(float crossFadeDuration, float clipSpeed)
         {
             if (animator == null) return;
+            animator.SetFloat(AttackDashSpeedHash, Mathf.Max(0.01f, clipSpeed));
             animator.CrossFade("Attack_Dash", Mathf.Max(0f, crossFadeDuration), 0, 0f);
             animator.SetInteger(DashAttackStateHash, 1);
         }
@@ -197,18 +202,20 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// DORMANT launcher slot (slice 3nonies): mirrors <see cref="PlayDashAttack"/> for the
-        /// EMPTY <c>Attack_Launcher</c> state (the launcher variant's own clip slot). Called by
-        /// <see cref="PlayerCombat"/> ONLY when the launcher step has an assigned clip
-        /// (<c>ComboStep.clip</c>) — entering the motion-less state with no clip would freeze
-        /// the pose, so until the animation exists the visual is skipped entirely. Pushing
-        /// LauncherState = 1 lets the controller's mirror exits (gated <c>LauncherState == 0</c>)
-        /// return to locomotion. Uses a DEDICATED param (NOT MoveState): the AnyState
-        /// <c>MoveState != 0</c> would hijack it.
+        /// Launcher slot (slice 3nonies; clip wired in anim-packs slice 2): mirrors
+        /// <see cref="PlayDashAttack"/> for the <c>Attack_Launcher</c> state (the
+        /// launcher/uppercut variant's own clip slot). Called by <see cref="PlayerCombat"/>
+        /// ONLY when the launcher step has an assigned clip (<c>ComboStep.clip</c>).
+        /// The step's <paramref name="clipSpeed"/> (ComboStep.speedMultiplier) is the
+        /// SINGLE retime source: pushed into the state's dedicated <c>LauncherSpeed</c>
+        /// float BEFORE the CrossFade. Pushing LauncherState = 1 lets the controller's
+        /// mirror exits (gated <c>LauncherState == 0</c>) return to locomotion. Uses a
+        /// DEDICATED param (NOT MoveState): the AnyState <c>MoveState != 0</c> would hijack it.
         /// </summary>
-        public void PlayLauncher(float crossFadeDuration)
+        public void PlayLauncher(float crossFadeDuration, float clipSpeed)
         {
             if (animator == null) return;
+            animator.SetFloat(LauncherSpeedHash, Mathf.Max(0.01f, clipSpeed));
             animator.CrossFade("Attack_Launcher", Mathf.Max(0f, crossFadeDuration), 0, 0f);
             animator.SetInteger(LauncherStateHash, 1);
         }

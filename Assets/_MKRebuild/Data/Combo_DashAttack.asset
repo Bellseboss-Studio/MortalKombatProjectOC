@@ -14,9 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   steps:
   - input: 0
+    direction: 0
     stepType: 0
     abilityRef: {fileID: 0}
-    clip: {fileID: 0}
+    clip: {fileID: 7400000, guid: 0c26963cde21cd14f84786d78d58b3e4, type: 2}
     duracion: 1.2
     hitNorm: {x: 0.15, y: 0.4}
     dano: 6
@@ -28,9 +29,46 @@ MonoBehaviour:
     cancelHitNorm: {x: 0.15, y: 0.85}
     siguiente:
       input: 0
+      direction: 0
       paso: 0
+    branches: []
     speedMultiplier: 6
     moveLock: 1
     lunge: 1
+    lungeCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: -1.1
+        outSlope: -1.1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.5
+        value: 0.45
+        inSlope: -1
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -0.9
+        outSlope: -0.9
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
     attackStateIndex: 0
+    launch: 0
+    launchImpulse: 0
   dashCancelsAll: 1
