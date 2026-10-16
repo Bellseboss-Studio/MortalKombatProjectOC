@@ -163,6 +163,11 @@ namespace MK.Rebuild
             bool pressed = combat != null && combat.ConsumeDashTap();
             if (!pressed || cooldownTimer > 0f || (combat != null && combat.IsHitstopped)) return;
 
+            // ACTION GATE (change action-gating): the dash is a ground mobility verb —
+            // denied in the air, while hanging, or in a scripted state (deny by default).
+            // The press is already consumed above, so a gated dash does not leak late.
+            if (motor != null && !motor.CanPerform(PlayerAction.Dash)) return;
+
             // Dash as INTERRUPTOR: cancel the active combo/swing, then dash.
             if (combat != null && combat.Attacking) combat.CancelCombo();
             StartDash();

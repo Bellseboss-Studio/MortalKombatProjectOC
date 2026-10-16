@@ -54,6 +54,7 @@ namespace MK.Rebuild
         private float ledgeReGrabTimer; // drop-through ban after a Down-release from a ledge
         private Collider ledgeBanCollider; // THAT ledge only: ignored until the ban expires
         private Collider ledgeCollider;   // ledge trigger overlapped this frame (if any)
+        private Vector3 ledgeInto;        // captured XZ INTO-edge direction of the current ledge hang (grab-time geometry)
         private bool wasLedgeHang; // previous frame's ledge hang: latches the hang while sliding (slide zeroes verticalVel, so the fall gate alone would flicker)
         private float wallCoyoteTimer;
 
@@ -103,6 +104,20 @@ namespace MK.Rebuild
         /// the motor without any game→debug coupling.
         /// </summary>
         public bool IsGrounded => grounded;
+
+        /// <summary>
+        /// Current logical movement state (last committed in FixedUpdate). Single source
+        /// for BOTH the visual and the action gate (<see cref="CanPerform"/>).
+        /// </summary>
+        public MoveState State { get; private set; }
+
+        /// <summary>
+        /// Central action gate (change action-gating): true when <paramref name="action"/>
+        /// is legal in the current <see cref="State"/> + grounded state. Consumers
+        /// (combat / dash / abilities / this motor's horizontal input) early-return when
+        /// this is false. Deny by default — see <see cref="PlayerActionGate"/>.
+        /// </summary>
+        public bool CanPerform(PlayerAction action) => PlayerActionGate.Allows(State, grounded, action);
 
         /// <summary>World-space direction the character should face this step (XZ). Zero = keep.</summary>
         public Vector3 DesiredFacing => desiredFacing;
@@ -231,6 +246,7 @@ namespace MK.Rebuild
                 ledgeBanCollider = null; // landed: the drop-through ban is spent
                 ledgeReGrabTimer = 0f;
                 wasLedgeHang = false; // landed: a walk-off starts falling fresh, never latched
+                ledgeInto = Vector3.zero; // landed: the ledge interaction is over, drop the captured into-edge dir
                 holdingWallJumpFacing = false; // land -> facing is free again
             }
 
@@ -378,13 +394,29 @@ namespace MK.Rebuild
                 return;
             }
 
+            // Movement state for the animator AND the action gate: most specific active
+            // state wins. Computed ONCE here — after the release/jump/mantle branches have
+            // settled `hanging` — so the gate below and the visual at the end of the step
+            // read the SAME value (no per-frame divergence).
+            if (holdingWallJumpFacing) State = MoveState.WallJump;
+            else if (ledgeHang) State = MoveState.LedgeHang;
+            else if (wallGrab) State = MoveState.WallGrab;
+            else State = MoveState.Free;
+
             // Snap-to-grip: on ledge-grab start, settle the root to the authored
             // hang pose (same XZ, Y = lip top - gripDepth) so every hang reads
             // identical instead of the variable physics overlap position. Instant
             // (industry standard) — no visible slide. Skipped when a mantle or
             // release fired this frame (the warp/impulse owns the root there).
             if (ledgeHang && !wasLedgeHang && ledgeCollider != null)
+            {
+                // Capture the INTO-edge direction NOW, while the grab-frame geometry is
+                // in reach. A stationary hang has no wall probe (CheckWall early-returns
+                // with no input/velocity), so without this the hang/mantle facing falls
+                // back to the stale visual.Facing and the character hangs/climbs sideways.
+                CaptureLedgeInto();
                 SnapToGrip();
+            }
 
             if (grounded)
             {
@@ -436,6 +468,15 @@ namespace MK.Rebuild
                 // Control locked: keep the impulse, skip the wish.
                 horizontal = lockHoriz;
                 smoothVel = lockHoriz;
+            }
+            else if (!CanPerform(PlayerAction.Move))
+            {
+                // ACTION GATE: hang states deny Move — ignore the horizontal wish and
+                // kill lateral drift, so the player cannot slide parallel to the lip.
+                // Vertical (slide) and the Down-release (Drop, handled above) are the
+                // motor's own and stay untouched.
+                horizontal = Vector3.zero;
+                smoothVel = Vector3.zero;
             }
             else if (InputLocked)
             {
@@ -492,19 +533,11 @@ namespace MK.Rebuild
             facingLocked = locked;
             desiredFacing = faceDir;
 
-            // Movement state for the animator: most specific active state wins.
-            MoveState moveState;
-            if (mantling) moveState = MoveState.Mantle;
-            else if (holdingWallJumpFacing) moveState = MoveState.WallJump;
-            else if (ledgeHang) moveState = MoveState.LedgeHang;
-            else if (wallGrab) moveState = MoveState.WallGrab;
-            else moveState = MoveState.Free;
-
             if (visual != null)
             {
                 if (faceDir.sqrMagnitude > 0.000001f) visual.SetFacing(faceDir);
                 visual.SetGrounded(grounded);
-                visual.SetMoveState(moveState);
+                visual.SetMoveState(State);
                 // Animation hooks: XZ speed picks Idle/Walk; vertical velocity picks
                 // the jump sub-phases (JumpStart → FlipMidAir → Landing).
                 visual.SetSpeed(new Vector2(rb.linearVelocity.x, rb.linearVelocity.z).magnitude);
@@ -919,6 +952,7 @@ namespace MK.Rebuild
             facingLocked = true;
             desiredFacing = HangIntoDir();
             grounded = false; // the warp is airborne; keep the debug readout honest
+            State = MoveState.Mantle; // gate: the warp is fully locked
             if (visual != null)
             {
                 if (desiredFacing.sqrMagnitude > 0.000001f) visual.SetFacing(desiredFacing);
@@ -1065,12 +1099,56 @@ namespace MK.Rebuild
                 rb.position.z);
         }
 
+        /// <summary>
+        /// Captures the ledge "into-edge" direction (XZ unit) at the grab edge: the
+        /// XZ direction from the body toward the ledge collider, refined by a short
+        /// ray into the solid surface behind the lip (the ray skips the trigger ledge
+        /// itself, so `QueryTriggerInteraction.Ignore` is correct). Cached in
+        /// <see cref="ledgeInto"/>; cleared when the hang ends (grounded). Gives
+        /// <see cref="HangIntoDir"/> a geometry-derived target during a stationary
+        /// hang instead of the stale <c>visual.Facing</c>.
+        /// </summary>
+        private void CaptureLedgeInto()
+        {
+            ledgeInto = Vector3.zero;
+            if (body == null || ledgeCollider == null) return;
+            Vector3 origin = body.bounds.center;
+            // Aim at the ledge's nearest point: a trigger marker is not hit by a ray,
+            // so this direction ALSO points into the edge for a wall-less platform lip.
+            Vector3 dir = ledgeCollider.ClosestPoint(origin) - origin;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.000001f) return;
+            dir.Normalize();
+            // Prefer the solid face normal behind the lip (into = -normal); the ray
+            // reliably finds the wall where the ClosestPoint aim is only approximate.
+            var hits = Physics.RaycastAll(origin, dir, paramsAsset.wallCheckDistance,
+                Physics.AllLayers, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            Vector3 normal = Vector3.zero;
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var hit = hits[i];
+                if (hit.collider == null || hit.collider == body) continue;
+                if (hit.rigidbody == rb) continue; // own Face / children
+                if (hit.distance >= best) continue;
+                best = hit.distance;
+                normal = hit.normal;
+            }
+            normal.y = 0f;
+            ledgeInto = normal.sqrMagnitude > 0.000001f ? -normal.normalized : dir;
+        }
+
         /// <summary>Direction from the hang point INTO the surface/edge (over the top).</summary>
         private Vector3 HangIntoDir()
         {
             // On a Grabbable wall the inward direction is opposite the wall normal.
             if (wallNormal.sqrMagnitude > 0.000001f) return -wallNormal;
-            // Ledge without a wall: climb toward the player's facing (they jumped in).
+            // Stationary ledge hang (no wall probe): use the direction captured at the
+            // grab edge, so the facing/climb goes INTO the edge instead of sideways.
+            if (ledgeInto.sqrMagnitude > 0.000001f) return ledgeInto;
+            // Safety net (wall-jump -> ledge chain): the last known wall normal.
+            if (lastWallNormal.sqrMagnitude > 0.000001f) return -lastWallNormal;
+            // Ledge without any geometry: climb toward the player's facing (they jumped in).
             Vector3 facing = visual != null ? visual.Facing : transform.forward;
             facing.y = 0f;
             return facing.sqrMagnitude > 0.000001f ? facing.normalized : Vector3.zero;

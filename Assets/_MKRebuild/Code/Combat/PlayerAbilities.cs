@@ -58,6 +58,7 @@ namespace MK.Rebuild
         [SerializeField] private AimAssistDefinition projectileAimAssist;
 
         private PlayerCombat combat;
+        private PlayerMotor motor;
         private AnimatorVisual animatorVisual;
         private ICharacterVisual visual;
         private Rigidbody rb;
@@ -77,6 +78,7 @@ namespace MK.Rebuild
         {
             rb = GetComponent<Rigidbody>();
             combat = GetComponent<PlayerCombat>();
+            motor = GetComponent<PlayerMotor>();
             visual = GetComponent<ICharacterVisual>();
             animatorVisual = GetComponent<AnimatorVisual>();
         }
@@ -104,6 +106,11 @@ namespace MK.Rebuild
 
             ComboInput which;
             if (!combat.ConsumeSkillTap(out which)) return;
+            // ACTION GATE (change action-gating): standalone abilities are ground-only —
+            // denied in the air, while hanging or in a scripted state (deny by default).
+            // Per-verb so Skill1/Skill2 can diverge later; identical rule today.
+            PlayerAction action = which == ComboInput.H1 ? PlayerAction.Skill1 : PlayerAction.Skill2;
+            if (motor != null && !motor.CanPerform(action)) return;
             AbilityDefinition def = which == ComboInput.H1 ? h1 : h2;
             if (def == null) return;
             StartAbility(def, def.projectileSpeed > 0f);

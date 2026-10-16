@@ -268,6 +268,17 @@ namespace MK.Rebuild
                 return;
             }
 
+            // ACTION GATE (change action-gating): no ground combat while airborne,
+            // hanging or in a scripted state. DENY BY DEFAULT — only Free-grounded
+            // starts a NEW attack. An attack already in flight keeps playing (its own
+            // branch above); only the ENTRY is gated.
+            if (!CanStartAttack())
+            {
+                lightBuffer = 0f;
+                heavyBuffer = 0f;
+                return;
+            }
+
             // While the dash owns the movement lock, combat cannot normally START an attack
             // (its lunge would fight the dash velocity). Two paths (slice 3septies):
             //   1. EARLY CANCEL: an attack pressed past the dash's min cancel window CUTS the
@@ -297,6 +308,18 @@ namespace MK.Rebuild
             if (heavy) heavyBuffer = 0f;
 
             TryStartAttack(light, heavy);
+        }
+
+        /// <summary>
+        /// Action gate for STARTING an attack (change action-gating): the motor's
+        /// central gate must allow the attack verb (Free-grounded only). Light and
+        /// Heavy share the same rule. Falls back to allowed when there is no motor,
+        /// so combat-only setups keep working.
+        /// </summary>
+        private bool CanStartAttack()
+        {
+            if (motor == null) return true;
+            return motor.CanPerform(PlayerAction.Light);
         }
 
         /// <summary>
