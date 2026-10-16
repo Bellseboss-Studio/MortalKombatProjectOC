@@ -47,6 +47,16 @@ namespace MK.Rebuild
 
         private PlayerParams paramsRef;
         private MoveState moveState = MoveState.Free;
+        private bool loggedLandingRecovery;
+
+        /// <summary>
+        /// Landing recovery (seconds) for the jump lockout, DERIVED from the real Animator:
+        /// the Landing clip's effective duration (<c>clipLength / landingClipSpeed</c>) plus
+        /// <see cref="PlayerParams.jumpLockoutExtra"/>. Falls back to
+        /// <see cref="PlayerParams.jumpLockout"/> when the clip is not resolved. Read by
+        /// PlayerMotor on touchdown (the motor owns no Animator — this layer does).
+        /// </summary>
+        public float LandingRecoverySeconds { get; private set; }
 
         public Vector3 Facing => (facingRoot != null ? facingRoot : transform).forward;
 
@@ -73,6 +83,39 @@ namespace MK.Rebuild
             animator.SetFloat(MantleClipSpeedHash, paramsRef.mantleClipSpeed);
             animator.SetFloat(DashSpeedHash, paramsRef.dashClipSpeed);
             animator.SetFloat(DeathSpeedHash, paramsRef.deathClipSpeed);
+            ResolveLandingRecovery();
+        }
+
+        /// <summary>
+        /// Derives <see cref="LandingRecoverySeconds"/> from the Landing clip length at runtime
+        /// (same retiming home as the other clip speeds): the clip is found by name
+        /// (contains "Jump_Landing") in the controller's clips, then divided by
+        /// <c>landingClipSpeed</c> and offset by <c>jumpLockoutExtra</c>. Falls back to the
+        /// serialized <c>jumpLockout</c> when the clip cannot be found.
+        /// </summary>
+        private void ResolveLandingRecovery()
+        {
+            float speed = Mathf.Max(0.0001f, paramsRef.landingClipSpeed);
+            float extra = Mathf.Max(0f, paramsRef.jumpLockoutExtra);
+            RuntimeAnimatorController controller = animator.runtimeAnimatorController;
+            if (controller != null)
+            {
+                AnimationClip[] clips = controller.animationClips;
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    AnimationClip clip = clips[i];
+                    if (clip == null || !clip.name.Contains("Jump_Landing")) continue;
+                    LandingRecoverySeconds = clip.length / speed + extra;
+                    if (!loggedLandingRecovery)
+                    {
+                        loggedLandingRecovery = true;
+                        Debug.Log($"[JumpLockout] landing '{clip.name}' {clip.length:0.000}s / " +
+                                  $"speed {speed:0.##} + extra {extra:0.###} = {LandingRecoverySeconds:0.000}s");
+                    }
+                    return;
+                }
+            }
+            LandingRecoverySeconds = paramsRef.jumpLockout; // fallback: clip not found
         }
 
         private void Awake()

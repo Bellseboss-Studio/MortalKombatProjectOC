@@ -34,6 +34,25 @@ namespace MK.Rebuild
         [Tooltip("ACTIVE since M0 feel-calibration (Mario jump): grace time to jump after leaving ground.")]
         public float coyoteTime = 0.12f;
 
+        [Tooltip("Landing recovery FALLBACK total (seconds) — used only when the Landing clip " +
+                  "cannot be resolved at runtime. The LIVE value is DERIVED: Landing clip " +
+                  "effective duration + jumpLockoutExtra (0.467 / 2 + 0.1 = ~0.333 s). During " +
+                  "this window a still-buffered ground/coyote jump may NOT re-fire, so the " +
+                  "animator gets a real grounded dwell instead of re-launching on the first " +
+                  "grounded frame (jump-spam thrash).")]
+        public float jumpLockout = 0.33f;
+
+        [Tooltip("Animator state speed multiplier for the Landing state. MUST match the Landing " +
+                  "state's m_Speed in Leena.controller (currently 2). The jump lockout derives the " +
+                  "Landing clip's EFFECTIVE duration as clipLength / landingClipSpeed. Same retiming " +
+                  "home as dashClipSpeed / mantleClipSpeed / deathClipSpeed.")]
+        public float landingClipSpeed = 2.0f;
+
+        [Tooltip("Extra settle time (seconds) added on top of the Landing clip's effective " +
+                  "duration to form the total jump lockout. Higher = the landing reads fully " +
+                  "before a buffered re-jump may fire (more settle / less responsive bunny-hop).")]
+        public float jumpLockoutExtra = 0.1f;
+
         [Header("Mario jump (tunables)")]
         [Tooltip("Descent gravity multiplier: gravity x this while falling (snap down).")]
         public float fallGravityMultiplier = 2.2f;

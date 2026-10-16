@@ -37,6 +37,7 @@ namespace MK.Rebuild
         private float verticalVel;
         private float bufferTimer;
         private float coyoteTimer;
+        private float jumpLockoutTimer; // landing recovery: blocks a buffered re-fire on touchdown
         private Transform cameraTransform;
 
         // Wall motion (M0): minimal contact state, no state machine.
@@ -67,6 +68,8 @@ namespace MK.Rebuild
         // Last ground-probe result (cached for the read-only debug seam).
         // Updated every FixedUpdate by CheckGrounded().
         private bool grounded;
+        // Previous step's probe: edge-detects touchdown (airborne -> grounded).
+        private bool wasGrounded;
 
         // 4 cardinal ground-probe origins (+X, -X, +Z, -Z around the base footprint).
         // Reused buffer — no per-frame allocation. Shared by CheckGrounded and the gizmo.
@@ -175,6 +178,7 @@ namespace MK.Rebuild
 
             float dt = Time.fixedDeltaTime;
             bufferTimer = Mathf.Max(0f, bufferTimer - dt);
+            jumpLockoutTimer = Mathf.Max(0f, jumpLockoutTimer - dt);
 
             // Mantle: animation-driven timed warp. Owns the root while active; input is
             // ignored and control returns exactly on arrival (A2: no kinematic switch).
@@ -211,6 +215,14 @@ namespace MK.Rebuild
             }
 
             grounded = CheckGrounded();
+            // Landing recovery: on touchdown (airborne -> grounded) start a short
+            // lockout so a still-buffered jump cannot re-launch on the FIRST grounded
+            // frame. Without a grounded dwell the animator never settles (jump-spam
+            // thrash: each state lives ~1 frame). The buffer itself is untouched —
+            // once the lockout expires, normal buffered jump behavior resumes.
+            if (grounded && !wasGrounded)
+                jumpLockoutTimer = ResolveJumpLockout();
+            wasGrounded = grounded;
             // Touching the ground clears the re-grab ban (and the coyote source).
             if (grounded)
             {
@@ -307,7 +319,7 @@ namespace MK.Rebuild
                 holdingWallJumpFacing = false; // release -> facing is free again
             }
             // Jump: ground takes priority, then hang (mantle if at a Ledge).
-            else if (bufferTimer > 0f && (grounded || coyoteTimer > 0f))
+            else if (bufferTimer > 0f && (grounded || coyoteTimer > 0f) && jumpLockoutTimer <= 0f)
             {
                 verticalVel = paramsAsset.jumpVelocity;
                 bufferTimer = 0f;
@@ -513,6 +525,22 @@ namespace MK.Rebuild
         {
             // Shared with the DASH (slice 3octies): one stick-to-world mapping.
             return CameraRelativeMotion.WishDirection(cameraTransform, stick);
+        }
+
+        /// <summary>
+        /// Landing recovery (seconds) for this touchdown: the DERIVED total =
+        /// Landing clip effective duration + jumpLockoutExtra, computed by the
+        /// presentation layer (which owns the Animator) and read here as a plain number —
+        /// the motor owns no Animator. Falls back to
+        /// <see cref="PlayerParams.jumpLockout"/> when the proxy visual is active or the
+        /// Landing clip could not be resolved. Read lazily on touchdown (after every
+        /// component's Awake), so the derivation is guaranteed to be ready.
+        /// </summary>
+        private float ResolveJumpLockout()
+        {
+            if (visual is AnimatorVisual animatorVisual && animatorVisual.LandingRecoverySeconds > 0f)
+                return animatorVisual.LandingRecoverySeconds;
+            return paramsAsset != null ? paramsAsset.jumpLockout : 0f;
         }
 
         /// <summary>
