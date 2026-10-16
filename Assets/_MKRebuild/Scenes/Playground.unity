@@ -600,7 +600,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 4294967295
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &50000023
 Transform:
   m_ObjectHideFlags: 0
@@ -1029,7 +1029,7 @@ Transform:
   m_GameObject: {fileID: 50000047}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 43.69, y: 2.65, z: 0}
+  m_LocalPosition: {x: 43.69, y: 2.24, z: 0}
   m_LocalScale: {x: 0.5, y: 6, z: 6}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3994,6 +3994,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HideRendererAtRuntime
   targetRenderers: []
+--- !u!134 &1288786842
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PlayerNoFriction (Instance)
+  serializedVersion: 2
+  m_DynamicFriction: 0
+  m_StaticFriction: 0
+  m_Bounciness: 0
+  m_FrictionCombine: 2
+  m_BounceCombine: 2
 --- !u!1 &1363962201
 GameObject:
   m_ObjectHideFlags: 0
@@ -4248,8 +4261,8 @@ Transform:
   m_GameObject: {fileID: 1527242428}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 53.516, y: 3.965, z: 0}
-  m_LocalScale: {x: 0.1, y: 0.1, z: 4}
+  m_LocalPosition: {x: 53.443, y: 5.97, z: 0}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 6}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -4678,7 +4691,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1837699311}
-  m_Material: {fileID: 13400000, guid: 7f3c2a91d64b4e5f8c1a9b0d2e4f6a8c, type: 2}
+  m_Material: {fileID: 1288786842}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
