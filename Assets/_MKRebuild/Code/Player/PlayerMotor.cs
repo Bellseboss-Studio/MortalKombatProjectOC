@@ -677,6 +677,16 @@ namespace MK.Rebuild
                 probe = CameraRelative(moveInput);
                 if (probe.sqrMagnitude < 0.000001f)
                     probe = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+                // Facing fallback: with no input and no horizontal velocity — a flush
+                // takeoff, or a collision-stopped arrival at a destination wall — still
+                // probe into the wall the character faces. The directionality test
+                // below (Dot(probe, normal) >= 0) keeps a back-to-wall from grabbing.
+                if (probe.sqrMagnitude < 0.000001f)
+                {
+                    Vector3 f = visual != null ? visual.Facing : transform.forward;
+                    f.y = 0f;
+                    probe = f;
+                }
                 if (probe.sqrMagnitude < 0.000001f) return;
             }
             probe.y = 0f;
@@ -993,8 +1003,17 @@ namespace MK.Rebuild
         {
             ledgeContact = false;
             ledgeCollider = null;
-            Vector3 center = body.bounds.center;
-            Vector3 half = body.bounds.extents;
+            // Query the UNION of the body AABB and the HANDS band (the same volume
+            // OverlapsHandsBand uses). The Ledge marker is a thin sliver buried in
+            // the wall, so on arrival the exact body AABB can drift just outside it
+            // while the hands band still reaches its exposed face. Keeping the body
+            // AABB in the box preserves the established-hang latch (the grip snap
+            // settles the root below the band, but the body still overlaps).
+            GetHandsBandVolume(body, out Vector3 hands, out Vector3 bandHalf);
+            Vector3 lo = Vector3.Min(body.bounds.min, hands - bandHalf);
+            Vector3 hi = Vector3.Max(body.bounds.max, hands + bandHalf);
+            Vector3 center = (lo + hi) * 0.5f;
+            Vector3 half = (hi - lo) * 0.5f;
             var cols = Physics.OverlapBox(center, half, Quaternion.identity,
                 Physics.AllLayers, QueryTriggerInteraction.Collide);
             for (int i = 0; i < cols.Length; i++)
