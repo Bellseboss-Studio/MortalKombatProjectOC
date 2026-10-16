@@ -156,6 +156,22 @@ namespace MK.Rebuild
         public bool IsHitstopped => hitstopRemaining > 0f;
 
         /// <summary>
+        /// Ability cancel-window seam (change ability-cancel-window): true while a real
+        /// COMBO is active AND its current step is PAST its cancel point — the earliest
+        /// frame the player may interrupt it (on a connected hit the window opens earlier
+        /// via <c>cancelHitNorm</c>, so the ability can cancel right after the strike
+        /// lands). <see cref="PlayerAbilities"/> reads this to cancel the step and play
+        /// the STANDALONE ability, mirroring how the dash cancels a combo. False when idle
+        /// and for the grey-box single swing (which has no cancel window).
+        /// </summary>
+        public bool CanCancelIntoAbility()
+        {
+            if (!comboActive) return false;
+            CancelWindowBounds(out float cancelStart, out float _);
+            return stepTime >= cancelStart;
+        }
+
+        /// <summary>
         /// Aim-assist tuning used by the ATTACK entry (read-only debug seam). The dash
         /// has its OWN definition now (<c>PlayerDash.dashAimAssist</c>), so the attack and
         /// the dash tune their range/cone independently. Null / disabled = forward-only.

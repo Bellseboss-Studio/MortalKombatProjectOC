@@ -10,12 +10,23 @@ namespace MK.Rebuild
     /// single consumer), so the combat controller stays thin (only the
     /// <c>ConsumeSkillTap</c> + <c>RequestHitstop</c> seams).
     ///
-    /// TWO entry paths share the same execution:
+    /// THREE entry paths share the same execution:
     /// 1. STANDALONE — Skill1 (H1) / Skill2 (H2), whenever no combo/swing/ability is
     ///    active and not frozen by hitstop.
+    /// 1b. COMBO CANCEL-WINDOW (change ability-cancel-window) — a Skill1/Skill2 pressed
+    ///    DURING a combo is captured into an UNSCALED skill buffer (jumpBuffer pattern,
+    ///    mirroring <see cref="PlayerCombat"/>'s light/heavy buffers) BEFORE any
+    ///    <c>Attacking</c> gate, so the press is neither dropped nor fired stale. Once the
+    ///    active step is PAST its cancel point (<see cref="PlayerCombat.CanCancelIntoAbility"/>)
+    ///    the ability cancels the step (clean release, like the dash
+    ///    <see cref="PlayerCombat.CancelCombo"/> path) and plays the STANDALONE ability.
     /// 2. COMBO STEP — <see cref="PlayerCombat"/> calls <see cref="PlayFromCombo"/> when
     ///    it enters a <see cref="ComboStep"/> with <c>stepType == Ability</c>; the same
     ///    ability plays inside the chain (the combo owns the step timing).
+    ///
+    /// COOLDOWN (change ability-cancel-window): <see cref="AbilityDefinition.cooldown"/>
+    /// is now ENFORCED with an unscaled per-slot timer armed when the ability fires, so an
+    /// ability cannot be re-fired (spammed) until it elapses.
     ///
     /// Kind is DATA-DRIVEN: <c>projectileSpeed &gt; 0</c> = projectile (H1);
     /// otherwise an area ability (H2) using <c>areaRadius</c> as a ONE-SHOT
@@ -48,6 +59,9 @@ namespace MK.Rebuild
         [Tooltip("Fallback ability duration (seconds) when the definition has no clip assigned (keeps the window readable without a real clip).")]
         [SerializeField] private float fallbackDuration = 0.5f;
 
+        [Tooltip("Skill input buffer in SECONDS (jumpBuffer pattern, mirrors PlayerCombat.inputBufferSeconds). UNSCALED: a Skill1/Skill2 press during a combo is captured here and survives ~this long, so it enters the ability at the combo step's cancel window instead of being dropped or firing late. 0 = no buffering.")]
+        [SerializeField] private float skillBufferSeconds = 0.15f;
+
         [Tooltip("Hitstop in MILLISECONDS applied when an ability connects (the SO has no hitstop field; this is the ability's shared value).")]
         [SerializeField] private int hitstopMs = 60;
 
@@ -71,8 +85,27 @@ namespace MK.Rebuild
         private float duration;
         private GameObject ring;
 
+        // Skill input buffer (change ability-cancel-window): the real Skill1/Skill2 press
+        // edge is captured here BEFORE any Attacking gate (mirrors PlayerCombat's
+        // lightBuffer/heavyBuffer) so a press during a combo is neither dropped nor fired
+        // stale. Unscaled seconds left; 0 = no pending press.
+        private float skill1Buffer;
+        private float skill2Buffer;
+
+        // Ability cooldowns (change ability-cancel-window): unscaled seconds left before
+        // the H1/H2 ability is ready again. Armed on StartAbility from
+        // AbilityDefinition.cooldown (0 = no cooldown).
+        private float cooldown1Timer;
+        private float cooldown2Timer;
+
         /// <summary>True while an ability window is running (read-only seam).</summary>
         public bool IsBusy => busy;
+
+        /// <summary>Unscaled seconds left before H1 is ready again (0 = ready). Read-only seam.</summary>
+        public float CooldownRemaining1 => cooldown1Timer;
+
+        /// <summary>Unscaled seconds left before H2 is ready again (0 = ready). Read-only seam.</summary>
+        public float CooldownRemaining2 => cooldown2Timer;
 
         private void Awake()
         {
@@ -91,6 +124,12 @@ namespace MK.Rebuild
 
         private void Update()
         {
+            // Unscaled ability cooldowns (change ability-cancel-window): they survive the
+            // hitstop freeze (timeScale = 0) and count down during the ability window too,
+            // so a fired ability is never immediately re-fireable.
+            if (cooldown1Timer > 0f) cooldown1Timer = Mathf.Max(0f, cooldown1Timer - Time.unscaledDeltaTime);
+            if (cooldown2Timer > 0f) cooldown2Timer = Mathf.Max(0f, cooldown2Timer - Time.unscaledDeltaTime);
+
             if (busy)
             {
                 // Scaled time: hitstop (timeScale = 0) freezes the ability too.
@@ -101,19 +140,77 @@ namespace MK.Rebuild
             }
 
             if (combat == null) return;
-            if (combat.IsHitstopped) return;   // no ability during the freeze
-            if (combat.Attacking) return;      // standalone only when idle (combo-step uses PlayFromCombo)
+            if (combat.IsHitstopped) return;   // no ability during the freeze (respect hitstop)
 
-            ComboInput which;
-            if (!combat.ConsumeSkillTap(out which)) return;
+            // Decay the skill buffers (unscaled, jumpBuffer pattern) BEFORE feeding, so a
+            // held press expires quickly and never fires stale.
+            if (skill1Buffer > 0f) skill1Buffer = Mathf.Max(0f, skill1Buffer - Time.unscaledDeltaTime);
+            if (skill2Buffer > 0f) skill2Buffer = Mathf.Max(0f, skill2Buffer - Time.unscaledDeltaTime);
+
+            // FEED from the real press edge BEFORE any Attacking gate (change
+            // ability-cancel-window): a Skill1/Skill2 pressed DURING a combo used to be
+            // dropped here (the early return skipped the only consumer). Capturing it into
+            // the buffer is what makes the press enterable at the combo's cancel window.
+            if (combat.ConsumeSkillTap(out ComboInput pressed))
+            {
+                if (pressed == ComboInput.H1) skill1Buffer = skillBufferSeconds;
+                else skill2Buffer = skillBufferSeconds;
+            }
+
+            if (skill1Buffer <= 0f && skill2Buffer <= 0f) return;
+
+            // COMBO CANCEL-WINDOW ENTRY: while a combo runs, a buffered skill may cancel
+            // the active step once it is PAST its cancel point and play the STANDALONE
+            // ability the SAME frame (mirrors the dash cancel: PlayerCombat.CancelCombo
+            // releases the step + moveLock cleanly). Before the window the buffer waits.
+            if (combat.Attacking)
+            {
+                if (combat.CanCancelIntoAbility()) TryConsumeBufferedAbility(cancelCombo: true);
+                return;
+            }
+
+            // STANDALONE idle entry (unchanged behavior): no combo/swing active.
+            TryConsumeBufferedAbility(cancelCombo: false);
+        }
+
+        /// <summary>
+        /// Attempts to fire the buffered skill (change ability-cancel-window). Picks the
+        /// buffered skill (H1 first), then the ACTION GATE (ground-only — never loosened
+        /// for airborne / hang states), the definition and the COOLDOWN must all allow it.
+        /// A press that is DENIED is DROPPED (never queued). On success it clears both
+        /// buffers, optionally cancels the active combo step (<paramref name="cancelCombo"/>,
+        /// clean release) and starts the ability the same frame.
+        /// </summary>
+        private void TryConsumeBufferedAbility(bool cancelCombo)
+        {
+            ComboInput which = skill1Buffer > 0f ? ComboInput.H1 : ComboInput.H2;
+
             // ACTION GATE (change action-gating): standalone abilities are ground-only —
             // denied in the air, while hanging or in a scripted state (deny by default).
             // Per-verb so Skill1/Skill2 can diverge later; identical rule today.
             PlayerAction action = which == ComboInput.H1 ? PlayerAction.Skill1 : PlayerAction.Skill2;
-            if (motor != null && !motor.CanPerform(action)) return;
+            if (motor != null && !motor.CanPerform(action)) { ClearSkillBuffer(which); return; }
+
             AbilityDefinition def = which == ComboInput.H1 ? h1 : h2;
-            if (def == null) return;
+            if (def == null) { ClearSkillBuffer(which); return; }
+
+            // COOLDOWN (change ability-cancel-window): an ability on cooldown does nothing
+            // (the press is dropped, not queued — no late fire when the cooldown expires).
+            if (CooldownRemaining(which) > 0f) { ClearSkillBuffer(which); return; }
+
+            skill1Buffer = 0f;
+            skill2Buffer = 0f;
+            if (cancelCombo) combat.CancelCombo(); // release the step + moveLock cleanly
             StartAbility(def, def.projectileSpeed > 0f);
+        }
+
+        private float CooldownRemaining(ComboInput which)
+            => which == ComboInput.H1 ? cooldown1Timer : cooldown2Timer;
+
+        private void ClearSkillBuffer(ComboInput which)
+        {
+            if (which == ComboInput.H1) skill1Buffer = 0f;
+            else skill2Buffer = 0f;
         }
 
         /// <summary>
@@ -149,6 +246,15 @@ namespace MK.Rebuild
             busy = true;
             hitFired = false;
             time = 0f;
+
+            // COOLDOWN (change ability-cancel-window): arm the ability's own cooldown
+            // (unscaled), mapped to the H1/H2 slot — so neither the standalone entry nor a
+            // scripted combo-step ability can be re-fired (spammed) until it elapses. A new
+            // ability also consumes any pending skill press so nothing fires stale later.
+            if (def == h1) cooldown1Timer = Mathf.Max(0f, def.cooldown);
+            else if (def == h2) cooldown2Timer = Mathf.Max(0f, def.cooldown);
+            skill1Buffer = 0f;
+            skill2Buffer = 0f;
 
             // Speed pass (m1-abilities): ONE data field retimes the whole ability. The
             // clip's speed multiplier drives the Animator state speed AND divides the
