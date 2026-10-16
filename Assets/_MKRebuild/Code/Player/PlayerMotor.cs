@@ -469,6 +469,14 @@ namespace MK.Rebuild
                 horizontal = lockHoriz;
                 smoothVel = lockHoriz;
             }
+            else if (State == MoveState.WallJump)
+            {
+                // Wall-jump flight: the gate denies *input* Move in WallJump (frozen
+                // matrix), but that must not brake our OWN ballistic push-off. Preserve
+                // the launch impulse (no mid-flight steering) so the arc completes.
+                horizontal = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+                smoothVel = horizontal;
+            }
             else if (!CanPerform(PlayerAction.Move))
             {
                 // ACTION GATE: hang states deny Move — ignore the horizontal wish and
@@ -675,8 +683,11 @@ namespace MK.Rebuild
             probe.Normalize();
 
             GetWallBandVolume(body, out Vector3 bandCenter, out Vector3 half);
+            // Collide (not Ignore): the Grabbable marker may be a TRIGGER collider
+            // (Playground S2_Wall / Grabbable_S3B). The GetComponentInParent<Grabbable>
+            // filter below keeps Ledge/other triggers out, so only Grabbable sides count.
             var cols = Physics.OverlapBox(bandCenter, half, Quaternion.identity,
-                Physics.AllLayers, QueryTriggerInteraction.Ignore);
+                Physics.AllLayers, QueryTriggerInteraction.Collide);
             float best = float.MaxValue;
             for (int i = 0; i < cols.Length; i++)
             {
@@ -751,8 +762,11 @@ namespace MK.Rebuild
         {
             normal = Vector3.zero;
             distance = float.MaxValue;
+            // Collide (not Ignore): the target may be a TRIGGER Grabbable. The
+            // `hit.collider != target` guard below still pins the normal to the
+            // SPECIFIC collider handed in, so extra trigger hits cannot leak through.
             var hits = Physics.RaycastAll(origin, dir, maxDist,
-                Physics.AllLayers, QueryTriggerInteraction.Ignore);
+                Physics.AllLayers, QueryTriggerInteraction.Collide);
             for (int i = 0; i < hits.Length; i++)
             {
                 var hit = hits[i];
