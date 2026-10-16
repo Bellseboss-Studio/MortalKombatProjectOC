@@ -4611,6 +4611,7 @@ GameObject:
   - component: {fileID: 1837699322}
   - component: {fileID: 1837699323}
   - component: {fileID: 1837699324}
+  - component: {fileID: 1837699325}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -4896,6 +4897,20 @@ MonoBehaviour:
   hitstopMs: 60
   knockback: 0.5
   projectileAimAssist: {fileID: 11400000, guid: b4e1c7a2d9f34a0b8e6c2f1a7d5b3c90, type: 2}
+--- !u!114 &1837699325
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1837699311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fff09df2b57f134eba33479883db234, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Debug::MK.Rebuild.Debugging.AnimatorThrashProbe
+  maxLines: 300
+  motor: {fileID: 0}
 --- !u!1 &2088531365
 GameObject:
   m_ObjectHideFlags: 0
