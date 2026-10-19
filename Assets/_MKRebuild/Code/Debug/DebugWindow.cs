@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Utilities;
 
 namespace MK.Rebuild.Debugging
 {
@@ -41,8 +44,14 @@ namespace MK.Rebuild.Debugging
         private AnimatorVisual visual;
         private Rigidbody body;
         private StyleMeter styleMeter;
+        private PlayerAbilities abilities;
+        private PlayerDamage damage;
         private Material greyMaterial;
         private readonly List<GameObject> spawned = new List<GameObject>();
+
+        private string lastInputPath = "<none>";
+        private string lastInputDevice = "<none>";
+        private IDisposable anyButtonSubscription;
 
         private Texture2D background;
         private GUIStyle boxStyle;
@@ -51,6 +60,42 @@ namespace MK.Rebuild.Debugging
         private void Awake()
         {
             ResolveTargets();
+        }
+
+        private void OnEnable()
+        {
+            // Observe-only input probe: raw button presses arrive even on a generic
+            // <Joystick> that no action binds — that is exactly the device we need to
+            // map. This is a readout, never a gameplay input source.
+            anyButtonSubscription = InputSystem.onAnyButtonPress.Call(control =>
+            {
+                if (control == null) return;
+                lastInputPath = control.path;
+                lastInputDevice = control.device != null ? control.device.displayName : "<unknown>";
+            });
+            InputSystem.onActionChange += OnActionChange;
+        }
+
+        private void OnDisable()
+        {
+            if (anyButtonSubscription != null)
+            {
+                anyButtonSubscription.Dispose();
+                anyButtonSubscription = null;
+            }
+            InputSystem.onActionChange -= OnActionChange;
+        }
+
+        private void OnActionChange(object obj, InputActionChange change)
+        {
+            // Stick/axis actions do not fire onAnyButtonPress; this catches them.
+            if (change != InputActionChange.ActionPerformed) return;
+            var action = obj as InputAction;
+            if (action == null) return;
+            InputControl control = action.activeControl;
+            if (control == null) return;
+            lastInputPath = control.path;
+            lastInputDevice = control.device != null ? control.device.displayName : "<unknown>";
         }
 
         private void OnDestroy()
@@ -66,6 +111,8 @@ namespace MK.Rebuild.Debugging
             if (motor == null) return;
             if (visual == null) visual = motor.GetComponent<AnimatorVisual>();
             if (body == null) body = motor.GetComponent<Rigidbody>();
+            if (abilities == null) abilities = motor.GetComponent<PlayerAbilities>();
+            if (damage == null) damage = motor.GetComponent<PlayerDamage>();
         }
 
         private void Update()
@@ -207,6 +254,51 @@ namespace MK.Rebuild.Debugging
             {
                 GUILayout.Label("ESTILO -- (sin medidor)", labelStyle);
             }
+
+            // INPUT / GATES (m3-build-feedback): the tester build must SHOW which
+            // device/control actually arrives and why an action is denied. Generic
+            // <Joystick> devices are the reason the gamepad bindings may never match —
+            // this readout is the mapping tool. Observe-only: drives nothing.
+            GUILayout.Space(6f);
+            GUILayout.Label("INPUT / GATES", labelStyle);
+            GUILayout.Label($"last: {lastInputDevice} / {lastInputPath}", labelStyle);
+            GUILayout.Label($"devices: {DescribeDevices()}", labelStyle);
+
+            bool held = motor.Body != null && motor.Body.IsHeld;
+            GUILayout.Label($"bodyOwner: {motor.BodyOwner?.ToString() ?? "none"}  held: {held}", labelStyle);
+            GUILayout.Label($"inputLocked: {motor.InputLocked}", labelStyle);
+
+            bool moveGate = motor.CanPerform(PlayerAction.Move) && !motor.InputLocked;
+            bool jumpGate = motor.CanPerform(PlayerAction.Jump) && !held;
+            bool dashGate = motor.CanPerform(PlayerAction.Dash) && motor.Body != null &&
+                            motor.Body.CanAcquire(BodyPriority.Dash);
+            bool skillGate = motor.CanPerform(PlayerAction.Skill1) && motor.Body != null &&
+                             motor.Body.CanAcquire(BodyPriority.Attack) &&
+                             (damage == null || damage.IsAlive);
+
+            GUILayout.Label(
+                $"Move {Gate(moveGate)}  Jump {Gate(jumpGate)}  Dash {Gate(dashGate)}  Skill {Gate(skillGate)}",
+                labelStyle);
+            GUILayout.Label(
+                $"alive: {(damage != null ? (damage.IsAlive ? "OK" : "DEAD") : "<none>")}  " +
+                $"hp: {(damage != null ? damage.HP + "/" + damage.MaxHp : "--")}",
+                labelStyle);
+            GUILayout.Label($"abilityBusy: {abilities != null && abilities.IsBusy}", labelStyle);
+        }
+
+        private static string Gate(bool allowed) => allowed ? "OK" : "BLOCK";
+
+        private static string DescribeDevices()
+        {
+            var devices = InputSystem.devices;
+            if (devices.Count == 0) return "<none>";
+            var sb = new StringBuilder();
+            for (int i = 0; i < devices.Count; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append(devices[i] != null ? devices[i].displayName : "<null>");
+            }
+            return sb.ToString();
         }
 
         private void EnsureStyles()
@@ -230,7 +322,8 @@ namespace MK.Rebuild.Debugging
             {
                 labelStyle = new GUIStyle(GUI.skin.label)
                 {
-                    fontStyle = FontStyle.Bold
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = true // long generic-joystick display names must not clip
                 };
                 labelStyle.normal.textColor = Color.white;
             }
