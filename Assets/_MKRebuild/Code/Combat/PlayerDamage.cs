@@ -140,6 +140,7 @@ namespace MK.Rebuild
                 return;
             }
 
+            AudioDirector.Play(AudioCueId.Hurt, transform.position);
             CancelAttacks();
             if (styleMeter != null) styleMeter.NotifyDamageTaken();
             OnDamaged?.Invoke();
@@ -233,6 +234,7 @@ namespace MK.Rebuild
 
         private void Die()
         {
+            AudioDirector.Play(AudioCueId.Death, transform.position);
             CancelRecovery();
             CancelAttacks();
             if (styleMeter != null) styleMeter.NotifyDamageTaken();

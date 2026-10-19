@@ -218,6 +218,7 @@ namespace MK.Rebuild
         private void StartDash()
         {
             isDashing = true;
+            AudioDirector.Play(AudioCueId.Dash, transform.position);
             dashTimer = Mathf.Max(0.001f, dashDuration);
             dashElapsed = 0f;
             sinceDash = 0f;

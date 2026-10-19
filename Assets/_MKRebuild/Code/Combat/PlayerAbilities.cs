@@ -313,6 +313,8 @@ namespace MK.Rebuild
 
         private void LaunchProjectile(AbilityDefinition def)
         {
+            AudioDirector.Play(AudioCueId.ProjectileFire, transform.position);
+
             Vector3 facing = FacingNow();
 
             // Aim-assist ON TOP of the launch facing (m1-abilities): the SAME shared
@@ -352,6 +354,8 @@ namespace MK.Rebuild
 
         private void FireArea(AbilityDefinition def)
         {
+            AudioDirector.Play(AudioCueId.AreaCast, transform.position);
+
             float radius = Mathf.Max(0.1f, def.areaRadius);
             Vector3 facing = FacingNow();
             Collider[] cols = Physics.OverlapSphere(

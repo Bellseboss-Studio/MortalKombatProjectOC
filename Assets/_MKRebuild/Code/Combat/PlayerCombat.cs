@@ -136,6 +136,7 @@ namespace MK.Rebuild
         private float savedTimeScale;            // the EXACT previous value to restore
 
         private bool warnedMissingDefinition;
+        private AudioCueId hitCue = AudioCueId.LightHit;
 
         /// <summary>True while a swing or a combo step is active (read-only debug seam).</summary>
         public bool Attacking => current != null || comboActive;
@@ -378,10 +379,18 @@ namespace MK.Rebuild
             // then corrects WHICH WAY the body faces (different axes, no conflict).
             AttackDirection direction = ReadAttackDirection();
 
+            // Impact cue for this attack (a heavy press selects the heavy hit, even when
+            // it falls through to a light/standalone path). Set BEFORE any path starts.
+            hitCue = heavy ? AudioCueId.HeavyHit : AudioCueId.LightHit;
+
             // DASH-ATTACK OPENER (slice 3octies): an attack during the dash or within
             // dashAttackWindow after it uses the dedicated dashAttack FIRST. Its
             // continuation chains into the normal combo roots (TryAdvanceOnBuffer).
-            if ((light || heavy) && TryStartDashAttack()) return true;
+            if ((light || heavy) && TryStartDashAttack())
+            {
+                PlayAttackAudio(heavy);
+                return true;
+            }
 
             // Combo entry (multi-root): pick the longest chain whose root matches
             // the pressed input AND the stick direction (exact > Any wildcard); a
@@ -390,16 +399,16 @@ namespace MK.Rebuild
             if (light)
             {
                 ComboDefinition c = SelectRoot(ComboInput.Ligero, direction);
-                if (c != null) { StartCombo(c); return true; }
+                if (c != null) { StartCombo(c); PlayAttackAudio(false); return true; }
             }
             if (heavy)
             {
                 ComboDefinition c = SelectRoot(ComboInput.Pesado, direction);
-                if (c != null) { StartCombo(c); return true; }
+                if (c != null) { StartCombo(c); PlayAttackAudio(true); return true; }
             }
 
-            if (light && lightAttack != null) { StartSwing(lightAttack); return true; }
-            if (heavy && heavyAttack != null) { StartSwing(heavyAttack); return true; }
+            if (light && lightAttack != null) { StartSwing(lightAttack); PlayAttackAudio(false); return true; }
+            if (heavy && heavyAttack != null) { StartSwing(heavyAttack); PlayAttackAudio(true); return true; }
 
             if ((light || heavy) && !warnedMissingDefinition)
             {
@@ -408,6 +417,17 @@ namespace MK.Rebuild
                     $"{name}: attack pressed but no AttackDefinition assigned in the inspector.", this);
             }
             return false;
+        }
+
+        /// <summary>
+        /// Plays the swing + effort voice for an attack that has JUST started. Called
+        /// from the single point where each attack path is committed (combo root,
+        /// standalone swing, dash-attack opener) so an attack never plays it twice.
+        /// </summary>
+        private void PlayAttackAudio(bool heavy)
+        {
+            AudioDirector.Play(heavy ? AudioCueId.HeavySwing : AudioCueId.LightSwing, transform.position);
+            AudioDirector.Play(heavy ? AudioCueId.HeavyVoice : AudioCueId.LightVoice, transform.position);
         }
 
         /// <summary>
@@ -1015,6 +1035,10 @@ namespace MK.Rebuild
                 if (moveKey != null) OnStepConnected?.Invoke(moveKey);
                 connected = true;
             }
+
+            // One impact per probe call (not per receiver).
+            if (connected) AudioDirector.Play(hitCue, transform.position);
+
             return connected;
         }
 

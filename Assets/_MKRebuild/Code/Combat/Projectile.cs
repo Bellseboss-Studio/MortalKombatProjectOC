@@ -78,6 +78,7 @@ namespace MK.Rebuild
                 receiver.TakeHit(damage, to * knockback, 0f); // FIRST target only (single hit)
                 if (ownerCombat != null) ownerCombat.RequestHitstop(hitstopMs);
                 GreyBoxFx.SpawnBurst(transform.position, 1f);
+                AudioDirector.Play(AudioCueId.ProjectileImpact, transform.position);
 
                 consumed = true;
                 Destroy(gameObject);

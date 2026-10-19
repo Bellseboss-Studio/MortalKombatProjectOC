@@ -26,6 +26,9 @@ namespace MK.Rebuild
         [Tooltip("Downward stick force while grounded (keeps contact on Floor).")]
         [SerializeField] private float stickForce = -1f;
 
+        [Tooltip("Seconds between footsteps while grounded and moving.")]
+        [SerializeField] private float footstepInterval = 0.4f;
+
         private Rigidbody rb;
         private CapsuleCollider body;
         private ICharacterVisual visual;
@@ -38,6 +41,7 @@ namespace MK.Rebuild
         private float bufferTimer;
         private float coyoteTimer;
         private float jumpLockoutTimer; // landing recovery: blocks a buffered re-fire on touchdown
+        private float footstepTimer;    // counts down to the next footstep while grounded + moving
         private Transform cameraTransform;
 
         // Wall motion (M0): minimal contact state, no state machine.
@@ -70,7 +74,7 @@ namespace MK.Rebuild
         // Updated every FixedUpdate by CheckGrounded().
         private bool grounded;
         // Previous step's probe: edge-detects touchdown (airborne -> grounded).
-        private bool wasGrounded;
+        private bool wasGrounded = true; // suppress the spawn "land" thud on the first grounded frame
 
         // 4 cardinal ground-probe origins (+X, -X, +Z, -Z around the base footprint).
         // Reused buffer — no per-frame allocation. Shared by CheckGrounded and the gizmo.
@@ -345,7 +349,10 @@ namespace MK.Rebuild
             // thrash: each state lives ~1 frame). The buffer itself is untouched —
             // once the lockout expires, normal buffered jump behavior resumes.
             if (grounded && !wasGrounded)
+            {
                 jumpLockoutTimer = ResolveJumpLockout();
+                AudioDirector.Play(AudioCueId.Land, transform.position);
+            }
             wasGrounded = grounded;
             // Touching the ground clears the re-grab ban (and the coyote source).
             if (grounded)
@@ -451,6 +458,8 @@ namespace MK.Rebuild
                 coyoteTimer = 0f;
                 grounded = false;
                 hanging = false;
+                AudioDirector.Play(AudioCueId.JumpVoice, transform.position);
+                AudioDirector.Play(AudioCueId.JumpWhoosh, transform.position);
             }
             else if (bufferTimer > 0f && !grounded && (hanging || wallCoyoteTimer > 0f) && !Body.IsHeld)
             {
@@ -470,6 +479,8 @@ namespace MK.Rebuild
                     lockHoriz = wallNormal * paramsAsset.wallJumpPushOff;
                     wallJumpLockTimer = paramsAsset.wallJumpLockTime;
                     wallReGrabTimer = paramsAsset.wallReGrabDelay;
+                    AudioDirector.Play(AudioCueId.JumpVoice, transform.position);
+                    AudioDirector.Play(AudioCueId.JumpWhoosh, transform.position);
                     lastWallJumpedFrom = lastWallContacted != null ? lastWallContacted : wallCollider;
                     // Scripted turn: face the destination wall (+wallNormal, away from the
                     // wall you left) and hold it through the whole flight. Falls back to the
@@ -570,6 +581,20 @@ namespace MK.Rebuild
                 running = true;
             }
             bool moving = targetSpeed > 0.0001f;
+
+            if (grounded && moving && !InputLocked)
+            {
+                footstepTimer -= dt;
+                if (footstepTimer <= 0f)
+                {
+                    AudioDirector.Play(AudioCueId.Footstep, transform.position);
+                    footstepTimer = Mathf.Max(0.1f, footstepInterval);
+                }
+            }
+            else
+            {
+                footstepTimer = 0.15f;
+            }
 
             Vector3 horizontal;
             if (wallJumpLockTimer > 0f)
