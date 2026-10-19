@@ -5278,6 +5278,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1824798504}
   - component: {fileID: 1824798503}
+  - component: {fileID: 1824798505}
   m_Layer: 0
   m_Name: AudioDirector
   m_TagString: Untagged
@@ -5299,7 +5300,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.AudioDirector
   catalog: {fileID: 11400000, guid: b1e5722cdc59cd248b43818e325ebd92, type: 2}
   voices: 8
+  masterVolume: 1
   sfxVolume: 1
+  ambienceVolume: 1
+  musicVolume: 1
+  initialAmbience: 1
+  initialMusic: 1
 --- !u!4 &1824798504
 Transform:
   m_ObjectHideFlags: 0
@@ -5315,6 +5321,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1824798505
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1824798502}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e7b264e0b3f7b24ca6128641fec684b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.MusicStateController
+  exploration: 1
+  combatCooldown: 8
 --- !u!1 &1830802771
 GameObject:
   m_ObjectHideFlags: 0

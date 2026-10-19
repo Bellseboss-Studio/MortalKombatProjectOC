@@ -17,8 +17,9 @@ namespace MK.Rebuild.Debugging
     /// (NO <c>[RuntimeInitializeOnLoadMethod]</c> — the debug stays in the gym).
     ///
     /// Keys (Input System only — legacy Input is dead, activeInputHandler:1):
-    ///   F1 toggle window · F2 spawn dummy · F3 toggle states readout · F4 cycle timeScale.
-    /// F5..F12 and a PauseManager are DEFERRED to M1+ (see 03-sistemas.md).
+    ///   F1 toggle window · F2 spawn dummy · F3 toggle states readout · F4 cycle timeScale ·
+    ///   F8 cycle ambience · F9 audition music state.
+    /// F5..F7 and a PauseManager are DEFERRED to M1+ (see 03-sistemas.md).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DebugWindow : MonoBehaviour
@@ -29,6 +30,19 @@ namespace MK.Rebuild.Debugging
         // keeps rendering because OnGUI is not tied to scaled time. A real PauseManager
         // is deferred debt — this is a direct Time.timeScale write, nothing more.
         private static readonly float[] TimeScales = { 0f, 0.25f, 0.5f, 1f, 2f };
+        // F8 cycles this ring; the ambience clips themselves live in AudioCatalog.asset.
+        private static readonly AmbienceState[] AmbienceCycle =
+        {
+            AmbienceState.Parkour, AmbienceState.Combat, AmbienceState.City,
+            AmbienceState.Menu, AmbienceState.None
+        };
+        // F9 auditions this ring through MusicStateController.SetDebugState; the
+        // controller is the normal owner, so the debug override has no auto-revert.
+        private static readonly MusicState[] MusicCycle =
+        {
+            MusicState.Parkour, MusicState.Combat, MusicState.City,
+            MusicState.Menu, MusicState.Boss, MusicState.None
+        };
         private const int MaxDummies = 5;          // small count, FIFO recycle past 5
         private const float SpawnAhead = 3f;       // units in front of the player
         private const float CapsuleHalfHeight = 1f;
@@ -123,6 +137,8 @@ namespace MK.Rebuild.Debugging
             if (keyboard.f2Key.wasPressedThisFrame) SpawnDummy();
             if (keyboard.f3Key.wasPressedThisFrame) showStates = !showStates;
             if (keyboard.f4Key.wasPressedThisFrame) CycleTimeScale();
+            if (keyboard.f8Key.wasPressedThisFrame) CycleAmbience();
+            if (keyboard.f9Key.wasPressedThisFrame) CycleMusic();
         }
 
         // --- Actions ---------------------------------------------------------
@@ -192,6 +208,30 @@ namespace MK.Rebuild.Debugging
             Time.timeScale = TimeScales[timeScaleIndex];
         }
 
+        /// <summary>Cycles ambience Parkour → Combat → City → Menu → None → Parkour.</summary>
+        private void CycleAmbience()
+        {
+            int index = Array.IndexOf(AmbienceCycle, AudioDirector.CurrentAmbience);
+            int next = index < 0 ? 0 : (index + 1) % AmbienceCycle.Length;
+            AudioDirector.SetAmbience(AmbienceCycle[next]);
+        }
+
+        /// <summary>
+        /// Auditions music Parkour → Combat → City → Menu → Boss → None → Parkour.
+        /// Prefers the scene owner; falls back to AudioDirector when the controller
+        /// is not in the scene.
+        /// </summary>
+        private void CycleMusic()
+        {
+            int index = Array.IndexOf(MusicCycle, AudioDirector.CurrentMusic);
+            int next = index < 0 ? 0 : (index + 1) % MusicCycle.Length;
+            MusicState state = MusicCycle[next];
+
+            var controller = FindFirstObjectByType<MusicStateController>();
+            if (controller != null) controller.SetDebugState(state);
+            else AudioDirector.SetMusic(state);
+        }
+
         // --- IMGUI overlay ---------------------------------------------------
 
         private void OnGUI()
@@ -206,6 +246,13 @@ namespace MK.Rebuild.Debugging
             GUILayout.Label($"timeScale: {Time.timeScale:0.##}   [F4] cycle", labelStyle);
             GUILayout.Label("[F2] spawn dummy", labelStyle);
             GUILayout.Label($"[F3] estados: {(showStates ? "ON" : "OFF")}", labelStyle);
+            GUILayout.Label($"[F8] ambience: {AudioDirector.CurrentAmbience}", labelStyle);
+            GUILayout.Label($"[F9] music: {AudioDirector.CurrentMusic}", labelStyle);
+
+            GUILayout.Space(4f);
+            GUILayout.Label($"master volume: {AudioDirector.MasterVolume:0.00}", labelStyle);
+            float master = GUILayout.HorizontalSlider(AudioDirector.MasterVolume, 0f, 1f);
+            if (!Mathf.Approximately(master, AudioDirector.MasterVolume)) AudioDirector.MasterVolume = master;
 
             if (showStates)
             {
@@ -263,6 +310,7 @@ namespace MK.Rebuild.Debugging
             GUILayout.Label("INPUT / GATES", labelStyle);
             GUILayout.Label($"last: {lastInputDevice} / {lastInputPath}", labelStyle);
             GUILayout.Label($"devices: {DescribeDevices()}", labelStyle);
+            GUILayout.Label($"ambience: {AudioDirector.CurrentAmbience}", labelStyle);
 
             bool held = motor.Body != null && motor.Body.IsHeld;
             GUILayout.Label($"bodyOwner: {motor.BodyOwner?.ToString() ?? "none"}  held: {held}", labelStyle);
