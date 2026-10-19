@@ -50,6 +50,9 @@ namespace MK.Rebuild
         /// <summary>Current HP (read-only debug seam).</summary>
         public int HP => hp;
 
+        /// <summary>Maximum HP (read-only seam, mirrors <see cref="HP"/>).</summary>
+        public int MaxHp => maxHp;
+
         /// <summary>
         /// Hurt signal (read-only seam): fired on a NON-lethal hit, alongside the hit
         /// reaction. No payload — observers read <see cref="HP"/>. Nobody listening means
