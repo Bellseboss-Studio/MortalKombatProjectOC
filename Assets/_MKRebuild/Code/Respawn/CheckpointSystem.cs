@@ -18,7 +18,7 @@ namespace MK.Rebuild
     /// can read, then teleports, heals, grants invulnerability and revives.
     ///
     /// Runtime-only: this type never references the Debug assembly. Slice 2 (SectionReset)
-    /// and slice 3 (StyleMeter.ResetRank) plug into <see cref="RespawnRoutine"/> later.
+    /// and slice 3 (StyleMeter.ResetRank) plug into <see cref="RespawnRoutine"/>.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class CheckpointSystem : MonoBehaviour
@@ -28,6 +28,9 @@ namespace MK.Rebuild
 
         [Tooltip("Player movement owner the respawn teleports. Null = auto-resolved (this GameObject).")]
         [SerializeField] private PlayerMotor motor;
+
+        [Tooltip("Runtime section reset run on death (dummies + IResettables). Null = auto-resolved (first in scene), or skipped if none.")]
+        [SerializeField] private SectionReset sectionReset;
 
         [Tooltip("Seconds between death and the respawn teleport, so the death clip reads before the revive crossfade.")]
         [SerializeField] private float respawnDelay = 0.9f;
@@ -63,6 +66,7 @@ namespace MK.Rebuild
         {
             if (damage == null) damage = GetComponent<PlayerDamage>();
             if (motor == null) motor = GetComponent<PlayerMotor>();
+            if (sectionReset == null) sectionReset = FindFirstObjectByType<SectionReset>();
             CaptureImplicitCheckpoint();
         }
 
@@ -123,14 +127,15 @@ namespace MK.Rebuild
 
         /// <summary>
         /// The respawn flow (1:1 with the design order): wait so the death clip reads,
-        /// teleport to the checkpoint pose, restore full HP, open the invulnerability
-        /// window, revive out of the Death pose, then hand control back. Section reset
-        /// (slice 2) and rank reset (slice 3) slot in before the teleport later.
+        /// reset the current section, teleport to the checkpoint pose, restore full HP,
+        /// open the invulnerability window, revive out of the Death pose, then hand
+        /// control back. Rank reset (slice 3) slots in before the teleport later.
         /// </summary>
         private IEnumerator RespawnRoutine()
         {
             yield return new WaitForSeconds(Mathf.Max(0f, respawnDelay));
 
+            if (sectionReset != null) sectionReset.ResetSection();
             if (motor != null) motor.Teleport(checkpointPosition, checkpointFacing);
             if (damage != null)
             {
