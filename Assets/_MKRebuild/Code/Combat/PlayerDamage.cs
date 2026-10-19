@@ -34,12 +34,23 @@ namespace MK.Rebuild
         [Tooltip("CrossFade duration (seconds) into the HitReaction/Death states (~0.1, same as the attack seams).")]
         [SerializeField] private float crossFadeDuration = 0.1f;
 
+        [Tooltip("Get-up lock duration (seconds) after landing from an air hit. Match the GetUp clip length.")]
+        [SerializeField] private float getUpDuration = 2f;
+
+        private enum HitPhase { None, AirHit, GetUp }
+
         private int hp;
         private float invulnerableUntil;
         private PlayerCombat combat;
         private StyleMeter styleMeter;
         private AnimatorVisual animatorVisual;
         private PlayerKnockback knockback;
+        private PlayerAbilities abilities;
+        private PlayerMotor motor;
+
+        private HitPhase hitPhase;
+        private BodyOwnership.Token recoveryToken;
+        private float getUpTimer;
 
         /// <summary>True while HP is above zero (read-only debug seam).</summary>
         public bool IsAlive => hp > 0;
@@ -73,6 +84,26 @@ namespace MK.Rebuild
             styleMeter = GetComponent<StyleMeter>();
             animatorVisual = GetComponent<AnimatorVisual>();
             knockback = GetComponent<PlayerKnockback>();
+            abilities = GetComponent<PlayerAbilities>();
+            motor = GetComponent<PlayerMotor>();
+        }
+
+        private void Update()
+        {
+            if (hitPhase == HitPhase.AirHit)
+            {
+                if (motor != null && motor.IsGrounded)
+                {
+                    hitPhase = HitPhase.GetUp;
+                    getUpTimer = Mathf.Max(0.01f, getUpDuration);
+                    if (animatorVisual != null) animatorVisual.PlayGetUp(crossFadeDuration);
+                }
+            }
+            else if (hitPhase == HitPhase.GetUp)
+            {
+                getUpTimer -= Time.deltaTime;
+                if (getUpTimer <= 0f) CancelRecovery();
+            }
         }
 
         /// <summary>
@@ -100,6 +131,7 @@ namespace MK.Rebuild
         public void TakeHit(int damage, Vector3 direction, float knockbackDistance, float knockbackDuration)
         {
             if (!IsAlive || IsInvulnerable) return;
+            CancelRecovery();
             hp = Mathf.Max(0, hp - Mathf.Max(0, damage));
 
             if (hp <= 0)
@@ -127,7 +159,16 @@ namespace MK.Rebuild
                 }
             }
 
-            if (animatorVisual != null) animatorVisual.PlayHitReaction(crossFadeDuration);
+            if (motor != null && !motor.IsGrounded)
+            {
+                hitPhase = HitPhase.AirHit;
+                AcquireRecoveryToken();
+                if (animatorVisual != null) animatorVisual.PlayAirHit(crossFadeDuration);
+            }
+            else if (animatorVisual != null)
+            {
+                animatorVisual.PlayHitReaction(crossFadeDuration);
+            }
         }
 
         /// <summary>
@@ -179,15 +220,44 @@ namespace MK.Rebuild
         /// </summary>
         public void Revive(float crossFadeDuration)
         {
+            CancelRecovery();
             if (animatorVisual != null) animatorVisual.ResetToLocomotion(crossFadeDuration);
+        }
+
+        /// <summary>Hit entry: cancels upward momentum/jump buffer (wall hits).</summary>
+        public void CancelAirMomentum()
+        {
+            if (motor == null) motor = GetComponent<PlayerMotor>();
+            if (motor != null) motor.CancelVerticalMomentum();
         }
 
         private void Die()
         {
+            CancelRecovery();
             CancelAttacks();
             if (styleMeter != null) styleMeter.NotifyDamageTaken();
             OnDied?.Invoke();
             if (animatorVisual != null) animatorVisual.PlayDeath(crossFadeDuration);
+        }
+
+        private void OnDisable()
+        {
+            CancelRecovery();
+        }
+
+        private void AcquireRecoveryToken()
+        {
+            if (motor == null || motor.Body == null || recoveryToken != null) return;
+            recoveryToken = motor.Body.Acquire(BodyPriority.HitRecovery);
+        }
+
+        private void CancelRecovery()
+        {
+            hitPhase = HitPhase.None;
+            getUpTimer = 0f;
+            if (recoveryToken != null && motor != null && motor.Body != null)
+                motor.Body.Release(recoveryToken);
+            recoveryToken = null;
         }
 
         /// <summary>
@@ -197,6 +267,7 @@ namespace MK.Rebuild
         private void CancelAttacks()
         {
             if (combat != null) combat.CancelCombo();
+            if (abilities != null) abilities.Stop();
         }
     }
 }

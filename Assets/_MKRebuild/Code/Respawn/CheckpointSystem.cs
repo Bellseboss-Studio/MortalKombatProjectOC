@@ -39,6 +39,9 @@ namespace MK.Rebuild
         [Tooltip("Style meter dropped to rank D on respawn (banked charges kept). Null = auto-resolved (this GameObject).")]
         [SerializeField] private StyleMeter styleMeter;
 
+        [Tooltip("Camera rig to warp on respawn. Null = auto-resolved (first CameraRig in scene).")]
+        [SerializeField] private CameraRig cameraRig;
+
         [Tooltip("OPTIONAL override (seconds) for the wait before the respawn teleport. 0 (default) = " +
                  "DERIVE from AnimatorVisual.DeathDuration (trimmed death clip length / deathClipSpeed), " +
                  "so the death always completes before the revive. Mirrors HazardDefinition.knockbackDuration.")]
@@ -104,6 +107,7 @@ namespace MK.Rebuild
             if (knockback == null) knockback = GetComponent<PlayerKnockback>();
             if (sectionReset == null) sectionReset = FindFirstObjectByType<SectionReset>();
             if (styleMeter == null) styleMeter = GetComponent<StyleMeter>();
+            if (cameraRig == null) cameraRig = FindFirstObjectByType<CameraRig>();
             if (animatorVisual == null) animatorVisual = GetComponent<AnimatorVisual>();
             CaptureImplicitCheckpoint();
         }
@@ -186,6 +190,9 @@ namespace MK.Rebuild
 
             if (sectionReset != null) sectionReset.ResetSection();
             if (motor != null) motor.Teleport(checkpointPosition, checkpointFacing);
+            // Shift the vcam by the same delta as the teleport BEFORE the next camera
+            // update, so the respawn does not glide across the level (or through geometry).
+            if (cameraRig != null) cameraRig.WarpTo(checkpointPosition);
             if (damage != null)
             {
                 damage.Heal();

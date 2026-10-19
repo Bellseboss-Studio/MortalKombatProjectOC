@@ -12,8 +12,9 @@ namespace MK.Rebuild
         Lever = 0,
         Attack = 1,
         Dash = 2,
-        Death = 3,
-        Knockback = 4,
+        HitRecovery = 3,
+        Death = 4,
+        Knockback = 5,
     }
 
     /// <summary>

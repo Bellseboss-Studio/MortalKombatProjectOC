@@ -174,6 +174,8 @@ namespace MK.Rebuild
             ledgeReGrabTimer = 0f;
             wallCoyoteTimer = 0f;
             coyoteTimer = 0f;
+            // A jump pressed before death/respawn must not fire on revive.
+            bufferTimer = 0f;
             wallGrabHeld = false;
             wallContact = false;
             wallCollider = null;
@@ -203,6 +205,21 @@ namespace MK.Rebuild
                 visual.SetVerticalSpeed(0f);
                 visual.SetGrounded(false);
                 visual.SetRunning(false);
+            }
+        }
+
+        /// <summary>Hit entry: cancels upward momentum and the jump buffer so a held jump cannot keep ascending.</summary>
+        public void CancelVerticalMomentum()
+        {
+            bufferTimer = 0f;
+            wallCoyoteTimer = 0f;
+            if (grounded) return;
+            verticalVel = 0f;
+            if (rb != null)
+            {
+                Vector3 v = rb.linearVelocity;
+                v.y = 0f;
+                rb.linearVelocity = v;
             }
         }
 
@@ -252,6 +269,15 @@ namespace MK.Rebuild
 
         private void RefreshCamera()
         {
+            // Prefer the owned rig's basis (the authored vcam) over the tagged camera:
+            // the rig is the deterministic contract, Camera.main is only a safety net.
+            var rig = FindFirstObjectByType<CameraRig>();
+            if (rig != null && rig.Basis != null)
+            {
+                cameraTransform = rig.Basis;
+                return;
+            }
+
             var cam = Camera.main;
             cameraTransform = cam != null ? cam.transform : null;
         }
@@ -273,7 +299,9 @@ namespace MK.Rebuild
             if (cameraTransform == null) RefreshCamera();
 
             float dt = Time.fixedDeltaTime;
-            bufferTimer = Mathf.Max(0f, bufferTimer - dt);
+            // A jump pressed during the dash must survive it as a buffer (dash holds
+            // the body, so the buffered press cannot fire until the token releases).
+            if (BodyOwner != BodyPriority.Dash) bufferTimer = Mathf.Max(0f, bufferTimer - dt);
             jumpLockoutTimer = Mathf.Max(0f, jumpLockoutTimer - dt);
 
             // Mantle: animation-driven timed warp. Owns the root while active; input is
@@ -416,7 +444,7 @@ namespace MK.Rebuild
                 holdingWallJumpFacing = false; // release -> facing is free again
             }
             // Jump: ground takes priority, then hang (mantle if at a Ledge).
-            else if (bufferTimer > 0f && (grounded || coyoteTimer > 0f) && jumpLockoutTimer <= 0f)
+            else if (bufferTimer > 0f && (grounded || coyoteTimer > 0f) && jumpLockoutTimer <= 0f && !Body.IsHeld)
             {
                 verticalVel = paramsAsset.jumpVelocity;
                 bufferTimer = 0f;
@@ -424,7 +452,7 @@ namespace MK.Rebuild
                 grounded = false;
                 hanging = false;
             }
-            else if (bufferTimer > 0f && !grounded && (hanging || wallCoyoteTimer > 0f))
+            else if (bufferTimer > 0f && !grounded && (hanging || wallCoyoteTimer > 0f) && !Body.IsHeld)
             {
                 bufferTimer = 0f;
                 if (ledgeHang)

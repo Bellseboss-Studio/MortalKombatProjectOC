@@ -16,37 +16,50 @@ namespace MK.Rebuild
         private static Material s_projectile;
         private static Material s_ring;
         private static Material s_burst;
+        private static bool s_projectileFailed;
+        private static bool s_ringFailed;
+        private static bool s_burstFailed;
+        private static bool s_shaderMissingLogged;
 
-        /// <summary>Opaque cyan material for the H1 projectile primitive.</summary>
+        /// <summary>
+        /// Opaque cyan material for the H1 projectile primitive. Returns null when
+        /// the shader is unavailable in this build (never a null-backed Material).
+        /// </summary>
         public static Material ProjectileMaterial()
         {
-            if (s_projectile == null)
-            {
-                s_projectile = Build("Universal Render Pipeline/Unlit", false);
-                s_projectile.SetColor("_BaseColor", new Color(0.25f, 0.95f, 1f));
-            }
+            if (s_projectile != null) return s_projectile;
+            if (s_projectileFailed) return null;
+            s_projectile = Build("Universal Render Pipeline/Unlit", false);
+            if (s_projectile == null) { s_projectileFailed = true; return null; }
+            s_projectile.SetColor("_BaseColor", new Color(0.25f, 0.95f, 1f));
             return s_projectile;
         }
 
-        /// <summary>Transparent amber material for the H2 area-radius ring.</summary>
+        /// <summary>
+        /// Transparent amber material for the H2 area-radius ring. Returns null when
+        /// the shader is unavailable in this build.
+        /// </summary>
         public static Material RingMaterial()
         {
-            if (s_ring == null)
-            {
-                s_ring = Build("Universal Render Pipeline/Unlit", true);
-                s_ring.SetColor("_BaseColor", new Color(1f, 0.85f, 0.3f, 0.3f));
-            }
+            if (s_ring != null) return s_ring;
+            if (s_ringFailed) return null;
+            s_ring = Build("Universal Render Pipeline/Unlit", true);
+            if (s_ring == null) { s_ringFailed = true; return null; }
+            s_ring.SetColor("_BaseColor", new Color(1f, 0.85f, 0.3f, 0.3f));
             return s_ring;
         }
 
-        /// <summary>Transparent material for the impact particle burst.</summary>
+        /// <summary>
+        /// Transparent material for the impact particle burst. Returns null when the
+        /// shader is unavailable in this build.
+        /// </summary>
         public static Material BurstMaterial()
         {
-            if (s_burst == null)
-            {
-                s_burst = Build("Universal Render Pipeline/Particles/Unlit", true);
-                s_burst.SetColor("_BaseColor", new Color(1f, 0.8f, 0.35f, 1f));
-            }
+            if (s_burst != null) return s_burst;
+            if (s_burstFailed) return null;
+            s_burst = Build("Universal Render Pipeline/Particles/Unlit", true);
+            if (s_burst == null) { s_burstFailed = true; return null; }
+            s_burst.SetColor("_BaseColor", new Color(1f, 0.8f, 0.35f, 1f));
             return s_burst;
         }
 
@@ -87,8 +100,9 @@ namespace MK.Rebuild
             shape.shapeType = ParticleSystemShapeType.Sphere;
             shape.radius = 0.05f;
 
+            var material = BurstMaterial();
             var renderer = go.GetComponent<ParticleSystemRenderer>();
-            if (renderer != null) renderer.sharedMaterial = BurstMaterial();
+            if (renderer != null && material != null) renderer.sharedMaterial = material;
 
             ps.Play();
             Object.Destroy(go, 1.5f); // safety net if stopAction is missed
@@ -105,8 +119,18 @@ namespace MK.Rebuild
             go.name = "Fx_AbilityRing";
             var col = go.GetComponent<Collider>();
             if (col != null) Object.Destroy(col);
+
+            // Build-safe: without the URP shader the primitive would keep Unity's
+            // default (magenta) material. Destroy it instead of leaking it.
+            var material = RingMaterial();
+            if (material == null)
+            {
+                Object.Destroy(go);
+                return null;
+            }
+
             var renderer = go.GetComponent<Renderer>();
-            if (renderer != null) renderer.sharedMaterial = RingMaterial();
+            if (renderer != null) renderer.sharedMaterial = material;
 
             go.transform.SetParent(parent, false);
             ApplyRingSize(go.transform, radius);
@@ -127,6 +151,20 @@ namespace MK.Rebuild
         {
             var shader = Shader.Find(shaderName);
             if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+            {
+                // Player builds strip shaders that no material/scene references:
+                // GraphicsSettings > Always Included Shaders must list them.
+                if (!s_shaderMissingLogged)
+                {
+                    s_shaderMissingLogged = true;
+                    Debug.LogError(
+                        "[GreyBoxFx] URP shader '" + shaderName + "' not found in this build. " +
+                        "Add Universal Render Pipeline/Unlit and Particles/Unlit to " +
+                        "Project Settings > Graphics > Always Included Shaders.");
+                }
+                return null;
+            }
             var material = new Material(shader);
             if (transparent)
             {

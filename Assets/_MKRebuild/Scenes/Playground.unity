@@ -5691,6 +5691,7 @@ GameObject:
   - component: {fileID: 2121642774}
   - component: {fileID: 2121642773}
   - component: {fileID: 2121642772}
+  - component: {fileID: 2121642776}
   m_Layer: 0
   m_Name: CinemachineCamera
   m_TagString: Untagged
@@ -5804,6 +5805,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2121642776
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2121642771}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d33d1b167e75e024aabfe3ded24ed24b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.CameraRig
+  vcam: {fileID: 0}
 --- !u!1001 &8525785853886015240
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -169,6 +169,12 @@ namespace MK.Rebuild
             // The press is already consumed above, so a gated dash does not leak late.
             if (motor != null && !motor.CanPerform(PlayerAction.Dash)) return;
 
+            // BODY PRIORITY (m3-build-feedback): the dash may still cancel an Attack
+            // (Attack 1 <= Dash 2), but NOT a hit recovery (3), death (4) or knockback (5).
+            // Deliberately NOT a blanket InputLocked gate: that would break the intended
+            // dash-cancels-attack behavior.
+            if (motor != null && motor.Body != null && !motor.Body.CanAcquire(BodyPriority.Dash)) return;
+
             // Dash as INTERRUPTOR: cancel the active combo/swing, then dash.
             if (combat != null && combat.Attacking) combat.CancelCombo();
             StartDash();

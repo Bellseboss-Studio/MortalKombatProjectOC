@@ -201,6 +201,15 @@ namespace MK.Rebuild
 
         private void RefreshCamera()
         {
+            // Prefer the owned rig's basis (the authored vcam) over the tagged camera:
+            // the rig is the deterministic contract, Camera.main is only a safety net.
+            var rig = FindFirstObjectByType<CameraRig>();
+            if (rig != null && rig.Basis != null)
+            {
+                cameraTransform = rig.Basis;
+                return;
+            }
+
             var cam = Camera.main;
             cameraTransform = cam != null ? cam.transform : null;
         }

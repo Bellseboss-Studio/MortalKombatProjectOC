@@ -62,6 +62,9 @@ namespace MK.Rebuild
                  "PlayerDamage.GrantInvulnerability knob (Kill is never gated, so pits are unaffected).")]
         public float iframeSeconds = 0.6f;
 
+        [Tooltip("Damage only: when true, the hit cancels the player's upward momentum and jump buffer (wall hits). Leave false for shoves that must preserve the ballistic arc.")]
+        public bool cancelVerticalOnHit = false;
+
         [Header("Kill plane (consequence = KillAndRespawn)")]
         [Tooltip("World Y at or below which the player dies (S4 kill-plane). Ignored by Damage/ReturnToEdge.")]
         public float killY = -20f;

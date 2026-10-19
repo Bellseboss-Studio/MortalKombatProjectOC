@@ -122,6 +122,11 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: StandaloneWindows64
+          buildName: MortalKombatProjectOC
+          # Tester build must be a Development build so DebugWindow /
+          # PlayerDamageTestDriver activate in the player.
+          customParameters: |
+            -Development
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -169,6 +174,10 @@ jobs:
             SRC="artifacts"
           fi
           cp -r "$SRC"/. release/
+          if [ ! -f "release/MortalKombatProjectOC.exe" ]; then
+            echo "::error::Expected release/MortalKombatProjectOC.exe was not produced by the build."
+            exit 1
+          fi
           ASSET="MortalKombat-Windows-${TAG}-${SHA7}.zip"
           (cd release && zip -qr "../${ASSET}" .)
           ls -lh "${ASSET}"

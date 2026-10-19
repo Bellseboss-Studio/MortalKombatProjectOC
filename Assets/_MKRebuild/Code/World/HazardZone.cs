@@ -225,6 +225,7 @@ namespace MK.Rebuild
             if (Time.time < nextDamageTime) return;
 
             Vector3 pushDir = ContactNormal(player.transform.position);
+            if (definition.cancelVerticalOnHit) player.CancelAirMomentum();
             player.TakeHit(
                 definition.damage,
                 pushDir,

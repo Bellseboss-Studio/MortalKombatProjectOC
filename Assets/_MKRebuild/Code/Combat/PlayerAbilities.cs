@@ -73,6 +73,7 @@ namespace MK.Rebuild
 
         private PlayerCombat combat;
         private PlayerMotor motor;
+        private PlayerDamage damage;
         private AnimatorVisual animatorVisual;
         private ICharacterVisual visual;
         private Rigidbody rb;
@@ -112,6 +113,7 @@ namespace MK.Rebuild
             rb = GetComponent<Rigidbody>();
             combat = GetComponent<PlayerCombat>();
             motor = GetComponent<PlayerMotor>();
+            damage = GetComponent<PlayerDamage>();
             visual = GetComponent<ICharacterVisual>();
             animatorVisual = GetComponent<AnimatorVisual>();
         }
@@ -185,6 +187,16 @@ namespace MK.Rebuild
         {
             ComboInput which = skill1Buffer > 0f ? ComboInput.H1 : ComboInput.H2;
 
+            // HIT/DEATH ENTRY GATE: death (3) and knockback (4) outrank an ability, so
+            // their body token blocks it. Equal priority (Attack = 1) still passes, which
+            // is what lets the combo cancel-window path fire.
+            if (damage != null && !damage.IsAlive) { ClearSkillBuffer(which); return; }
+            if (motor != null && motor.Body != null && !motor.Body.CanAcquire(BodyPriority.Attack))
+            {
+                ClearSkillBuffer(which);
+                return;
+            }
+
             // ACTION GATE (change action-gating): standalone abilities are ground-only —
             // denied in the air, while hanging or in a scripted state (deny by default).
             // Per-verb so Skill1/Skill2 can diverge later; identical rule today.
@@ -220,6 +232,11 @@ namespace MK.Rebuild
         public void PlayFromCombo(AbilityDefinition def)
         {
             if (def == null) return;
+            // Same hit/death gate as the standalone entry. Combo steps run under
+            // PlayerCombat's Attack token (equal priority), so they still pass.
+            if (damage != null && !damage.IsAlive) return;
+            if (motor != null && motor.Body != null && !motor.Body.CanAcquire(BodyPriority.Attack))
+                return;
             StartAbility(def, def.projectileSpeed > 0f);
         }
 
@@ -316,13 +333,17 @@ namespace MK.Rebuild
             if (col != null) Destroy(col); // transform-driven: no physics collider
             float d = Mathf.Max(0.1f, def.projectileRadius * 2f);
             go.transform.localScale = new Vector3(d, d, d);
-            var renderer = go.GetComponent<Renderer>();
-            if (renderer != null) renderer.sharedMaterial = GreyBoxFx.ProjectileMaterial();
             go.transform.position = origin;
 
+            // Gameplay first: the projectile must launch even if the cosmetic
+            // material is unavailable in this build.
             var projectile = go.AddComponent<Projectile>();
             projectile.Launch(facing, def.projectileSpeed, def.projectileLifetime,
                 def.projectileRadius, def.dano, knockback, hitstopMs, rb, combat);
+
+            var material = GreyBoxFx.ProjectileMaterial();
+            var renderer = go.GetComponent<Renderer>();
+            if (renderer != null && material != null) renderer.sharedMaterial = material;
         }
 
         // ------------------------------------------------------------------
@@ -367,7 +388,11 @@ namespace MK.Rebuild
 
         private void ShowRing(AbilityDefinition def)
         {
-            if (ring == null) ring = GreyBoxFx.CreateRing(transform, def.areaRadius);
+            if (ring == null)
+            {
+                ring = GreyBoxFx.CreateRing(transform, def.areaRadius);
+                if (ring == null) return;
+            }
             GreyBoxFx.ApplyRingSize(ring.transform, def.areaRadius);
             ring.SetActive(true);
         }

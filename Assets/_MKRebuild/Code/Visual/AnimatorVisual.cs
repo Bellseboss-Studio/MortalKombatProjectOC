@@ -431,6 +431,40 @@ namespace MK.Rebuild
         }
 
         /// <summary>
+        /// Air-hit seam (m3-build-feedback): code-driven CrossFade into the <c>AirHit</c>
+        /// state — the airborne counterpart of <see cref="PlayHitReaction"/>. The controller's
+        /// own transition chains <c>AirHit -&gt; GetUp</c> on <c>Grounded == true</c>, so no new
+        /// Animator params are pushed from code. Falls back to the ground hit reaction when the
+        /// state has not been wired yet, so the hurt flow never freezes on a missing state.
+        /// Called by <see cref="PlayerDamage"/>.
+        /// </summary>
+        public void PlayAirHit(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            if (!HasState("AirHit")) { PlayHitReaction(crossFadeDuration); return; }
+            animator.CrossFade("AirHit", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+        }
+
+        /// <summary>
+        /// Get-up seam (m3-build-feedback): code-driven CrossFade into the <c>GetUp</c> state
+        /// when the player lands from an air hit. As with <see cref="PlayHitReaction"/>, the
+        /// state's own exit-time transition returns to locomotion when the one-shot ends.
+        /// Falls back to <see cref="ResetToLocomotion"/> when the state has not been wired yet.
+        /// Called by <see cref="PlayerDamage"/>.
+        /// </summary>
+        public void PlayGetUp(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            if (!HasState("GetUp")) { ResetToLocomotion(crossFadeDuration); return; }
+            animator.CrossFade("GetUp", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+        }
+
+        private bool HasState(string stateName)
+        {
+            return animator != null && animator.HasState(0, Animator.StringToHash(stateName));
+        }
+
+        /// <summary>
         /// Player DEATH seam (anim-packs-integration slice 3): code-driven CrossFade into
         /// the <c>Death</c> state. The state has NO outgoing transition, so the clip plays
         /// once and HOLDS its final pose (no T-pose, no snap). Called by
