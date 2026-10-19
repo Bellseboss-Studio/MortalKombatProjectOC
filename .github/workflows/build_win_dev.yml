@@ -1,12 +1,101 @@
 name: Actions Windows Dev 😎
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump for the release"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      create_release:
+        description: "Create a GitHub Release from this build (uncheck to only build)"
+        required: true
+        default: true
+        type: boolean
   pull_request:
     branches:
       - develop
 
+permissions: {}
+
+concurrency:
+  group: windows-dev-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # Computes the next SemVer tag. Runs only for a manual dispatch that asked
+  # for a release, so pull-request builds never touch tags.
+  version:
+    name: Compute release version
+    if: github.event_name == 'workflow_dispatch' && inputs.create_release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.semver.outputs.tag }}
+      sha7: ${{ steps.semver.outputs.sha7 }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next SemVer tag
+        id: semver
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          SHA7="${GITHUB_SHA:0:7}"
+          LATEST="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+          if [ -z "$LATEST" ]; then
+            NEXT="v0.1.0"
+          else
+            BASE="${LATEST#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+            case "$BUMP" in
+              patch) NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+              minor) NEXT="v${MAJOR}.$((MINOR + 1)).0" ;;
+              major) NEXT="v$((MAJOR + 1)).0.0" ;;
+              *) echo "::error::Unknown bump type '${BUMP}'"; exit 1 ;;
+            esac
+          fi
+          echo "Next tag: ${NEXT} (sha7=${SHA7})"
+          echo "tag=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "sha7=${SHA7}" >> "$GITHUB_OUTPUT"
+
+      - name: Guard - tag must not exist on another commit
+        env:
+          TAG: ${{ steps.semver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} is free - proceeding."
+            exit 0
+          fi
+          TAG_COMMIT="$(git rev-list -n 1 "refs/tags/${TAG}")"
+          if [ "${TAG_COMMIT}" = "${GITHUB_SHA}" ]; then
+            echo "::warning::Tag ${TAG} already points at this commit - resuming idempotently."
+            exit 0
+          fi
+          echo "::error::Tag ${TAG} already exists on ${TAG_COMMIT} (this run targets ${GITHUB_SHA}). Pick a different bump."
+          exit 1
+
+  # NOTE: release guard intentionally omitted while the active branch is
+  # `refactor/rebuild-from-scratch`. When `main` becomes the release branch,
+  # uncomment this step to block releases from anywhere else.
+  #
+  #      - name: Guard - release only from main
+  #        if: github.ref != 'refs/heads/main'
+  #        run: |
+  #          echo "::error::Release dispatch only allowed from main (got '${GITHUB_REF}')."
+  #          exit 1
+
   build:
     name: Build Project Dev
     runs-on: ubuntu-latest
@@ -51,3 +140,66 @@ jobs:
           curl -X POST -H "Content-Type: application/json" -d "$json_payload" ${{ secrets.DISCORD_WEBHOOK_URL }}
         env:
           DOWNLOAD_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/${{ steps.get_artifact_id.outputs.artifact-id }}"
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build, version]
+    if: github.event_name == 'workflow_dispatch' && inputs.create_release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+      SHA7: ${{ needs.version.outputs.sha7 }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-Windows
+          path: artifacts
+
+      - name: Package Windows build
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          if [ -d "artifacts/StandaloneWindows64" ]; then
+            SRC="artifacts/StandaloneWindows64"
+          else
+            SRC="artifacts"
+          fi
+          cp -r "$SRC"/. release/
+          ASSET="MortalKombat-Windows-${TAG}-${SHA7}.zip"
+          (cd release && zip -qr "../${ASSET}" .)
+          ls -lh "${ASSET}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Mortal Kombat Project ${{ needs.version.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: MortalKombat-Windows-*.zip
+
+      # ---------------------------------------------------------------------
+      # Itch.io deployment - DISABLED until we have a release-quality build.
+      # To enable: uncomment, fill in ITCH_USER / ITCH_GAME for this project,
+      # add the BUTLER_CREDENTIALS secret and a channel per platform.
+      # ---------------------------------------------------------------------
+      # - name: Unpack for Butler
+      #   run: |
+      #     set -euo pipefail
+      #     mkdir -p itch/Windows
+      #     unzip -q "MortalKombat-Windows-${TAG}-${SHA7}.zip" -d itch/Windows
+      #     ls -R itch | head -n 100 || true
+      #
+      # - name: Deploy Windows
+      #   uses: josephbmanley/butler-publish-itchio-action@master
+      #   env:
+      #     BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+      #     CHANNEL: windows
+      #     ITCH_GAME: <itch-game-slug>
+      #     ITCH_USER: <itch-user>
+      #     PACKAGE: itch/Windows
