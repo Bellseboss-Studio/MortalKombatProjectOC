@@ -35,6 +35,7 @@ namespace MK.Rebuild
         private static readonly int AttackDashSpeedHash = Animator.StringToHash("AttackDashSpeed");
         private static readonly int LauncherSpeedHash = Animator.StringToHash("LauncherSpeed");
         private static readonly int DeathSpeedHash = Animator.StringToHash("DeathSpeed");
+        private static readonly int HitReactionSpeedHash = Animator.StringToHash("HitReactionSpeed");
         private static readonly int AttackStepHash = Animator.StringToHash("AttackStep");
         private static readonly int DashStateHash = Animator.StringToHash("DashState");
         private static readonly int DashAttackStateHash = Animator.StringToHash("DashAttackState");
@@ -48,6 +49,20 @@ namespace MK.Rebuild
         private PlayerParams paramsRef;
         private MoveState moveState = MoveState.Free;
         private bool loggedLandingRecovery;
+        private bool loggedHitReaction;
+        private bool loggedDeath;
+
+        /// <summary>
+        /// Fallback only: used when the trimmed HitReaction clip cannot be resolved (e.g. a
+        /// proxy visual / missing controller). The LIVE lock is always derived from the clip.
+        /// </summary>
+        private const float HitReactionFallbackSeconds = 0.4f;
+
+        /// <summary>
+        /// Fallback only: used when the trimmed Death clip cannot be resolved. The LIVE respawn
+        /// delay is always derived from the clip (2.5 s collapse / 3.5 ≈ 0.714 s).
+        /// </summary>
+        private const float DeathFallbackSeconds = 0.714f;
 
         /// <summary>
         /// Landing recovery (seconds) for the jump lockout, DERIVED from the real Animator:
@@ -57,6 +72,25 @@ namespace MK.Rebuild
         /// PlayerMotor on touchdown (the motor owns no Animator — this layer does).
         /// </summary>
         public float LandingRecoverySeconds { get; private set; }
+
+        /// <summary>
+        /// Hit-reaction body-lock duration (seconds), DERIVED from the Animator exactly like
+        /// <see cref="LandingRecoverySeconds"/>: the trimmed impact clip's effective duration
+        /// (<c>clipLength / hitReactionClipSpeed</c>). This is the ONE source of truth for the
+        /// lock: <see cref="PlayerKnockback"/> reads it so the lock and the played clip can
+        /// never drift apart. Falls back to a sane constant when the clip is unresolved.
+        /// </summary>
+        public float HitReactionDuration { get; private set; } = HitReactionFallbackSeconds;
+
+        /// <summary>
+        /// Death collapse duration (seconds), DERIVED from the Animator exactly like
+        /// <see cref="HitReactionDuration"/>: the trimmed collapse clip's effective duration
+        /// (<c>clipLength / deathClipSpeed</c>). This is the ONE source of truth for how long
+        /// the corpse holds before the respawn teleport: <see cref="CheckpointSystem"/> reads
+        /// it, so the revive can never drift from the played animation. Falls back to a sane
+        /// constant when the clip is unresolved.
+        /// </summary>
+        public float DeathDuration { get; private set; } = DeathFallbackSeconds;
 
         public Vector3 Facing => (facingRoot != null ? facingRoot : transform).forward;
 
@@ -82,8 +116,87 @@ namespace MK.Rebuild
             animator.SetFloat(FlipMidAirSpeedHash, paramsRef.flipMidAirSpeed);
             animator.SetFloat(MantleClipSpeedHash, paramsRef.mantleClipSpeed);
             animator.SetFloat(DashSpeedHash, paramsRef.dashClipSpeed);
-            animator.SetFloat(DeathSpeedHash, paramsRef.deathClipSpeed);
+            animator.SetFloat(DeathSpeedHash, DeathClipSpeed);
+            animator.SetFloat(HitReactionSpeedHash, HitReactionClipSpeed);
             ResolveLandingRecovery();
+            ResolveHitReaction();
+            ResolveDeath();
+        }
+
+        /// <summary>
+        /// Data-driven playback multiplier for the HitReaction state (defaults to 1 when no
+        /// params asset is bound, so the clip still plays at natural speed).
+        /// </summary>
+        private float HitReactionClipSpeed =>
+            paramsRef != null ? Mathf.Max(0.0001f, paramsRef.hitReactionClipSpeed) : 1f;
+
+        /// <summary>
+        /// Data-driven playback multiplier for the Death state (defaults to 1 when no params
+        /// asset is bound, so the clip still plays at natural speed).
+        /// </summary>
+        private float DeathClipSpeed =>
+            paramsRef != null ? Mathf.Max(0.0001f, paramsRef.deathClipSpeed) : 1f;
+
+        /// <summary>
+        /// Derives <see cref="DeathDuration"/> from the trimmed collapse clip length at runtime
+        /// (same retiming home as <see cref="ResolveHitReaction"/>): the clip is found by name
+        /// (contains "dizzy_death_collapse") in the controller's clips, then divided by
+        /// <c>deathClipSpeed</c>. This is what makes the respawn delay EQUAL to the played
+        /// collapse by construction — no hand-tuned duration anywhere.
+        /// </summary>
+        private void ResolveDeath()
+        {
+            float speed = DeathClipSpeed;
+            RuntimeAnimatorController controller = animator.runtimeAnimatorController;
+            if (controller != null)
+            {
+                AnimationClip[] clips = controller.animationClips;
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    AnimationClip clip = clips[i];
+                    if (clip == null || !clip.name.Contains("dizzy_death_collapse")) continue;
+                    DeathDuration = clip.length / speed;
+                    if (!loggedDeath)
+                    {
+                        loggedDeath = true;
+                        Debug.Log($"[Death] collapse '{clip.name}' {clip.length:0.000}s / " +
+                                  $"speed {speed:0.##} = {DeathDuration:0.000}s");
+                    }
+                    return;
+                }
+            }
+            DeathDuration = DeathFallbackSeconds; // fallback: clip not found
+        }
+
+        /// <summary>
+        /// Derives <see cref="HitReactionDuration"/> from the trimmed impact clip length at
+        /// runtime (same retiming home as <see cref="ResolveLandingRecovery"/>): the clip is
+        /// found by name (contains "Damaged_push_impact") in the controller's clips, then
+        /// divided by <c>hitReactionClipSpeed</c>. This is what makes the body lock EQUAL to
+        /// the played animation by construction — no hardcoded duration anywhere.
+        /// </summary>
+        private void ResolveHitReaction()
+        {
+            float speed = HitReactionClipSpeed;
+            RuntimeAnimatorController controller = animator.runtimeAnimatorController;
+            if (controller != null)
+            {
+                AnimationClip[] clips = controller.animationClips;
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    AnimationClip clip = clips[i];
+                    if (clip == null || !clip.name.Contains("Damaged_push_impact")) continue;
+                    HitReactionDuration = clip.length / speed;
+                    if (!loggedHitReaction)
+                    {
+                        loggedHitReaction = true;
+                        Debug.Log($"[HitReaction] impact '{clip.name}' {clip.length:0.000}s / " +
+                                  $"speed {speed:0.##} = {HitReactionDuration:0.000}s");
+                    }
+                    return;
+                }
+            }
+            HitReactionDuration = HitReactionFallbackSeconds; // fallback: clip not found
         }
 
         /// <summary>
@@ -311,6 +424,9 @@ namespace MK.Rebuild
         public void PlayHitReaction(float crossFadeDuration)
         {
             if (animator == null) return;
+            // Push the retime BEFORE entering, so the played clip matches the duration the
+            // lock was derived from (same retiming home as DeathSpeed / DashSpeed).
+            animator.SetFloat(HitReactionSpeedHash, HitReactionClipSpeed);
             animator.CrossFade("HitReaction", Mathf.Max(0f, crossFadeDuration), 0, 0f);
         }
 
@@ -319,13 +435,15 @@ namespace MK.Rebuild
         /// the <c>Death</c> state. The state has NO outgoing transition, so the clip plays
         /// once and HOLDS its final pose (no T-pose, no snap). Called by
         /// <see cref="PlayerDamage"/>. The state's playback rate is the dedicated
-        /// <c>DeathSpeed</c> float param — a STATIC value set once in
-        /// <see cref="ApplyClipSpeeds"/> from <c>PlayerParams.deathClipSpeed</c> (data, not
-        /// code), same retiming home as <c>DashSpeed</c>.
+        /// <c>DeathSpeed</c> float param, driven by <c>PlayerParams.deathClipSpeed</c> (data,
+        /// not code). It is re-pushed BEFORE entering (mirrors <see cref="PlayHitReaction"/>),
+        /// so the played clip matches the duration <see cref="DeathDuration"/> was derived
+        /// from — the respawn delay can never drift from the animation.
         /// </summary>
         public void PlayDeath(float crossFadeDuration)
         {
             if (animator == null) return;
+            animator.SetFloat(DeathSpeedHash, DeathClipSpeed);
             animator.CrossFade("Death", Mathf.Max(0f, crossFadeDuration), 0, 0f);
         }
 

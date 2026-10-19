@@ -7,10 +7,10 @@ namespace MK.Rebuild
     /// Defense/mobility: an impulse along the facing (~0.35 s) with a short invuln
     /// window (~0.25 s) and a cooldown (~1.2 s), numbers from doc 05.
     ///
-    /// The MOTOR stays the movement owner: during the dash this component sets
-    /// <see cref="PlayerMotor.InputLocked"/> = true (the motor preserves the horizontal
-    /// velocity the dash writes — no wish input, no input rotation; gravity/jump/wall
-    /// untouched) and Rigorously releases the lock at dash end AND on OnDisable.
+    /// The MOTOR stays the movement owner: during the dash this component acquires a
+    /// <see cref="BodyPriority.Dash"/> token on <see cref="PlayerMotor.Body"/> (the motor
+    /// preserves the horizontal velocity the dash writes — no wish input, no input rotation;
+    /// gravity/jump/wall untouched) and releases ONLY that token at dash end AND on OnDisable.
     /// Facing is locked along the dash direction (<see cref="ICharacterVisual.SetFacing"/>).
     ///
     /// Dash = INTERRUPTOR, not a combo step (doc: "dash cancela TODO salvo hitstop
@@ -51,8 +51,8 @@ namespace MK.Rebuild
     /// ATTACK CANCEL (slice 3septies): an attack pressed during the dash CANCELS it early
     /// (dash-cancel into attack) — but only once the dash has run <see cref="minCancelTime"/>
     /// unscaled seconds, so the dash stays readable and cannot be cut at t=0.
-    /// <see cref="TryCancelByAttack"/> ends the dash and releases
-    /// <see cref="PlayerMotor.InputLocked"/>; <see cref="PlayerCombat"/> starts the attack the
+    /// <see cref="TryCancelByAttack"/> ends the dash and releases its
+    /// <see cref="BodyPriority.Dash"/> token; <see cref="PlayerCombat"/> starts the attack the
     /// same frame. Before the window (or with no attack) the fallback is the 3sexies buffer:
     /// the press is held and fires when the dash ends on its own.
     /// </summary>
@@ -91,6 +91,7 @@ namespace MK.Rebuild
         private AnimatorVisual animatorVisual;
 
         private bool isDashing;
+        private BodyOwnership.Token dashToken; // body-ownership token (released by EndDash / OnDisable)
         private float dashTimer;      // unscaled seconds left of the impulse
         private float dashElapsed;    // unscaled seconds into the impulse (curve time)
         private float invulnTimer;    // unscaled seconds left of IsInvulnerable
@@ -181,6 +182,17 @@ namespace MK.Rebuild
         private void FixedUpdate()
         {
             if (!isDashing || rb == null) return;
+
+            // BODY-OWNERSHIP YIELD (m2-hazards S2, W1): a higher-priority owner (death /
+            // knockback) took the body while the dash was running. End the dash WITHOUT
+            // writing velocity onto the corpse — the corpse must carry no dash velocity.
+            // EndDash releases ONLY the dash token, so the Death token keeps the lock.
+            if (motor == null || motor.Body == null || motor.Body.Owner != BodyPriority.Dash)
+            {
+                EndDash();
+                return;
+            }
+
             float window = Mathf.Max(0.001f, dashDuration);
             float speed = Mathf.Max(0f, CurveMotion.Speed(dashCurve, dashDistance, window, dashElapsed));
             Vector3 v = rb.linearVelocity;
@@ -238,7 +250,8 @@ namespace MK.Rebuild
             else
                 baseVelocity = Vector3.zero;
 
-            if (motor != null) motor.InputLocked = true;
+            if (motor != null && motor.Body != null)
+                dashToken = motor.Body.Acquire(BodyPriority.Dash);
 
             // Real dash clip (slice 1): CrossFade into the Dash state + raise
             // DashState so the mirror exits stay gated until EndDash releases it.
@@ -252,7 +265,7 @@ namespace MK.Rebuild
         /// true when the dash was actually cut (the caller starts the attack this same
         /// frame); false when no dash is running or the min window has not elapsed.
         /// Movement/iframes/cooldown are untouched: the cooldown was armed at dash START, so
-        /// a cancelled dash still pays it. The released <see cref="PlayerMotor.InputLocked"/>
+        /// a cancelled dash still pays it. The released <see cref="BodyPriority.Dash"/> token
         /// lets PlayerCombat's attack entry take over immediately.
         /// </summary>
         public bool TryCancelByAttack()
@@ -267,9 +280,12 @@ namespace MK.Rebuild
         {
             isDashing = false;
             dashTimer = 0f;
-            // Release the lock -> PlayerCombat's attack buffer (fed/held during the dash)
-            // fires this frame or next and starts the combo: dash -> attack -> combo.
-            if (motor != null) motor.InputLocked = false; // rigorous release: control returns
+            // Release ONLY the dash token -> PlayerCombat's attack buffer (fed/held during
+            // the dash) fires this frame or next and starts the combo: dash -> attack ->
+            // combo. A higher-priority token (death / knockback) is untouched, so the body
+            // stays locked through the respawn window.
+            if (motor != null && motor.Body != null) motor.Body.Release(dashToken);
+            dashToken = null;
             // Drop DashState to 0 -> the controller's mirror exits return to locomotion
             // exactly when the 0.35 s window closes (exit is param-gated, not exit-time).
             if (animatorVisual != null) animatorVisual.ReleaseDash();
@@ -280,7 +296,8 @@ namespace MK.Rebuild
             // Rigorous release even if the dash is killed mid-flight (disable/stop).
             isDashing = false;
             dashTimer = 0f;
-            if (motor != null) motor.InputLocked = false;
+            if (motor != null && motor.Body != null) motor.Body.Release(dashToken);
+            dashToken = null;
             if (animatorVisual != null) animatorVisual.ReleaseDash();
         }
 

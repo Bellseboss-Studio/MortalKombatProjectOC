@@ -90,13 +90,26 @@ namespace MK.Rebuild
         public bool FacingLocked => facingLocked;
 
         /// <summary>
-        /// Attack movement lock (combat seam, default false). While true the motor
-        /// IGNORES the horizontal wish input and PRESERVES the current horizontal
-        /// velocity, so <see cref="PlayerCombat"/> can drive the per-step lunge;
-        /// the facing stops following the input. Gravity / jump / wall state are
-        /// untouched — the motor stays the movement owner.
+        /// Prioritized body-control arbiter (m2-hazards S2). Created in <see cref="Awake"/>;
+        /// every lock writer acquires/releases its own <see cref="BodyOwnership.Token"/>.
         /// </summary>
-        public bool InputLocked { get; set; }
+        public BodyOwnership Body { get; private set; }
+
+        /// <summary>
+        /// Movement lock DERIVED from the arbiter: true while ANY system holds a body
+        /// token (attack / dash / death / knockback). No setter — writers acquire and
+        /// release their own token. While true the motor IGNORES the horizontal wish
+        /// input and PRESERVES the current horizontal velocity, the facing stops
+        /// following the input, and gravity / jump / wall state stay untouched.
+        /// </summary>
+        public bool InputLocked => Body.IsHeld;
+
+        /// <summary>
+        /// Current body owner (highest-priority held token), or null when free. Read-only
+        /// seam for semantic checks that need to know WHICH system holds the body
+        /// (e.g. PlayerCombat's dash-lock reads).
+        /// </summary>
+        public BodyPriority? BodyOwner => Body.Owner;
 
         /// <summary>
         /// True when the ground probe found a floor collider on the latest step.
@@ -195,6 +208,10 @@ namespace MK.Rebuild
 
         private void Awake()
         {
+            // Body ownership first: every sibling component reads Body in its own
+            // Update/FixedUpdate, but a same-GameObject Awake order is not guaranteed —
+            // create the arbiter before anything can observe it.
+            Body = new BodyOwnership();
             rb = GetComponent<Rigidbody>();
             body = GetComponent<CapsuleCollider>();
             visual = GetComponent<ICharacterVisual>();

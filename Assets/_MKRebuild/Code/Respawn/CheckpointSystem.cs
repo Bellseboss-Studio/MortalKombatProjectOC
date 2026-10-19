@@ -30,14 +30,19 @@ namespace MK.Rebuild
         [Tooltip("Player movement owner the respawn teleports. Null = auto-resolved (this GameObject).")]
         [SerializeField] private PlayerMotor motor;
 
+        [Tooltip("In-flight shove cleared on death so no residual knockback velocity survives. Null = auto-resolved (this GameObject).")]
+        [SerializeField] private PlayerKnockback knockback;
+
         [Tooltip("Runtime section reset run on death (dummies + IResettables). Null = auto-resolved (first in scene), or skipped if none.")]
         [SerializeField] private SectionReset sectionReset;
 
         [Tooltip("Style meter dropped to rank D on respawn (banked charges kept). Null = auto-resolved (this GameObject).")]
         [SerializeField] private StyleMeter styleMeter;
 
-        [Tooltip("Seconds between death and the respawn teleport, so the death clip reads before the revive crossfade.")]
-        [SerializeField] private float respawnDelay = 0.9f;
+        [Tooltip("OPTIONAL override (seconds) for the wait before the respawn teleport. 0 (default) = " +
+                 "DERIVE from AnimatorVisual.DeathDuration (trimmed death clip length / deathClipSpeed), " +
+                 "so the death always completes before the revive. Mirrors HazardDefinition.knockbackDuration.")]
+        [SerializeField] private float respawnDelay = 0f;
 
         [Tooltip("CrossFade duration out of the held Death pose into locomotion on revive.")]
         [SerializeField] private float respawnCrossFade = 0.15f;
@@ -45,11 +50,21 @@ namespace MK.Rebuild
         [Tooltip("Brief post-respawn invulnerability window (seconds).")]
         [SerializeField] private float invulnSeconds = 1f;
 
+        private AnimatorVisual animatorVisual;
         private Vector3 checkpointPosition;
         private Vector3 checkpointFacing;
         private int checkpointSectionId;
         private bool captured;
         private bool respawning;
+        private BodyOwnership.Token deathToken; // body ownership held for the death → respawn window
+
+        /// <summary>
+        /// Small margin (seconds) added on top of the DERIVED death duration: the coroutine
+        /// starts on the OnDied frame, but the Death CrossFade is fired right after it, so the
+        /// clip begins ~one frame later. 0.05 s guarantees the collapse finishes (last frame
+        /// shown) before the teleport. Only used on the derived path.
+        /// </summary>
+        private const float DeathRespawnMargin = 0.05f;
 
         /// <summary>Current respawn position (implicit checkpoint 0 until one is recorded).</summary>
         public Vector3 CheckpointPosition => checkpointPosition;
@@ -66,12 +81,30 @@ namespace MK.Rebuild
         /// <summary>True once a respawn target is held (always true after Awake — the implicit checkpoint 0).</summary>
         public bool HasCheckpoint => captured;
 
+        /// <summary>
+        /// Effective wait (seconds) between death and the respawn teleport. Derived from the
+        /// played animation by default (<see cref="AnimatorVisual.DeathDuration"/> + a one-frame
+        /// margin), so the collapse reads fully and the two can never drift; the serialized
+        /// <c>respawnDelay</c> is an explicit override (0 = derive).
+        /// </summary>
+        public float RespawnDelay
+        {
+            get
+            {
+                if (respawnDelay > 0f) return respawnDelay;
+                if (animatorVisual != null) return animatorVisual.DeathDuration + DeathRespawnMargin;
+                return 0.9f; // fallback: no visual driver (proxy) — pre-slice behavior
+            }
+        }
+
         private void Awake()
         {
             if (damage == null) damage = GetComponent<PlayerDamage>();
             if (motor == null) motor = GetComponent<PlayerMotor>();
+            if (knockback == null) knockback = GetComponent<PlayerKnockback>();
             if (sectionReset == null) sectionReset = FindFirstObjectByType<SectionReset>();
             if (styleMeter == null) styleMeter = GetComponent<StyleMeter>();
+            if (animatorVisual == null) animatorVisual = GetComponent<AnimatorVisual>();
             CaptureImplicitCheckpoint();
         }
 
@@ -119,9 +152,20 @@ namespace MK.Rebuild
             if (respawning) return;
             respawning = true;
 
+            // DEATH OUTRANKS KNOCKBACK IN PRACTICE (documented exception): the arbiter ranks
+            // Knockback (4) ABOVE Death (3), so merely acquiring Death while a shove token is
+            // held would leave the shove as the owner. Cancel the shove FIRST — that releases
+            // its token and zeroes its horizontal contribution — then Death owns the body.
+            // This is exactly the modified checkpoint-respawn requirement "clear any in-flight
+            // knockback" / "no residual knockback velocity persists".
+            if (knockback != null) knockback.Cancel();
+
             if (motor != null)
             {
-                motor.InputLocked = true;
+                // Acquire Death (outranks Dash/Attack): the corpse keeps the body lock for
+                // the WHOLE respawn window, and each system's own release can no longer
+                // clobber it (W1). Released by RespawnRoutine after Revive.
+                if (motor.Body != null) deathToken = motor.Body.Acquire(BodyPriority.Death);
                 // Teleport-in-place: zero the corpse velocity so a mid-air death does not
                 // slide during the delay. Facing (zero arg) is left untouched.
                 motor.Teleport(transform.position);
@@ -138,7 +182,7 @@ namespace MK.Rebuild
         /// </summary>
         private IEnumerator RespawnRoutine()
         {
-            yield return new WaitForSeconds(Mathf.Max(0f, respawnDelay));
+            yield return new WaitForSeconds(Mathf.Max(0f, RespawnDelay));
 
             if (sectionReset != null) sectionReset.ResetSection();
             if (motor != null) motor.Teleport(checkpointPosition, checkpointFacing);
@@ -149,7 +193,9 @@ namespace MK.Rebuild
                 damage.Revive(respawnCrossFade);
             }
             if (styleMeter != null) styleMeter.ResetRank();
-            if (motor != null) motor.InputLocked = false;
+            // Release ONLY the death token: any other in-flight owner keeps its lock.
+            if (motor != null && motor.Body != null) motor.Body.Release(deathToken);
+            deathToken = null;
 
             respawning = false;
         }

@@ -117,6 +117,7 @@ namespace MK.Rebuild
         private bool comboActive;
         private int stepIndex = -1;             // index into combo.steps
         private ComboStep currentStep;          // struct copy of the active step
+        private BodyOwnership.Token attackToken; // body-ownership token for moveLock steps
         private float stepTime;                 // scaled seconds into the step
         private bool connectedThisStep;         // hit landed this step -> wider cancel
         private readonly HashSet<HitReceiver> hitThisStep = new HashSet<HitReceiver>();
@@ -213,7 +214,7 @@ namespace MK.Rebuild
         private void OnDisable()
         {
             if (input != null) input.Player.Disable();
-            if (motor != null) motor.InputLocked = false; // never leave a stale attack lock
+            ReleaseAttackToken(); // never leave a stale attack token
         }
 
         private void OnDestroy()
@@ -238,11 +239,11 @@ namespace MK.Rebuild
             }
 
             // Unscaled buffer decay (jumpBuffer pattern): a tap survives ~0.15 s.
-            // EXCEPT while the DASH holds the movement lock (idle + InputLocked + no combo):
+            // EXCEPT while the DASH owns the body (idle + dash token + no combo):
             // the attack pressed mid-dash is HELD (no decay) so it fires the instant the dash
             // ends — dash -> attack -> combo. Combo steps are UNAFFECTED: their own 0.15 s
             // step buffer keeps decaying (comboActive skips this hold).
-            bool dashHoldsInput = motor != null && motor.InputLocked && !comboActive;
+            bool dashHoldsInput = motor != null && motor.BodyOwner == BodyPriority.Dash && !comboActive;
             if (!dashHoldsInput)
             {
                 if (lightBuffer > 0f) lightBuffer = Mathf.Max(0f, lightBuffer - Time.unscaledDeltaTime);
@@ -258,6 +259,13 @@ namespace MK.Rebuild
         private void FixedUpdate()
         {
             if (hitstopRemaining > 0f) return;
+            // BODY-OWNERSHIP GUARD (m2-hazards S2): a higher-priority system (death /
+            // knockback) owns the body — do NOT write a lunge velocity or probe hits onto
+            // the corpse. Mirrors PlayerDash's yield check. The combo itself keeps running
+            // (UpdateCombo) and ends normally, releasing ONLY its own attack token.
+            if (motor != null && motor.Body != null
+                && motor.Body.Owner != null && motor.Body.Owner != BodyPriority.Attack)
+                return;
             if (comboActive)
             {
                 ApplyLunge(currentStep);
@@ -295,14 +303,14 @@ namespace MK.Rebuild
                 return;
             }
 
-            // While the dash owns the movement lock, combat cannot normally START an attack
+            // While the DASH owns the body, combat cannot normally START an attack
             // (its lunge would fight the dash velocity). Two paths (slice 3septies):
             //   1. EARLY CANCEL: an attack pressed past the dash's min cancel window CUTS the
             //      dash short (PlayerDash.TryCancelByAttack) and starts the attack this SAME
             //      frame — no waiting for the dash to end (dash-cancel into attack).
             //   2. FALLBACK: before that window (or with no dash) the press is BUFFERED (held,
-            //      not decayed) and fires when PlayerDash releases the lock at dash end.
-            if (motor != null && motor.InputLocked)
+            //      not decayed) and fires when PlayerDash releases the token at dash end.
+            if (motor != null && motor.BodyOwner == BodyPriority.Dash)
             {
                 bool lightPressed = LightPressedThisFrame();
                 bool heavyPressed = HeavyPressedThisFrame();
@@ -347,6 +355,14 @@ namespace MK.Rebuild
         /// </summary>
         private bool TryStartAttack(bool light, bool heavy)
         {
+            // BODY-OWNERSHIP ENTRY GATE (m2-hazards S2): a swing must not start while a
+            // higher-priority system (death / knockback) owns the body. Checked HERE rather
+            // than in CanStartAttack: the dash branch of UpdateIdle must stay reachable so an
+            // attack pressed during the dash can CANCEL it — this gate is re-evaluated after
+            // that cancel releases the dash token.
+            if (motor != null && motor.Body != null && !motor.Body.CanAcquire(BodyPriority.Attack))
+                return false;
+
             // DIRECTIONAL VARIANT (slice 3nonies, decision a/f): read the RAW stick in
             // the FRAME OF THE PRESS and classify it. Done HERE, before StartCombo ->
             // ApplyAimAssist: the direction picks WHICH attack (root), the aim-assist
@@ -508,7 +524,7 @@ namespace MK.Rebuild
         {
             if (comboActive) EndCombo();
             if (current != null) EndSwing();
-            if (motor != null) motor.InputLocked = false; // belt-and-braces: never leave a stale lock
+            ReleaseAttackToken(); // belt-and-braces: never leave a stale attack token
             lightBuffer = 0f;
             heavyBuffer = 0f;
         }
@@ -705,7 +721,7 @@ namespace MK.Rebuild
             connectedThisStep = false;
             hitThisStep.Clear();
             ClearAimAssist();
-            if (motor != null) motor.InputLocked = false; // release the attack lock -> wish control returns
+            ReleaseAttackToken(); // release the attack token -> wish control returns
             if (visual is AnimatorVisual animatorVisual)
             {
                 animatorVisual.ReleaseAttack();
@@ -722,7 +738,25 @@ namespace MK.Rebuild
         /// </summary>
         private void ApplyStepLock(in ComboStep step)
         {
-            if (motor != null) motor.InputLocked = step.moveLock;
+            if (motor == null || motor.Body == null) return;
+            if (step.moveLock)
+            {
+                // ONE token per combo. Release removes a SPECIFIC token, so acquiring a
+                // fresh token on every moveLock step would orphan the earlier ones and
+                // leave the body locked forever after EndCombo (deadlock).
+                if (attackToken == null) attackToken = motor.Body.Acquire(BodyPriority.Attack);
+            }
+            else
+            {
+                ReleaseAttackToken();
+            }
+        }
+
+        /// <summary>Releases the combo's attack token (idempotent).</summary>
+        private void ReleaseAttackToken()
+        {
+            if (motor != null && motor.Body != null) motor.Body.Release(attackToken);
+            attackToken = null;
         }
 
         /// <summary>

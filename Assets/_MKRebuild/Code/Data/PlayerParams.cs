@@ -79,11 +79,21 @@ namespace MK.Rebuild
                  "jumpStartSpeed; drives the Dash state's DashSpeed parameter.")]
         public float dashClipSpeed = 2.29f;
 
-        [Header("Death clip retiming (TEMPORARY — set to 1 once the clip is retimed to x1)")]
-        [Tooltip("Animator state speed multiplier for the Death state (anim_dizzy_death is 12.667 s). " +
-                 "Default 1.0 = natural playback: evaluate the full death animation first, THEN tune. " +
-                 "Same retiming home as dashClipSpeed; drives the Death state's DeathSpeed parameter.")]
-        public float deathClipSpeed = 1.0f;
+        [Header("Death clip retiming")]
+        [Tooltip("Animator state speed multiplier for the Death state. The Death state plays the " +
+                 "trimmed collapse clip anim_dizzy_death_collapse (2.5 s: 7.0→9.5 s of the source, " +
+                 "the readable fall; the 12.667 s source was dizzy → collapse → motionless corpse). " +
+                 "3.5 speeds the collapse to ~0.71 s. The respawn delay is DERIVED from it: " +
+                 "AnimatorVisual.DeathDuration = clip.length / this value, so the teleport happens " +
+                 "when the collapse completes (same contract as hitReactionClipSpeed).")]
+        public float deathClipSpeed = 3.5f;
+
+        [Header("Hit reaction clip retiming")]
+        [Tooltip("Animator state speed multiplier for the HitReaction state. The body lock is " +
+                 "DERIVED from the trimmed impact clip: AnimatorVisual.HitReactionDuration = " +
+                 "clip.length / this value, so the lock and the animation can never drift apart. " +
+                 "1 = natural playback of the 0.40 s impact clip (peak lean + 2-frame hold).")]
+        public float hitReactionClipSpeed = 1.0f;
 
         [Header("Feel (tunables)")]
         [Tooltip("Seconds to reach full speed (ground).")]

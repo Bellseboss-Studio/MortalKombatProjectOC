@@ -6,10 +6,10 @@ namespace MK.Rebuild
     /// <summary>
     /// M1 slice anim-packs-integration (slice 3-uno): the PLAYER's hurt path. Until now
     /// the player had NONE — <see cref="HitReceiver"/> is victim-side only (enemies/dummies).
-    /// This is the one genuinely new seam of the slice, kept deliberately SIGNAL-ONLY:
-    /// it plays the hit-reaction one-shot or the death one-shot and fires
-    /// <see cref="OnDamaged"/>/<see cref="OnDied"/>. NO knockback, NO hitstop, NO health UI,
-    /// NO respawn/Destroy — all future work.
+    /// The hurt path plays the hit-reaction one-shot or the death one-shot, faces the hit
+    /// source, applies the authored horizontal shove (<see cref="PlayerKnockback"/>, S3) and
+    /// fires <see cref="OnDamaged"/>/<see cref="OnDied"/>. No hitstop, no health UI, no
+    /// respawn/Destroy here — those are other systems.
     ///
     /// Minimal live/dead gate only: <see cref="TakeHit"/> subtracts HP and plays the
     /// HitReaction state (which returns to locomotion on its own exit-time transition);
@@ -28,8 +28,8 @@ namespace MK.Rebuild
     [DisallowMultipleComponent]
     public sealed class PlayerDamage : MonoBehaviour
     {
-        [Tooltip("Max HP. 20 mirrors HitReceiver's dummy default. TakeHit subtracts; at 0 the death clip plays. Minimal live/dead gate — NOT a health system, no HUD.")]
-        [SerializeField] private int maxHp = 20;
+        [Tooltip("Max HP. 100 is the GDD player baseline (dummy HitReceiver HP is separate). TakeHit subtracts; at 0 the death clip plays. Minimal live/dead gate — NOT a health system, no HUD.")]
+        [SerializeField] private int maxHp = 100;
 
         [Tooltip("CrossFade duration (seconds) into the HitReaction/Death states (~0.1, same as the attack seams).")]
         [SerializeField] private float crossFadeDuration = 0.1f;
@@ -39,6 +39,7 @@ namespace MK.Rebuild
         private PlayerCombat combat;
         private StyleMeter styleMeter;
         private AnimatorVisual animatorVisual;
+        private PlayerKnockback knockback;
 
         /// <summary>True while HP is above zero (read-only debug seam).</summary>
         public bool IsAlive => hp > 0;
@@ -68,18 +69,32 @@ namespace MK.Rebuild
             combat = GetComponent<PlayerCombat>();
             styleMeter = GetComponent<StyleMeter>();
             animatorVisual = GetComponent<AnimatorVisual>();
+            knockback = GetComponent<PlayerKnockback>();
         }
 
         /// <summary>
         /// Applies <paramref name="damage"/> to the player. A non-lethal hit plays the
-        /// hit-reaction one-shot and fires <see cref="OnDamaged"/>; damage that brings HP
-        /// to 0 dies (death one-shot + <see cref="OnDied"/>) instead. No-op once dead
-        /// OR while the respawn invulnerability window is open
-        /// (<see cref="GrantInvulnerability"/>). <paramref name="direction"/> is RESERVED
-        /// for the future knockback/push seam — this slice is signal-only and does not
-        /// move the body.
+        /// hit-reaction one-shot, faces the hit source, applies the shove and fires
+        /// <see cref="OnDamaged"/>; damage that brings HP to 0 dies (death one-shot +
+        /// <see cref="OnDied"/>) instead. No-op once dead OR while the invulnerability
+        /// window is open (<see cref="GrantInvulnerability"/>).
+        ///
+        /// <paramref name="direction"/> is the PUSH direction (away from the source); the
+        /// body faces its OPPOSITE (the attacker/wall) and <see cref="PlayerKnockback"/>
+        /// moves it. This 2-arg overload uses the knockback component's fallback distance;
+        /// hazards use the 4-arg overload with their authored numbers.
         /// </summary>
         public void TakeHit(int damage, Vector3 direction)
+        {
+            TakeHit(damage, direction, -1f, 0f);
+        }
+
+        /// <summary>
+        /// Hazard entry (m2-hazards S3): same hurt path, with an AUTHORED knockback distance
+        /// (meters) and an optional duration override (0 = derive from the hit animation).
+        /// <paramref name="knockbackDistance"/> &lt; 0 means "use the component fallback".
+        /// </summary>
+        public void TakeHit(int damage, Vector3 direction, float knockbackDistance, float knockbackDuration)
         {
             if (!IsAlive || IsInvulnerable) return;
             hp = Mathf.Max(0, hp - Mathf.Max(0, damage));
@@ -93,6 +108,22 @@ namespace MK.Rebuild
             CancelAttacks();
             if (styleMeter != null) styleMeter.NotifyDamageTaken();
             OnDamaged?.Invoke();
+
+            // m2-hazards S3: the reserved direction is now real. Face the SOURCE (opposite
+            // the push), then hand the horizontal shove to PlayerKnockback. Ordered before
+            // PlayHitReaction so the shove clip is already oriented at the threat.
+            Vector3 push = direction;
+            push.y = 0f;
+            if (push.sqrMagnitude > 0.000001f)
+            {
+                if (animatorVisual != null) animatorVisual.SnapFacing(-push);
+                if (knockback != null)
+                {
+                    float distance = knockbackDistance >= 0f ? knockbackDistance : knockback.DefaultDistance;
+                    knockback.Apply(push, distance, knockbackDuration);
+                }
+            }
+
             if (animatorVisual != null) animatorVisual.PlayHitReaction(crossFadeDuration);
         }
 
