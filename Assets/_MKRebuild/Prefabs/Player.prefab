@@ -22,6 +22,7 @@ GameObject:
   - component: {fileID: 6227659845601279009}
   - component: {fileID: 7278438221546404397}
   - component: {fileID: 4324381211253474142}
+  - component: {fileID: 6204770575668994066}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -168,6 +169,7 @@ MonoBehaviour:
   paramsAsset: {fileID: 11400000, guid: ad08d2f47e8b56d42b69fb0969737279, type: 2}
   groundSnap: 0.15
   stickForce: -1
+  footstepInterval: 0.4
 --- !u!114 &2864747290847500365
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -288,6 +290,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerDamage
   maxHp: 100
   crossFadeDuration: 0.1
+  getUpDuration: 2
 --- !u!114 &6227659845601279009
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -325,6 +328,7 @@ MonoBehaviour:
   knockback: {fileID: 0}
   sectionReset: {fileID: 0}
   styleMeter: {fileID: 0}
+  cameraRig: {fileID: 0}
   respawnDelay: 0
   respawnCrossFade: 0.15
   invulnSeconds: 1
@@ -341,6 +345,29 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerKnockback
   defaultDistance: 2.5
+--- !u!114 &6204770575668994066
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555956608794397432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cc9ef63ae8991c42b19b4483d92c1a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerShadow
+  maxDistance: 50
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundOffset: 0.02
+  baseDiameter: 1.2
+  minDiameter: 0.35
+  maxHeight: 8
+  baseAlpha: 0.55
+  minAlpha: 0.12
+  rayStartOffset: 0.3
 --- !u!1 &6055354495051249728
 GameObject:
   m_ObjectHideFlags: 0
@@ -499,7 +526,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5837948900917359932, guid: 878b806aa43efd949b1ff75f173a3ed9, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.9086153
+      value: -0.976
       objectReference: {fileID: 0}
     - target: {fileID: 5837948900917359932, guid: 878b806aa43efd949b1ff75f173a3ed9, type: 3}
       propertyPath: m_LocalPosition.z
