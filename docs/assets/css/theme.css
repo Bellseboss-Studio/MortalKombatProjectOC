@@ -1,0 +1,347 @@
+/*
+	Mortal Kombat Project OC — theme overrides
+	Layered on top of Stellar (HTML5 UP) main.css.
+	Plain CSS (no SCSS build). Loaded AFTER main.css.
+*/
+
+/* ------------------------------------------------------------------ */
+/* 01. Palette tokens + display font                                   */
+/* ------------------------------------------------------------------ */
+
+:root {
+	--mk-black: #0a0a0a;
+	--mk-ink: #141414;
+	--mk-white: #fff;
+	--mk-red: #c1121f;
+	--mk-red-bright: #e01b24;
+	--mk-red-dark: #8a0d16;
+	--mk-text: #2b2b2b;
+	--mk-body: #4a4a4a;
+	--mk-border: #e2e2e2;
+	--mk-on-dark: rgba(255, 255, 255, .72);
+	--mk-display: 'Oswald', 'Source Sans Pro', sans-serif;
+}
+
+h1, h2, h3,
+.button,
+#nav ul li a {
+	font-family: var(--mk-display);
+}
+
+/* ------------------------------------------------------------------ */
+/* 02. Canvas: solid black, kill the purple gradient + overlay.png     */
+/* ------------------------------------------------------------------ */
+
+html, body {
+	background: var(--mk-black);
+}
+
+body {
+	background-image: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* 03. Accessible focus ring                                           */
+/* ------------------------------------------------------------------ */
+
+*:focus-visible {
+	outline: 2px solid var(--mk-red-bright);
+	outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 04. Hero / header.alt                                               */
+/* ------------------------------------------------------------------ */
+
+#header.alt {
+	position: relative;
+	overflow: hidden;
+	background: var(--mk-black);
+}
+
+.hero-bg,
+.hero-video {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: .45;
+}
+
+.hero-bg {
+	opacity: 1 !important;
+	transition: none;
+}
+
+/* Hero sting plays ONCE, then fades out and is removed (never loops). */
+.hero-video {
+	transition: opacity .8s ease;
+}
+
+.hero-video.is-hidden {
+	opacity: 0;
+}
+
+.hero-inner {
+	position: relative;
+	z-index: 1;
+}
+
+#header.alt h1 {
+	color: #fff;
+}
+
+#header.alt h1 .sub {
+	display: block;
+	font-size: .55em;
+	letter-spacing: .18em;
+	color: var(--mk-on-dark);
+}
+
+.tagline {
+	color: var(--mk-on-dark);
+}
+
+/* ------------------------------------------------------------------ */
+/* 05. Nav (dark)                                                      */
+/* ------------------------------------------------------------------ */
+
+#nav {
+	background: var(--mk-ink);
+	color: #fff;
+}
+
+#nav a {
+	color: rgba(255, 255, 255, .8);
+}
+
+#nav a:hover {
+	color: #fff;
+}
+
+#nav ul li a.active {
+	background: var(--mk-red);
+	color: #fff;
+}
+
+#nav.alt {
+	background: rgba(10, 10, 10, .96);
+}
+
+/* ------------------------------------------------------------------ */
+/* 06. Buttons                                                         */
+/* ------------------------------------------------------------------ */
+
+.button {
+	font-weight: 600;
+	letter-spacing: .02em;
+}
+
+.button.primary,
+#main .button.primary {
+	background: var(--mk-red);
+}
+
+.button.primary:hover,
+#main .button.primary:hover {
+	background: var(--mk-red-bright);
+}
+
+.button.primary:active,
+#main .button.primary:active {
+	background: var(--mk-red-dark);
+}
+
+/* On-dark (hero / footer) outline buttons stay legible on black. */
+#header .button,
+#footer .button {
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .4);
+}
+
+/* ------------------------------------------------------------------ */
+/* 07. #main content panel (stays white, red accents)                  */
+/* ------------------------------------------------------------------ */
+
+#main {
+	color: var(--mk-body);
+}
+
+#main h1, #main h2, #main h3, #main h4, #main h5, #main h6 {
+	color: var(--mk-text);
+}
+
+#main a {
+	color: var(--mk-red);
+}
+
+#main a:hover {
+	color: var(--mk-red-dark);
+}
+
+#main header.major h2:after {
+	background-image: none;
+	background-color: var(--mk-red);
+}
+
+#main > .main {
+	border-top-color: var(--mk-border);
+}
+
+#main table tbody tr,
+#main table thead,
+#main table tfoot,
+#main table.alt tbody tr td {
+	border-color: var(--mk-border);
+}
+
+#main .spotlight .image {
+	border-color: var(--mk-border);
+}
+
+/* ------------------------------------------------------------------ */
+/* 08. Roster feature icons — neutralise pastel palette to red         */
+/* ------------------------------------------------------------------ */
+
+.icon.major.style1, .icon.major.style2, .icon.major.style3,
+.icon.major.style4, .icon.major.style5 {
+	color: var(--mk-red);
+}
+
+.icon.major,
+.icon.major:before {
+	border-color: var(--mk-border);
+}
+
+.features li .icon.major:before {
+	color: var(--mk-red);
+}
+
+/* ------------------------------------------------------------------ */
+/* 09. Statistics strip                                                */
+/* ------------------------------------------------------------------ */
+
+.statistics li.style1,
+.statistics li.style3,
+.statistics li.style5 {
+	background: var(--mk-red-dark);
+}
+
+.statistics li.style2,
+.statistics li.style4 {
+	background: var(--mk-black);
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. Spotlight — un-circle the image, use soft rounded frames        */
+/* ------------------------------------------------------------------ */
+
+#main .spotlight .image {
+	border-radius: 8px;
+	padding: 0;
+}
+
+#main .spotlight .image img {
+	border-radius: 8px;
+	width: 100%;
+	max-width: 22em;
+}
+
+/* ------------------------------------------------------------------ */
+/* 11. Grids (concept art + gallery)                                   */
+/* ------------------------------------------------------------------ */
+
+#main .row.gtr-uniform .image img,
+#main .row.gtr-uniform > div > a > img {
+	border-radius: 8px;
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* 12. Table (facts + controls)                                        */
+/* ------------------------------------------------------------------ */
+
+.table-wrapper {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+/* ------------------------------------------------------------------ */
+/* 13. Footer + disclaimer                                             */
+/* ------------------------------------------------------------------ */
+
+#footer {
+	color: var(--mk-on-dark);
+}
+
+#footer a {
+	color: #fff;
+}
+
+#footer .copyright {
+	color: rgba(255, 255, 255, .55);
+}
+
+.disclaimer {
+	font-size: .85em;
+	color: rgba(255, 255, 255, .6);
+}
+
+/* ------------------------------------------------------------------ */
+/* 14. Mobile nav (Stellar hides #nav under 736px — bring it back)     */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 736px) {
+
+	#nav {
+		position: static;
+		display: block;
+		width: 100%;
+		max-width: 100%;
+		border-radius: 0;
+	}
+
+	#nav.alt {
+		position: static;
+	}
+
+	#nav + #main {
+		padding-top: 0;
+	}
+
+	#nav ul li a {
+		font-size: .85em;
+		padding: 0 .75rem;
+	}
+
+}
+
+/* ------------------------------------------------------------------ */
+/* 15. Defensive guards                                                */
+/* ------------------------------------------------------------------ */
+
+html {
+	overflow-x: hidden;
+}
+
+img, video, table {
+	max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+	.hero-video {
+		display: none;
+	}
+
+}
+
+@media (max-width: 736px) {
+
+	.hero-video {
+		display: none;
+	}
+
+}
