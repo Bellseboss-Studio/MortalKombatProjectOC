@@ -17,8 +17,9 @@ namespace MK.Rebuild
     /// corpse (teleport-in-place) and starts a coroutine that waits so the death clip
     /// can read, then teleports, heals, grants invulnerability and revives.
     ///
-    /// Runtime-only: this type never references the Debug assembly. Slice 2 (SectionReset)
-    /// and slice 3 (StyleMeter.ResetRank) plug into <see cref="RespawnRoutine"/>.
+    /// Runtime-only: this type never references the Debug assembly. The SectionReset
+    /// seam (slice 2) and the StyleMeter rank→D reset (slice 3) both plug into
+    /// <see cref="RespawnRoutine"/>.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class CheckpointSystem : MonoBehaviour
@@ -31,6 +32,9 @@ namespace MK.Rebuild
 
         [Tooltip("Runtime section reset run on death (dummies + IResettables). Null = auto-resolved (first in scene), or skipped if none.")]
         [SerializeField] private SectionReset sectionReset;
+
+        [Tooltip("Style meter dropped to rank D on respawn (banked charges kept). Null = auto-resolved (this GameObject).")]
+        [SerializeField] private StyleMeter styleMeter;
 
         [Tooltip("Seconds between death and the respawn teleport, so the death clip reads before the revive crossfade.")]
         [SerializeField] private float respawnDelay = 0.9f;
@@ -67,6 +71,7 @@ namespace MK.Rebuild
             if (damage == null) damage = GetComponent<PlayerDamage>();
             if (motor == null) motor = GetComponent<PlayerMotor>();
             if (sectionReset == null) sectionReset = FindFirstObjectByType<SectionReset>();
+            if (styleMeter == null) styleMeter = GetComponent<StyleMeter>();
             CaptureImplicitCheckpoint();
         }
 
@@ -128,8 +133,8 @@ namespace MK.Rebuild
         /// <summary>
         /// The respawn flow (1:1 with the design order): wait so the death clip reads,
         /// reset the current section, teleport to the checkpoint pose, restore full HP,
-        /// open the invulnerability window, revive out of the Death pose, then hand
-        /// control back. Rank reset (slice 3) slots in before the teleport later.
+        /// open the invulnerability window, revive out of the Death pose, drop the style
+        /// rank to D (banked charges kept), then hand control back.
         /// </summary>
         private IEnumerator RespawnRoutine()
         {
@@ -143,6 +148,7 @@ namespace MK.Rebuild
                 damage.GrantInvulnerability(invulnSeconds);
                 damage.Revive(respawnCrossFade);
             }
+            if (styleMeter != null) styleMeter.ResetRank();
             if (motor != null) motor.InputLocked = false;
 
             respawning = false;

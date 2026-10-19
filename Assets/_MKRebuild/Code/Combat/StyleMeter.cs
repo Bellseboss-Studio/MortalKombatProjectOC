@@ -21,8 +21,12 @@ namespace MK.Rebuild
     /// M4 Fatality banks/spends through <see cref="AddCharge"/> /
     /// <see cref="SpendCharge"/> — no finisher, no QTE here.
     ///
-    /// Limpieza (damage-taken rank-down) is a DORMANT stub: Leena is not damageable
-    /// and no enemy hits back (M3). <see cref="NotifyDamageTaken"/> has no callers.
+    /// Limpieza (damage-taken rank-down): <see cref="NotifyDamageTaken"/> is an
+    /// effect-free stub. It now HAS a real caller — <see cref="PlayerDamage"/> invokes
+    /// it on every non-lethal hit and on death — but the rank-down effect itself is
+    /// deferred to M3 (a future design decision), so its body stays empty. Rank→D on
+    /// RESPAWN is instead the explicit <see cref="ResetRank"/> that
+    /// <see cref="CheckpointSystem"/> drives (m2-respawn slice 3).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class StyleMeter : MonoBehaviour
@@ -140,6 +144,17 @@ namespace MK.Rebuild
         public void NotifyDamageTaken()
         {
             // M3: rank-down effect goes here. Deliberately empty in this slice.
+        }
+
+        /// <summary>
+        /// Drops the rank to D by zeroing style points. Called by
+        /// <see cref="CheckpointSystem"/> on respawn (m2-respawn slice 3). Banked
+        /// Fatality <see cref="Charges"/> are deliberately UNTOUCHED — death resets the
+        /// rank, not the banked stock. Charge progress is left alone (it only ever fills).
+        /// </summary>
+        public void ResetRank()
+        {
+            points = 0f;
         }
 
         /// <summary>
