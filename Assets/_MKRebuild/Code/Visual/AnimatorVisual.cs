@@ -330,6 +330,40 @@ namespace MK.Rebuild
         }
 
         /// <summary>
+        /// REVIVE seam (m2-respawn slice 1): forces the Animator OUT of the held Death
+        /// pose and back into locomotion. The <c>Death</c> state has NO outgoing transition
+        /// (Leena.controller), so this uses a forced <see cref="Animator.CrossFade"/> to
+        /// the real <c>Idle</c> state — bypassing the authored transition graph, no
+        /// controller asset edit and no new parameter. <c>MoveState</c>/<c>Speed</c> are
+        /// settled to Free/0 so the controller enters Idle (not a stale Walk/Run) and the
+        /// next FixedUpdate resumes normally from input. Called by
+        /// <see cref="PlayerDamage.Revive"/>.
+        /// </summary>
+        public void ResetToLocomotion(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            moveState = MoveState.Free;
+            animator.SetInteger(MoveStateHash, (int)MoveState.Free);
+            animator.SetFloat(SpeedHash, 0f);
+            animator.SetFloat(VerticalSpeedHash, 0f);
+            animator.SetBool(RunningHash, false);
+            animator.CrossFade("Idle", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+        }
+
+        /// <summary>
+        /// Instantly snaps the facing root to a world direction (m2-respawn slice 1):
+        /// unlike <see cref="SetFacing"/> (which turns at <c>turnSpeed</c> per frame),
+        /// this sets the rotation in one shot so a respawn restores the checkpoint's
+        /// captured facing immediately. Used by <see cref="PlayerMotor.Teleport"/>.
+        /// </summary>
+        public void SnapFacing(Vector3 worldDirection)
+        {
+            if (worldDirection.sqrMagnitude < 0.0001f) return;
+            var root = facingRoot != null ? facingRoot : transform;
+            root.rotation = Quaternion.LookRotation(worldDirection.normalized, Vector3.up);
+        }
+
+        /// <summary>
         /// Per-step clip speed multiplier mapped to the state's speed parameter
         /// (decision c, 1 = normal playback). Static: set when a step starts.
         /// </summary>

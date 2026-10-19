@@ -35,12 +35,16 @@ namespace MK.Rebuild
         [SerializeField] private float crossFadeDuration = 0.1f;
 
         private int hp;
+        private float invulnerableUntil;
         private PlayerCombat combat;
         private StyleMeter styleMeter;
         private AnimatorVisual animatorVisual;
 
         /// <summary>True while HP is above zero (read-only debug seam).</summary>
         public bool IsAlive => hp > 0;
+
+        /// <summary>True while the post-respawn invulnerability window is open (read-only debug seam).</summary>
+        public bool IsInvulnerable => Time.time < invulnerableUntil;
 
         /// <summary>Current HP (read-only debug seam).</summary>
         public int HP => hp;
@@ -69,13 +73,15 @@ namespace MK.Rebuild
         /// <summary>
         /// Applies <paramref name="damage"/> to the player. A non-lethal hit plays the
         /// hit-reaction one-shot and fires <see cref="OnDamaged"/>; damage that brings HP
-        /// to 0 dies (death one-shot + <see cref="OnDied"/>) instead. No-op once dead.
-        /// <paramref name="direction"/> is RESERVED for the future knockback/push seam —
-        /// this slice is signal-only and does not move the body.
+        /// to 0 dies (death one-shot + <see cref="OnDied"/>) instead. No-op once dead
+        /// OR while the respawn invulnerability window is open
+        /// (<see cref="GrantInvulnerability"/>). <paramref name="direction"/> is RESERVED
+        /// for the future knockback/push seam — this slice is signal-only and does not
+        /// move the body.
         /// </summary>
         public void TakeHit(int damage, Vector3 direction)
         {
-            if (!IsAlive) return;
+            if (!IsAlive || IsInvulnerable) return;
             hp = Mathf.Max(0, hp - Mathf.Max(0, damage));
 
             if (hp <= 0)
@@ -99,6 +105,47 @@ namespace MK.Rebuild
             if (!IsAlive) return;
             hp = 0;
             Die();
+        }
+
+        /// <summary>
+        /// Restores FULL HP (hp = maxHp). Does NOT revive the Animator — pair with
+        /// <see cref="Revive"/> (the respawn routine calls both). No other state is
+        /// touched: this is the smallest "back to full" seam, not a health system.
+        /// </summary>
+        public void Heal()
+        {
+            hp = maxHp;
+        }
+
+        /// <summary>
+        /// Opens a brief invulnerability window of <paramref name="duration"/> seconds.
+        /// While open, <see cref="TakeHit"/> early-returns (no damage, no hit reaction) —
+        /// the respawn grace after a revive. <see cref="Kill"/> is deliberately NOT gated,
+        /// so the F7 debug driver stays deterministic.
+        /// </summary>
+        public void GrantInvulnerability(float duration)
+        {
+            invulnerableUntil = Time.time + Mathf.Max(0f, duration);
+        }
+
+        /// <summary>
+        /// Revives from the held Death pose: forces the visual back to locomotion
+        /// (<see cref="AnimatorVisual.ResetToLocomotion"/>) using this component's
+        /// serialized <c>crossFadeDuration</c>. The hurt-entry owns the anim driver
+        /// (same as <see cref="Die"/>), so the respawn routine asks here, not directly.
+        /// </summary>
+        public void Revive()
+        {
+            Revive(crossFadeDuration);
+        }
+
+        /// <summary>
+        /// Revives from the held Death pose with an explicit crossfade duration
+        /// (<paramref name="crossFadeDuration"/> seconds into locomotion).
+        /// </summary>
+        public void Revive(float crossFadeDuration)
+        {
+            if (animatorVisual != null) animatorVisual.ResetToLocomotion(crossFadeDuration);
         }
 
         private void Die()

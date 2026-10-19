@@ -129,6 +129,70 @@ namespace MK.Rebuild
         /// </summary>
         public Vector3 WishDirection => wishDir;
 
+        /// <summary>
+        /// Hard-sets this actor's root pose (m2-respawn slice 1) and CLEARS every stale
+        /// motion cache, so a leftover mantle warp, hang slide, wall-jump impulse or
+        /// re-grab latch cannot carry across the move. This is the respawn teleport seam —
+        /// the motor stays the movement owner (the checkpoint system does NOT poke the
+        /// Rigidbody directly). Facing is kept.
+        /// </summary>
+        public void Teleport(Vector3 position)
+        {
+            Teleport(position, Vector3.zero);
+        }
+
+        /// <summary>
+        /// Hard-sets the root to <paramref name="position"/> (and snaps the facing root to
+        /// <paramref name="facing"/> when non-zero), then clears the stale motion caches.
+        /// See <see cref="Teleport(Vector3)"/>.
+        /// </summary>
+        public void Teleport(Vector3 position, Vector3 facing)
+        {
+            // Kill the mantle warp outright; warpT is only meaningful while mantling.
+            mantling = false;
+            warpT = 0f;
+            // Velocity + movement smoothing: nothing from the previous life carries over.
+            verticalVel = 0f;
+            smoothVel = Vector3.zero;
+            lockHoriz = Vector3.zero;
+            // Wall/ledge/lock timers and contact latches: a fresh pose grabs/falls fresh.
+            wallJumpLockTimer = 0f;
+            wallReGrabTimer = 0f;
+            ledgeReGrabTimer = 0f;
+            wallCoyoteTimer = 0f;
+            coyoteTimer = 0f;
+            wallGrabHeld = false;
+            wallContact = false;
+            wallCollider = null;
+            ledgeContact = false;
+            ledgeCollider = null;
+            wasLedgeHang = false;
+            holdingWallJumpFacing = false;
+            facingLocked = false;
+            desiredFacing = Vector3.zero;
+
+            if (rb != null)
+            {
+                rb.position = position;
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+
+            if (visual != null)
+            {
+                if (facing.sqrMagnitude > 0.000001f)
+                {
+                    if (visual is AnimatorVisual animatorVisual) animatorVisual.SnapFacing(facing);
+                    else visual.SetFacing(facing);
+                }
+                visual.SetMoveState(MoveState.Free);
+                visual.SetSpeed(0f);
+                visual.SetVerticalSpeed(0f);
+                visual.SetGrounded(false);
+                visual.SetRunning(false);
+            }
+        }
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody>();
