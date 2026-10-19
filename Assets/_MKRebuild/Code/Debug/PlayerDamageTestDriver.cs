@@ -21,6 +21,7 @@ namespace MK.Rebuild.Debugging
     [DisallowMultipleComponent]
     public sealed class PlayerDamageTestDriver : MonoBehaviour
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         private const int TestDamage = 6;
 
         [Tooltip("Player hurt path to drive. Null = auto-resolved (first PlayerDamage in the scene).")]
@@ -37,5 +38,6 @@ namespace MK.Rebuild.Debugging
             if (keyboard.f6Key.wasPressedThisFrame) damage.TakeHit(TestDamage, transform.forward);
             if (keyboard.f7Key.wasPressedThisFrame) damage.Kill();
         }
+#endif
     }
 }

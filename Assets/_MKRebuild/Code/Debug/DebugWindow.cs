@@ -20,6 +20,7 @@ namespace MK.Rebuild.Debugging
     [DisallowMultipleComponent]
     public sealed class DebugWindow : MonoBehaviour
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         // timeScale cycle: 0 → 0.25 → 0.5 → 1 → 2. Starts at 1x (index 3).
         // NOTE: timeScale = 0 freezes the Animator + FixedUpdate; this OnGUI overlay
         // keeps rendering because OnGUI is not tied to scaled time. A real PauseManager
@@ -234,5 +235,6 @@ namespace MK.Rebuild.Debugging
                 labelStyle.normal.textColor = Color.white;
             }
         }
+#endif
     }
 }
