@@ -58,6 +58,24 @@ namespace MK.Rebuild
         /// <summary>Current HP (read-only for the debug/verify seam).</summary>
         public int HP => hp;
 
+        /// <summary>Max HP of the current configure/serialized value (read-only debug seam).</summary>
+        public int MaxHp => maxHp;
+
+        /// <summary>
+        /// Phase-gate seam (boss): while TRUE, <see cref="TakeHit"/> is a no-op.
+        /// The boss turns this on during the roar transition and off when phase 2
+        /// begins. Dummies/enemies never set it, so their behavior is unchanged.
+        /// </summary>
+        public bool Invulnerable { get; set; }
+
+        /// <summary>
+        /// Lethal-hit seam (boss): fired INSTEAD of <see cref="OnDied"/> when HP
+        /// reaches 0. A listener may restore HP (phase transition) and the object
+        /// then stays alive; no death events fire. With no listener (dummies /
+        /// enemies) the behavior is identical to before.
+        /// </summary>
+        public event Action<HitReceiver> LethalHit;
+
         /// <summary>True while HP is above zero.</summary>
         public bool IsAlive => hp > 0;
 
@@ -115,6 +133,7 @@ namespace MK.Rebuild
         /// </summary>
         public void TakeHit(int damage, Vector3 dir, float launchImpulse = 0f)
         {
+            if (Invulnerable) return; // boss phase transition: no damage, no feedback
             if (!IsAlive) return;
             hp = Mathf.Max(0, hp - damage);
 
@@ -122,8 +141,14 @@ namespace MK.Rebuild
             // the scene Dummy and debug-spawned dummies alike (shared component).
             // The `!IsAlive` guard above makes a dying target stop taking hits —
             // even during the frame Destroy is deferred to end-of-frame.
+            //
+            // Boss seam: LethalHit fires first. If a listener restores HP (phase 1
+            // -> phase 2 transition) the object survives and this frame ends with
+            // no death/feedback. Without a listener, Die() runs exactly as before.
             if (hp <= 0)
             {
+                LethalHit?.Invoke(this);
+                if (hp > 0) return; // listener restored phase HP
                 Die();
                 return; // no feedback on the killing blow — the object is gone
             }

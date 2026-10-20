@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fb2204dbb26ce343b27a3fd66df023c, type: 3}
+  m_Name: Boss_Brute
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.BossDefinition
+  id: boss_brute
+  phaseHp: 400
+  moveSpeed: 2.5
+  aggroRadius: 30
+  turnSpeed: 180
+  leashRadius: 10
+  slamTell: 0.8
+  slamRecovery: 2
+  slamRadius: 2.8
+  slamDamage: 25
+  chargeTell: 0.8
+  chargeRecovery: 2
+  chargeSpeed: 8
+  chargeDistance: 8
+  chargeOvershoot: 2
+  chargeHitRadius: 1.2
+  chargeDamage: 15
+  chargeStartRange: 8
+  attackCooldown: 2.5
+  phase2SpeedMultiplier: 1.25
+  roarDuration: 1.2
+  deathDelay: 1.5

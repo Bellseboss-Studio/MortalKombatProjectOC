@@ -140,6 +140,7 @@ namespace MK.Rebuild.Debugging
             if (keyboard.f5Key.wasPressedThisFrame) SpawnEnemy();
             if (keyboard.f8Key.wasPressedThisFrame) CycleAmbience();
             if (keyboard.f9Key.wasPressedThisFrame) CycleMusic();
+            if (keyboard.bKey.wasPressedThisFrame) SpawnBoss();
         }
 
         // --- Actions ---------------------------------------------------------
@@ -204,6 +205,16 @@ namespace MK.Rebuild.Debugging
             if (spawner != null) spawner.SpawnOne();
         }
 
+        /// <summary>
+        /// Spawns the boss through the first scene <see cref="BossSpawner"/> (M3.4).
+        /// No spawner = no-op; the debug window never fabricates encounters itself.
+        /// </summary>
+        private void SpawnBoss()
+        {
+            var spawner = FindFirstObjectByType<BossSpawner>();
+            if (spawner != null) spawner.SpawnBoss();
+        }
+
         private static Material CreateGreyMaterial()
         {
             var shader = Shader.Find("Universal Render Pipeline/Lit");
@@ -255,7 +266,7 @@ namespace MK.Rebuild.Debugging
 
             GUILayout.Label("MK DEBUG  ·  [F1] toggle", labelStyle);
             GUILayout.Label($"timeScale: {Time.timeScale:0.##}   [F4] cycle", labelStyle);
-            GUILayout.Label("[F2] spawn dummy   [F5] spawn enemy", labelStyle);
+            GUILayout.Label("[F2] spawn dummy   [F5] spawn enemy   [B] spawn boss", labelStyle);
             GUILayout.Label($"[F3] estados: {(showStates ? "ON" : "OFF")}", labelStyle);
             GUILayout.Label($"[F8] ambience: {AudioDirector.CurrentAmbience}", labelStyle);
             GUILayout.Label($"[F9] music: {AudioDirector.CurrentMusic}", labelStyle);
@@ -323,6 +334,13 @@ namespace MK.Rebuild.Debugging
             GUILayout.Label($"devices: {DescribeDevices()}", labelStyle);
             GUILayout.Label($"ambience: {AudioDirector.CurrentAmbience}", labelStyle);
             GUILayout.Label($"enemies: {CountEnemies()}  attackers: {CombatCoordinator.Instance?.AttackerCount ?? 0}", labelStyle);
+
+            // Boss readout (M3.4): phase + current-phase HP. Dedicated boss bar is
+            // a later step; this keeps the two-phase fight observable right now.
+            var boss = FindFirstObjectByType<BossController>();
+            GUILayout.Label(
+                boss != null ? $"boss: {boss.Phase} {boss.HP}/{boss.MaxHp}" : "boss: none",
+                labelStyle);
 
             bool held = motor.Body != null && motor.Body.IsHeld;
             GUILayout.Label($"bodyOwner: {motor.BodyOwner?.ToString() ?? "none"}  held: {held}", labelStyle);

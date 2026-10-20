@@ -31,12 +31,28 @@ namespace MK.Rebuild
         private readonly List<HitReceiver> sceneSet = new();
         private readonly List<IResettable> resettables = new();
         private readonly List<EnemySpawner> enemySpawners = new();
+        private readonly List<BossSpawner> bossSpawners = new();
 
         private void Awake()
         {
             SnapshotDummies();
             CacheResettables();
             CacheEnemySpawners();
+            CacheBossSpawners();
+        }
+
+        /// <summary>
+        /// Caches the scene boss spawners once at Awake (M3.4). The boss is spawned
+        /// on demand, but its owner exists in the authored scene, so this is stable.
+        /// </summary>
+        private void CacheBossSpawners()
+        {
+            bossSpawners.Clear();
+            var found = FindObjectsByType<BossSpawner>(FindObjectsSortMode.None);
+            for (int i = 0; i < found.Length; i++)
+            {
+                if (found[i] != null) bossSpawners.Add(found[i]);
+            }
         }
 
         /// <summary>
@@ -125,6 +141,14 @@ namespace MK.Rebuild
                 var spawner = enemySpawners[i];
                 if (spawner != null) spawner.ResetEncounter();
             }
+
+            // Boss (M3.4): only the CURRENT phase HP and position are restored —
+            // the fight keeps its phase. An unspawned/dead boss is a no-op.
+            for (int i = 0; i < bossSpawners.Count; i++)
+            {
+                var bossSpawner = bossSpawners[i];
+                if (bossSpawner != null) bossSpawner.ResetBoss();
+            }
         }
 
         private void ResetDummies()
@@ -171,6 +195,9 @@ namespace MK.Rebuild
                 if (sceneSet.Contains(receiver)) continue;
                 // Enemies are owned by their spawner (ResetEnemies), not by the dummy cleanup.
                 if (receiver.GetComponent<EnemyController>() != null) continue;
+                // Bosses are owned by their BossSpawner (ResetEnemies -> ResetBoss) and
+                // must survive this cleanup so their current phase is preserved.
+                if (receiver.GetComponent<BossController>() != null) continue;
                 if (!receiver.gameObject.activeInHierarchy) continue; // our inactive templates
                 Destroy(receiver.gameObject);
             }
