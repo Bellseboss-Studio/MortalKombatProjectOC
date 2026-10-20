@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MK.Rebuild
@@ -31,11 +32,19 @@ namespace MK.Rebuild
         [Tooltip("Transform scaled by the death routine. Defaults to this transform.")]
         [SerializeField] private Transform visualRoot;
 
+        [Tooltip("Grey-box Esbirro spawned at the phase transition (M3.5a).")]
+        [SerializeField] private EnemyController minionPrefab;
+
+        private readonly List<EnemyController> minions = new();
+
         private Rigidbody rb;
         private HitReceiver receiver;
         private Collider bodyCollider;
         private PlayerDamage player;
+        private PlayerMotor playerMotor;
         private MusicStateController music;
+        private bool shockwaveSpawned;
+        private GameObject shockwaveRoot;
 
         private State state = State.Approach;
         private int phase = 1;
@@ -67,10 +76,14 @@ namespace MK.Rebuild
                 ? Mathf.Clamp01((float)HP / Mathf.Max(1, definition.phaseHp))
                 : 0f;
 
-        /// <summary>Phase-2 bar fill [0..1]; 0 while still in phase 1.</summary>
+        /// <summary>Phase-2 bar fill [0..1]; full while still in phase 1, then drains.</summary>
         public float Phase2Normalized =>
-            definition != null && phase == 2
-                ? Mathf.Clamp01((float)HP / Mathf.Max(1, definition.phaseHp))
+            definition != null
+                ? (phase == 1
+                    ? 1f
+                    : phase == 2
+                        ? Mathf.Clamp01((float)HP / Mathf.Max(1, definition.phaseHp))
+                        : 0f)
                 : 0f;
 
         /// <summary>True after the final (phase-2) death blow.</summary>
@@ -93,10 +106,21 @@ namespace MK.Rebuild
             originalScale = visualRoot != null ? visualRoot.localScale : transform.localScale;
         }
 
+        private void Start()
+        {
+            playerMotor = FindFirstObjectByType<PlayerMotor>();
+            BossArena.Instance?.Bind(this);
+            BossHealthBar.Instance?.Bind(this);
+        }
+
         private void OnDisable()
         {
             Unsubscribe();
             StopAllCoroutines();
+            DestroyShockwave();
+            BossHealthBar.Instance?.Hide();
+            BossArena.Instance?.Open();
+            ClearMinions();
             NotifyCombatEndOnce();
         }
 
@@ -104,6 +128,10 @@ namespace MK.Rebuild
         {
             Unsubscribe();
             StopAllCoroutines();
+            DestroyShockwave();
+            BossHealthBar.Instance?.Hide();
+            BossArena.Instance?.Open();
+            ClearMinions();
             NotifyCombatEndOnce();
         }
 
@@ -192,6 +220,7 @@ namespace MK.Rebuild
         private void ResolveRefs()
         {
             if (player == null) player = FindFirstObjectByType<PlayerDamage>();
+            if (playerMotor == null) playerMotor = FindFirstObjectByType<PlayerMotor>();
             if (music == null) music = FindFirstObjectByType<MusicStateController>();
         }
 
@@ -225,6 +254,7 @@ namespace MK.Rebuild
             state = State.Slam;
             attackTimer = 0f;
             slamHitApplied = false;
+            shockwaveSpawned = false;
             StopHorizontal();
             Face(FlatDirectionTo(player.transform.position), Time.fixedDeltaTime);
         }
@@ -244,6 +274,13 @@ namespace MK.Rebuild
                 {
                     player.TakeHit(definition.slamDamage, toPlayer);
                 }
+
+                // M3.5a: phase-2 slams also release a jumpable shockwave.
+                if (phase == 2 && !shockwaveSpawned)
+                {
+                    shockwaveSpawned = true;
+                    StartCoroutine(ShockwaveRoutine());
+                }
             }
 
             if (attackTimer >= (definition.slamTell + definition.slamRecovery) / mult)
@@ -251,6 +288,68 @@ namespace MK.Rebuild
                 cooldownTimer = definition.attackCooldown / mult;
                 state = State.Approach;
             }
+        }
+
+        /// <summary>
+        /// M3.5a phase-2 slam shockwave: a thin grey-box ring expands from the boss on
+        /// SCALED time. It only hits a GROUNDED player the first time the expanding
+        /// front passes over them, so a jump clears it. Purely visual + one proximity
+        /// check — no physics collider, no NavMesh, no animation.
+        /// </summary>
+        private IEnumerator ShockwaveRoutine()
+        {
+            var root = new GameObject("BossShockwave");
+            shockwaveRoot = root;
+            root.transform.position = transform.position;
+
+            var ring = GreyBoxFx.CreateRing(root.transform, 0.5f);
+            if (ring == null)
+            {
+                Destroy(root);
+                shockwaveRoot = null;
+                yield break;
+            }
+
+            float mult = phase == 2 ? definition.phase2SpeedMultiplier : 1f;
+            float duration = Mathf.Max(0.0001f, definition.shockwaveDuration / mult);
+            float radius = definition.shockwaveRadius;
+            float hitBand = definition.shockwaveHitRadius;
+            float elapsed = 0f;
+            bool hitApplied = false;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float current = Mathf.Lerp(0.5f, radius, t);
+                GreyBoxFx.ApplyRingSize(ring.transform, current);
+
+                if (!hitApplied && playerMotor != null && playerMotor.IsGrounded)
+                {
+                    float distance = FlatDistanceTo(playerMotor.transform.position);
+                    if (distance <= current + hitBand && distance >= current - 0.8f)
+                    {
+                        hitApplied = true;
+                        if (player != null)
+                        {
+                            player.TakeHit(
+                                definition.shockwaveDamage,
+                                FlatDirectionTo(playerMotor.transform.position));
+                        }
+                    }
+                }
+
+                yield return null;
+            }
+
+            Destroy(root);
+            if (shockwaveRoot == root) shockwaveRoot = null;
+        }
+
+        private void DestroyShockwave()
+        {
+            if (shockwaveRoot != null) Destroy(shockwaveRoot);
+            shockwaveRoot = null;
         }
 
         private void EnterCharge()
@@ -364,7 +463,46 @@ namespace MK.Rebuild
             receiver.Invulnerable = true;
             StopHorizontal();
             state = State.Roar;
+
+            // M3.5a: the exit is revealed (visual only; the collider stays) and the
+            // brute calls two Esbirros while the roar plays.
+            BossArena.Instance?.BreakExitWall();
+            BossHealthBar.Instance?.Bind(this);
+            SummonMinions();
+
             StartCoroutine(RoarRoutine());
+        }
+
+        /// <summary>
+        /// M3.5a: spawns <see cref="BossDefinition.minionsToSummon"/> Esbirros 2 m
+        /// around the boss on opposite sides. No-op without a prefab.
+        /// </summary>
+        private void SummonMinions()
+        {
+            if (minionPrefab == null || definition == null) return;
+
+            int count = Mathf.Max(0, definition.minionsToSummon);
+            for (int i = 0; i < count; i++)
+            {
+                float angle = count > 0 ? (Mathf.PI * 2f * i) / count : 0f;
+                Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 2f;
+                Vector3 position = transform.position + offset;
+                Vector3 facing = offset.sqrMagnitude > 0.000001f ? -offset : transform.forward;
+
+                EnemyController minion = Instantiate(
+                    minionPrefab, position, Quaternion.LookRotation(facing, Vector3.up));
+                if (minion != null) minions.Add(minion);
+            }
+        }
+
+        /// <summary>M3.5a: destroys every boss-summoned minion and clears the list.</summary>
+        private void ClearMinions()
+        {
+            for (int i = 0; i < minions.Count; i++)
+            {
+                if (minions[i] != null) Destroy(minions[i].gameObject);
+            }
+            minions.Clear();
         }
 
         private IEnumerator RoarRoutine()
@@ -386,6 +524,10 @@ namespace MK.Rebuild
             if (IsDead) return;
             IsDead = true;
             state = State.Dead;
+
+            BossHealthBar.Instance?.Hide();
+            BossArena.Instance?.Open();
+            ClearMinions();
 
             StopHorizontal();
             if (bodyCollider != null) bodyCollider.enabled = false;
@@ -432,7 +574,11 @@ namespace MK.Rebuild
         {
             if (IsDead) return;
 
+            BossArena.Instance?.Open();
+            ClearMinions();
+
             StopAllCoroutines();
+            DestroyShockwave();
 
             transform.position = spawnPosition;
             leashCenter = spawnPosition;
@@ -455,9 +601,12 @@ namespace MK.Rebuild
             chargeLaunched = false;
             chargeHitApplied = false;
             slamHitApplied = false;
+            shockwaveSpawned = false;
             state = State.Approach;
 
             if (visualRoot != null) visualRoot.localScale = originalScale;
+
+            BossHealthBar.Instance?.Bind(this);
         }
 
         // --- Movement helpers ------------------------------------------------

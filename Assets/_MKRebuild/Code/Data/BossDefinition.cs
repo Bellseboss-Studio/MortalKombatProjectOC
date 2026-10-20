@@ -82,5 +82,21 @@ namespace MK.Rebuild
 
         [Tooltip("Delay in UNSCALED seconds between death and the visual/destroy (scale-down).")]
         public float deathDelay = 1.5f;
+
+        [Header("Phase 2 Shockwave")]
+        [Tooltip("Esbirros summoned at the phase-1 -> phase-2 transition.")]
+        public int minionsToSummon = 2;
+
+        [Tooltip("Damage applied to PlayerDamage by a passing shockwave.")]
+        public int shockwaveDamage = 20;
+
+        [Tooltip("Maximum flat radius the shockwave expands to, in metres.")]
+        public float shockwaveRadius = 4f;
+
+        [Tooltip("Expansion duration in SCALED seconds at phase-1 speed (divided by the phase-2 multiplier).")]
+        public float shockwaveDuration = 0.6f;
+
+        [Tooltip("Thickness of the expanding hit band around the wave front.")]
+        public float shockwaveHitRadius = 0.6f;
     }
 }
