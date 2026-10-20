@@ -2118,6 +2118,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HitReceiver
   maxHp: 20
+  destroyOnDeath: 1
+  rigidbodyKnockback: 0
   flashDuration: 0.12
   flashTint: {r: 1, g: 0.35, b: 0.35, a: 1}
   knockbackSpeed: 6
@@ -2251,6 +2253,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HitReceiver
   maxHp: 20
+  destroyOnDeath: 1
+  rigidbodyKnockback: 0
   flashDuration: 0.12
   flashTint: {r: 1, g: 0.35, b: 0.35, a: 1}
   knockbackSpeed: 6
@@ -2384,6 +2388,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HitReceiver
   maxHp: 20
+  destroyOnDeath: 1
+  rigidbodyKnockback: 0
   flashDuration: 0.12
   flashTint: {r: 1, g: 0.35, b: 0.35, a: 1}
   knockbackSpeed: 6
@@ -2517,6 +2523,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HitReceiver
   maxHp: 20
+  destroyOnDeath: 1
+  rigidbodyKnockback: 0
   flashDuration: 0.12
   flashTint: {r: 1, g: 0.35, b: 0.35, a: 1}
   knockbackSpeed: 6
@@ -3180,6 +3188,51 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.22975297, y: 0, z: 0, w: 0.973249}
   m_LocalPosition: {x: 0, y: 6, z: -10}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &365200376
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 365200378}
+  - component: {fileID: 365200377}
+  m_Layer: 0
+  m_Name: CombatCoordinator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &365200377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 365200376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c9860288aad269c41b1183feea50db74, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.CombatCoordinator
+  maxMeleeAttackers: 2
+--- !u!4 &365200378
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 365200376}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3942,6 +3995,60 @@ PhysicsMaterial:
   m_Bounciness: 0
   m_FrictionCombine: 0
   m_BounceCombine: 0
+--- !u!1 &854177707
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 854177709}
+  - component: {fileID: 854177708}
+  m_Layer: 0
+  m_Name: EnemyEncounter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &854177708
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 854177707}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f30000fc65330a949a9b6282ce224c7b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.EnemySpawner
+  prefab: {fileID: 5733532687125248128, guid: 2317eb5b6dbe91640b58621ca3bbad6b, type: 3}
+  spawnPoints:
+  - {fileID: 1785669106}
+  - {fileID: 1216682031}
+  - {fileID: 1149709543}
+  initialCount: 2
+  spawnOnStart: 1
+--- !u!4 &854177709
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 854177707}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 71.95, y: 0, z: 1.525}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1785669106}
+  - {fileID: 1216682031}
+  - {fileID: 1149709543}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1010950238
 GameObject:
   m_ObjectHideFlags: 0
@@ -4309,6 +4416,37 @@ MonoBehaviour:
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HazardZone
   definition: {fileID: 11400000, guid: 8e9212eb0a6ee804790dc3f4d2433008, type: 2}
   safePoint: {fileID: 0}
+--- !u!1 &1149709542
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1149709543}
+  m_Layer: 0
+  m_Name: SpawnPoint_Back
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1149709543
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1149709542}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 854177709}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1177597802
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4322,6 +4460,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HideRendererAtRuntime
   targetRenderers: []
+--- !u!1 &1216682030
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1216682031}
+  m_Layer: 0
+  m_Name: SpawnPoint_Right
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1216682031
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1216682030}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 2, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 854177709}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1249382283
 GameObject:
   m_ObjectHideFlags: 0
@@ -5268,6 +5437,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.HideRendererAtRuntime
   targetRenderers: []
+--- !u!1 &1785669105
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1785669106}
+  m_Layer: 0
+  m_Name: SpawnPoint_Left
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1785669106
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1785669105}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -2, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 854177709}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1824798502
 GameObject:
   m_ObjectHideFlags: 0
@@ -6006,3 +6206,5 @@ SceneRoots:
   - {fileID: 1249382286}
   - {fileID: 1725051852}
   - {fileID: 1824798504}
+  - {fileID: 365200378}
+  - {fileID: 854177709}

@@ -7,8 +7,8 @@ namespace MK.Rebuild
     /// m2-respawn slice 2: the RUNTIME section reset. Restores the current section to its
     /// initial state on death (or on any explicit caller): scene-placed <see cref="HitReceiver"/>
     /// dummies are re-posed at full HP, destroyed ones are re-spawned, debug-spawned extras are
-    /// removed, and every cached <see cref="IResettable"/> is restored. Enemy reset is an empty
-    /// stub (M3).
+    /// removed, every cached <see cref="IResettable"/> is restored, and each cached
+    /// <see cref="EnemySpawner"/> resets its encounter (M3).
     ///
     /// This is a straight PROMOTION of the Debug-only logic that used to live in
     /// <c>MK.Rebuild.Debugging.FinishResetZone</c> (snapshot/restore moved, not changed) — it now
@@ -30,11 +30,28 @@ namespace MK.Rebuild
         private readonly List<GameObject> templates = new();
         private readonly List<HitReceiver> sceneSet = new();
         private readonly List<IResettable> resettables = new();
+        private readonly List<EnemySpawner> enemySpawners = new();
 
         private void Awake()
         {
             SnapshotDummies();
             CacheResettables();
+            CacheEnemySpawners();
+        }
+
+        /// <summary>
+        /// Caches the scene encounter spawners once at Awake. Their enemies spawn in
+        /// Start, so this is the authored set; <see cref="ResetEnemies"/> restores
+        /// each encounter through its own owner.
+        /// </summary>
+        private void CacheEnemySpawners()
+        {
+            enemySpawners.Clear();
+            var found = FindObjectsByType<EnemySpawner>(FindObjectsSortMode.None);
+            for (int i = 0; i < found.Length; i++)
+            {
+                if (found[i] != null) enemySpawners.Add(found[i]);
+            }
         }
 
         /// <summary>
@@ -96,11 +113,18 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// M3 stub: there are no enemies yet, so this is intentionally empty. A later slice
-        /// re-spawns / re-poses enemies here, keeping the reset call site stable.
+        /// M3: restores every cached encounter through its <see cref="EnemySpawner"/>
+        /// (destroy the spawned wave + spawn the initial one). Runs after the dummy
+        /// reset so a respawned wave is not mistaken for a debug extra. Safe when the
+        /// encounter list is empty.
         /// </summary>
         public void ResetEnemies()
         {
+            for (int i = 0; i < enemySpawners.Count; i++)
+            {
+                var spawner = enemySpawners[i];
+                if (spawner != null) spawner.ResetEncounter();
+            }
         }
 
         private void ResetDummies()
@@ -145,6 +169,8 @@ namespace MK.Rebuild
                 var receiver = all[i];
                 if (receiver == null) continue;
                 if (sceneSet.Contains(receiver)) continue;
+                // Enemies are owned by their spawner (ResetEnemies), not by the dummy cleanup.
+                if (receiver.GetComponent<EnemyController>() != null) continue;
                 if (!receiver.gameObject.activeInHierarchy) continue; // our inactive templates
                 Destroy(receiver.gameObject);
             }

@@ -13,15 +13,24 @@ namespace MK.Rebuild
     /// Both run on UNSCALED time so they stay visible during hitstop
     /// (<c>Time.timeScale = 0</c>) — scaled time would freeze them.
     ///
-    /// The victim has no Rigidbody (scene Dummy), so knockback is a manual
-    /// damped push, not a physics impulse. A LAUNCHER hit also drives the
+    /// Defaults keep the scene/debug Dummies exactly as before: a victim with no
+    /// Rigidbody gets a manual damped push, and a LAUNCHER hit drives the
     /// juggle-lite vertical arc (rise -> fall -> land), manual velocity + gravity.
+    /// Enemies opt into <c>rigidbodyKnockback</c> (horizontal physics velocity,
+    /// no manual arc) and <c>destroyOnDeath = false</c> (their controller owns
+    /// the death visual/destroy).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HitReceiver : MonoBehaviour
     {
         [Tooltip("Max HP. 20 default (doc 05 esbirro); raise in the inspector if the dummy dies too fast.")]
         public int maxHp = 20;
+
+        [Tooltip("Death behavior. TRUE (dummies): destroy the object instantly. FALSE (enemies): disable the root collider and let the controller own the death visual/destroy.")]
+        [SerializeField] private bool destroyOnDeath = true;
+
+        [Tooltip("Feedback mode. FALSE (dummies): manual damped nudge. TRUE (enemies with a Rigidbody): horizontal physics velocity instead.")]
+        [SerializeField] private bool rigidbodyKnockback = false;
 
         [Tooltip("Flash duration in seconds (UNSCALED — visible during hitstop).")]
         [SerializeField] private float flashDuration = 0.12f;
@@ -53,6 +62,14 @@ namespace MK.Rebuild
         public bool IsAlive => hp > 0;
 
         /// <summary>
+        /// Non-lethal hit seam (enemy controller): damage, horizontal push
+        /// direction and launch impulse. Fired BEFORE the grey-box feedback so a
+        /// stagger can react on the same frame. The killing blow does NOT fire
+        /// this — it fires <see cref="OnDied"/> instead.
+        /// </summary>
+        public event Action<int, Vector3, float> Damaged;
+
+        /// <summary>
         /// Style-meter seam (slice style-meter): fired in <see cref="Die"/> BEFORE
         /// <c>Destroy</c> so the +25 kill bonus can still observe the death.
         /// </summary>
@@ -68,6 +85,17 @@ namespace MK.Rebuild
         {
             hp = maxHp;
             ResolveRenderer();
+        }
+
+        /// <summary>
+        /// Applies a data-driven HP value (enemy archetypes) instead of relying on
+        /// the serialized default. Clamped to at least 1 so a misconfigured asset
+        /// never creates an already-dead target.
+        /// </summary>
+        public void Configure(int hpValue)
+        {
+            maxHp = Mathf.Max(1, hpValue);
+            hp = maxHp;
         }
 
         private void ResolveRenderer()
@@ -100,13 +128,18 @@ namespace MK.Rebuild
                 return; // no feedback on the killing blow — the object is gone
             }
 
+            // Enemy seam: let the controller react (stagger) BEFORE the feedback
+            // coroutine starts. Dummies have no listener, so nothing changes there.
+            Damaged?.Invoke(damage, dir, launchImpulse);
+
             if (feedbackRoutine != null) StopCoroutine(feedbackRoutine);
             feedbackRoutine = StartCoroutine(Feedback(dir));
 
             // JUGGLE-LITE (slice 3nonies): only a launcher (impulse > 0) starts the
             // vertical arc. The ground Y is captured ONCE (the resting height) so
-            // re-launches while airborne still land on the same plane.
-            if (launchImpulse > 0f)
+            // re-launches while airborne still land on the same plane. A Rigidbody
+            // victim (enemies) owns its vertical movement, so the manual arc is skipped.
+            if (launchImpulse > 0f && !rigidbodyKnockback)
             {
                 if (!groundCaptured) { groundY = transform.position.y; groundCaptured = true; }
                 if (arcRoutine != null) StopCoroutine(arcRoutine);
@@ -151,11 +184,33 @@ namespace MK.Rebuild
         {
             OnDied?.Invoke();
             AnyDied?.Invoke();
+
+            // Dummies: instant destroy, exactly as before. Enemies: the controller
+            // owns the death visual/destroy, so this only removes the hurtbox.
+            if (!destroyOnDeath)
+            {
+                var rootCollider = GetComponent<Collider>();
+                if (rootCollider != null) rootCollider.enabled = false;
+                enabled = false;
+                return;
+            }
+
             Destroy(gameObject);
         }
 
         private IEnumerator Feedback(Vector3 push)
         {
+            // Enemy path: a Rigidbody steers the push, preserving vertical motion.
+            if (rigidbodyKnockback && TryGetComponent<Rigidbody>(out var body))
+            {
+                Vector3 velocity = body.linearVelocity;
+                velocity.x = push.x * knockbackSpeed;
+                velocity.z = push.z * knockbackSpeed;
+                body.linearVelocity = velocity;
+                yield return Flash();
+                yield break;
+            }
+
             yield return Flash();
 
             // Knockback: damped manual nudge, unscaled so it reads in hitstop/slow-mo.

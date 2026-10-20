@@ -18,8 +18,8 @@ namespace MK.Rebuild.Debugging
     ///
     /// Keys (Input System only — legacy Input is dead, activeInputHandler:1):
     ///   F1 toggle window · F2 spawn dummy · F3 toggle states readout · F4 cycle timeScale ·
-    ///   F8 cycle ambience · F9 audition music state.
-    /// F5..F7 and a PauseManager are DEFERRED to M1+ (see 03-sistemas.md).
+    ///   F5 spawn enemy · F8 cycle ambience · F9 audition music state.
+    /// F6..F7 belong to the damage test driver; a PauseManager is still deferred.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DebugWindow : MonoBehaviour
@@ -137,6 +137,7 @@ namespace MK.Rebuild.Debugging
             if (keyboard.f2Key.wasPressedThisFrame) SpawnDummy();
             if (keyboard.f3Key.wasPressedThisFrame) showStates = !showStates;
             if (keyboard.f4Key.wasPressedThisFrame) CycleTimeScale();
+            if (keyboard.f5Key.wasPressedThisFrame) SpawnEnemy();
             if (keyboard.f8Key.wasPressedThisFrame) CycleAmbience();
             if (keyboard.f9Key.wasPressedThisFrame) CycleMusic();
         }
@@ -193,6 +194,16 @@ namespace MK.Rebuild.Debugging
             spawned.Add(dummy);
         }
 
+        /// <summary>
+        /// Spawns one enemy through the first scene <see cref="EnemySpawner"/> (M3).
+        /// No spawner = no-op; the debug window never fabricates encounters itself.
+        /// </summary>
+        private void SpawnEnemy()
+        {
+            var spawner = FindFirstObjectByType<EnemySpawner>();
+            if (spawner != null) spawner.SpawnOne();
+        }
+
         private static Material CreateGreyMaterial()
         {
             var shader = Shader.Find("Universal Render Pipeline/Lit");
@@ -244,7 +255,7 @@ namespace MK.Rebuild.Debugging
 
             GUILayout.Label("MK DEBUG  ·  [F1] toggle", labelStyle);
             GUILayout.Label($"timeScale: {Time.timeScale:0.##}   [F4] cycle", labelStyle);
-            GUILayout.Label("[F2] spawn dummy", labelStyle);
+            GUILayout.Label("[F2] spawn dummy   [F5] spawn enemy", labelStyle);
             GUILayout.Label($"[F3] estados: {(showStates ? "ON" : "OFF")}", labelStyle);
             GUILayout.Label($"[F8] ambience: {AudioDirector.CurrentAmbience}", labelStyle);
             GUILayout.Label($"[F9] music: {AudioDirector.CurrentMusic}", labelStyle);
@@ -311,6 +322,7 @@ namespace MK.Rebuild.Debugging
             GUILayout.Label($"last: {lastInputDevice} / {lastInputPath}", labelStyle);
             GUILayout.Label($"devices: {DescribeDevices()}", labelStyle);
             GUILayout.Label($"ambience: {AudioDirector.CurrentAmbience}", labelStyle);
+            GUILayout.Label($"enemies: {CountEnemies()}  attackers: {CombatCoordinator.Instance?.AttackerCount ?? 0}", labelStyle);
 
             bool held = motor.Body != null && motor.Body.IsHeld;
             GUILayout.Label($"bodyOwner: {motor.BodyOwner?.ToString() ?? "none"}  held: {held}", labelStyle);
@@ -335,6 +347,17 @@ namespace MK.Rebuild.Debugging
         }
 
         private static string Gate(bool allowed) => allowed ? "OK" : "BLOCK";
+
+        private static int CountEnemies()
+        {
+            var enemies = FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
+            int count = 0;
+            for (int i = 0; i < enemies.Length; i++)
+            {
+                if (enemies[i] != null) count++;
+            }
+            return count;
+        }
 
         private static string DescribeDevices()
         {
