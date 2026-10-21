@@ -120,6 +120,12 @@ namespace MK.Rebuild
         [Tooltip("Hitbox origin offset in the attacker's local space (x = sideways, y = height, z = forward).")]
         public Vector3 hitboxOffset;
 
+        [Tooltip("Vertical half-band of the probe (meters) around the hitbox origin's y: a victim only counts when its collider bounds overlap origin.y +/- this value. <= 0 = off (legacy sphere behavior, no vertical filter).")]
+        public float hitboxHalfHeight;
+
+        [Tooltip("Victims this step may damage (1 = honest single target, 3 = cleave). Clamped to >= 1 at runtime.")]
+        [Min(1)] public int maxTargets;
+
         [Tooltip("Cancel window as NORMALIZED time when the hit MISSED (whiff): x = a, y = b.")]
         public Vector2 cancelNorm;
 

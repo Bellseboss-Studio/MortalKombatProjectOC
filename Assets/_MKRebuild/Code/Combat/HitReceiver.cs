@@ -48,8 +48,9 @@ namespace MK.Rebuild
         [SerializeField] private float launchGravity = 18f;
 
         private int hp;
-        private Renderer cachedRenderer;
-        private Color originalColor;
+        private Renderer[] cachedRenderers;
+        private Material[] cachedMaterials;
+        private Color[] originalColors;
         private Coroutine feedbackRoutine;
         private Coroutine arcRoutine;
         private bool groundCaptured;
@@ -102,7 +103,7 @@ namespace MK.Rebuild
         private void OnEnable()
         {
             hp = maxHp;
-            ResolveRenderer();
+            ResolveRenderers();
         }
 
         /// <summary>
@@ -116,11 +117,48 @@ namespace MK.Rebuild
             hp = maxHp;
         }
 
-        private void ResolveRenderer()
+        /// <summary>
+        /// Caches every renderer and material instance under this receiver. The X Bot
+        /// visual is a SkinnedMeshRenderer with one material per mesh (two meshes), so
+        /// the flash must cover all of them instead of only the first renderer found.
+        /// </summary>
+        private void ResolveRenderers()
         {
-            if (cachedRenderer != null) return;
-            cachedRenderer = GetComponentInChildren<Renderer>();
-            if (cachedRenderer != null) originalColor = cachedRenderer.material.color;
+            if (cachedRenderers != null && cachedRenderers.Length > 0) return;
+
+            cachedRenderers = GetComponentsInChildren<Renderer>(true);
+            if (cachedRenderers == null || cachedRenderers.Length == 0)
+            {
+                cachedMaterials = null;
+                originalColors = null;
+                return;
+            }
+
+            int count = 0;
+            for (int i = 0; i < cachedRenderers.Length; i++)
+            {
+                if (cachedRenderers[i] != null) count += cachedRenderers[i].sharedMaterials.Length;
+            }
+
+            cachedMaterials = new Material[count];
+            originalColors = new Color[count];
+
+            int index = 0;
+            for (int i = 0; i < cachedRenderers.Length; i++)
+            {
+                Renderer renderer = cachedRenderers[i];
+                if (renderer == null) continue;
+
+                // .materials returns per-renderer instances, so the flash never
+                // mutates the shared XBot_* material assets.
+                Material[] materials = renderer.materials;
+                for (int m = 0; m < materials.Length && index < count; m++, index++)
+                {
+                    Material material = materials[m];
+                    cachedMaterials[index] = material;
+                    originalColors[index] = material != null ? material.color : Color.white;
+                }
+            }
         }
 
         /// <summary>
@@ -252,14 +290,22 @@ namespace MK.Rebuild
 
         private IEnumerator Flash()
         {
-            ResolveRenderer();
-            if (cachedRenderer == null) yield break;
+            ResolveRenderers();
+            if (cachedMaterials == null || cachedMaterials.Length == 0) yield break;
 
-            var material = cachedRenderer.material; // instance — never clobber shared mats
-            Color previous = originalColor;
-            material.color = FlashColor(previous);
+            for (int i = 0; i < cachedMaterials.Length; i++)
+            {
+                Material material = cachedMaterials[i];
+                if (material != null) material.color = FlashColor(originalColors[i]);
+            }
+
             yield return new WaitForSecondsRealtime(flashDuration * 0.5f);
-            material.color = previous;
+
+            for (int i = 0; i < cachedMaterials.Length; i++)
+            {
+                Material material = cachedMaterials[i];
+                if (material != null) material.color = originalColors[i];
+            }
         }
 
         private Color FlashColor(Color baseColor)

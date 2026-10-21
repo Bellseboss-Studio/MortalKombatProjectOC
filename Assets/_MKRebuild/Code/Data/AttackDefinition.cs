@@ -35,6 +35,9 @@ namespace MK.Rebuild
         [Tooltip("Hitbox origin offset in the attacker's local space (x = sideways, y = height, z = forward).")]
         public Vector3 hitboxOffset;
 
+        [Tooltip("Victims this attack may damage (1 = honest single target, 3 = cleave). Clamped to >= 1 at runtime.")]
+        [Min(1)] public int maxTargets = 1;
+
         [Tooltip("Knockback push distance in meters applied to the victim on connect (manual nudge — dummy has no Rigidbody).")]
         public float knockback;
     }

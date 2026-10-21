@@ -84,6 +84,7 @@ MonoBehaviour:
   combatSystemAngel: {fileID: 6450505206572829772}
   stunSystem: {fileID: 534167336280134677}
   movementADSR: {fileID: 1299896912879345712}
+  allowRotationDuringJump: 1
   FatalitySystem: {fileID: 2444257111532387366}
   _enemiesInCombat: []
   healComponent: {fileID: 5044403068392838141}
@@ -101,15 +102,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   force: 25
   floorController: {fileID: 1332983113479227212}
-  isFall: 0
-  isUp: 0
   jumpSystem: {fileID: 7670399559363912957}
   inputMin: 0.1
   inputMax: 0.5
   minSpeed: 0.25
   maxSpeed: 1
   isScalableWall: 0
-  forceToGravitate: 0
   timeToMaxSpeed: 0.3
   timeToStop: 0.5
   accelerationCurve:
@@ -160,13 +158,10 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  acceleration: 10
-  deceleration: 8
   turnSpeed: 320
   airControlFactor: 0.66
   startRunEventSpeed: 0.1
   stopRunEventSpeed: 0.05
-  enableDebugLogs: 0
   _canMove: 0
   brakeMultiplier: 2.2
   oppositeBrakeMultiplier: 4
@@ -183,6 +178,7 @@ MonoBehaviour:
   monksCardinalDeadZone: 0.25
   instantFaceTarget: 1
   normalizeDiagonal: 1
+  enableMovementDebugLogs: 0
 --- !u!114 &1323116692971994159
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -301,6 +297,16 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   accelerationTime: 0.1
+  airRotationSpeedMultiplier: 0.7
+  movementSystem: {fileID: 0}
+  movementReference: {fileID: 0}
+  directionChangeThreshold: 5
+  rotationThreshold: 1
+  minRotationVelocity: 0.1
+  alignmentThreshold: 0.7
+  alignmentHysteresis: 0.03
+  directionSmoothing: 0.12
+  enableDebugLogs: 0
 --- !u!114 &1332983113479227212
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -326,6 +332,8 @@ MonoBehaviour:
   raycastCenter: {fileID: 2422320353955034664}
   shadow: {fileID: 9110938358404020778}
   maxDistance: 100
+  raycastUpOffset: 0.1
+  logFloorDebug: 0
 --- !u!114 &7670399559363912957
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -340,6 +348,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   behaviourOfJumpSystemNormal: {fileID: 1237056365323985068}
   behaviourOfJumpSystemWalls: {fileID: 6425755724015305859}
+  coyoteTime: 0.12
+  jumpBufferTime: 0.15
+  preventDoubleDuringSequence: 1
+  physicsJumpMode: 1
+  jumpImpulseForce: 7
+  wallJumpHorizontalForce: 4
+  wallJumpVerticalBoost: 1.1
 --- !u!114 &1299896912879345712
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -393,13 +408,60 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   timeToAttack: 0.5
-  timeToDecreasing: 0.2
+  timeToDecay: 0.2
   timeToSustain: 0
-  timeToRelease: 0
-  maxHeighJump: 5
-  heightDecreasing: 1
-  forceToAttack: 1
-  forceToDecreasing: 1
+  maxFallTime: 0
+  maxHeight: 2.5
+  sustainLevel: 0.65
+  attackCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  decayCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  releaseStartVelocityDown: 0
   floorController: {fileID: 1332983113479227212}
 --- !u!114 &6450505206572829772
 MonoBehaviour:
@@ -505,6 +567,7 @@ MonoBehaviour:
   attacking: 0
   _deltatimeLocal: 0
   targetFocus: {fileID: 2571177497556315722}
+  allowAirAttacks: 0
 --- !u!114 &534167336280134677
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1497,6 +1560,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -1620,6 +1684,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!212 &9110938358404020778
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1665,6 +1730,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: -2413806693520163455, guid: ebe73ca9363db456bacf42c025bb4847, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.5803922}
   m_FlipX: 0
@@ -1674,7 +1740,6 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!1 &2168992875201352665
 GameObject:
@@ -2008,6 +2073,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!65 &1251221339468447156
 BoxCollider:
@@ -2318,6 +2384,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -3038,6 +3105,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!65 &95921611769226037
 BoxCollider:
@@ -3179,6 +3247,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -3434,13 +3503,60 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   timeToAttack: 0.5
-  timeToDecreasing: 0.2
+  timeToDecay: 0.2
   timeToSustain: 0
-  timeToRelease: 0
-  maxHeighJump: 8
-  heightDecreasing: 2
-  forceToAttack: 1
-  forceToDecreasing: 2
+  maxFallTime: 0
+  maxHeight: 2.5
+  sustainLevel: 0.65
+  attackCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  decayCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  releaseStartVelocityDown: 0
   floorController: {fileID: 1332983113479227212}
 --- !u!1 &6387273917205632558
 GameObject:
@@ -3545,6 +3661,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -3984,6 +4101,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -4652,6 +4770,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0

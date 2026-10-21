@@ -19,15 +19,16 @@ MonoBehaviour:
     hitNorm: {x: 0.2, y: 0.4}
     dano: 9
     knockback: 1
-    hitstopMs: 90
+    hitstopMs: 80
     hitboxRadius: 1.7
     hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    maxTargets: 3
     cancelNorm: {x: 0.55, y: 0.85}
     cancelHitNorm: {x: 0.15, y: 0.85}
     siguiente:
       input: 1
       paso: -1
-    speedMultiplier: 7
+    speedMultiplier: 4.75
     moveLock: 1
     lunge: 2
     lungeCurve:

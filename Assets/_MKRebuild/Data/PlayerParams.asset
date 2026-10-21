@@ -14,14 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerParams
   walkSpeed: 6
   runSpeed: 9
-  jumpVelocity: 8
-  gravity: -20
+  jumpVelocity: 10
+  gravity: -25
   walkInputThreshold: 0.2
   runInputThreshold: 0.4
   jumpBuffer: 0.15
   coyoteTime: 0.12
   jumpLockout: 0.33
-  landingClipSpeed: 2
+  landingClipSpeed: 4
   jumpLockoutExtra: 0.1
   fallGravityMultiplier: 2.2
   jumpCutMultiplier: 0.45
@@ -30,11 +30,19 @@ MonoBehaviour:
   flipMidAirSpeed: 3.5
   dashClipSpeed: 2.29
   deathClipSpeed: 3.5
+  hitReactionClipSpeed: 1
+  attackSpeedScale: 1.5
+  attackReachScale: 1
+  hitstopScale: 1
+  cancelStartScale: 1
+  maxTargetsOverride: 0
+  directionFlickWindow: 0.22
   accelTime: 0.08
   decelTime: 0.1
   airControlFactor: 0.66
   turnSpeed: 1500
   groundRayOffset: 0.4
+  groundNormalMinDot: 0.7
   wallCheckDistance: 0.7
   wallBandSize: {x: 1.2, y: 0.6, z: 1.2}
   wallBandHeight: 0.4

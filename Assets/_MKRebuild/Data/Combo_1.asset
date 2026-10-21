@@ -11,57 +11,381 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4012df37171106e41b45de212bb2aef1, type: 3}
   m_Name: Combo_1
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.ComboDefinition
   steps:
   - input: 0
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
     clip: {fileID: 7400000, guid: 0814d9be54a045f48990c3c889b989f9, type: 2}
     duracion: 2.5
     hitNorm: {x: 0.15, y: 0.35}
     dano: 6
     knockback: 0.5
-    hitstopMs: 40
-    hitboxRadius: 1.5
-    hitboxOffset: {x: 0, y: 0.1, z: 1.5}
+    hitstopMs: 70
+    hitboxRadius: 0.95
+    hitboxOffset: {x: 0, y: 0.5, z: 0.95}
+    hitboxHalfHeight: 0.6
+    maxTargets: 1
     cancelNorm: {x: 0.55, y: 0.85}
     cancelHitNorm: {x: 0.15, y: 0.85}
     siguiente:
       input: 0
+      direction: 0
       paso: 1
-    speedMultiplier: 7
+    branches:
+    - input: 1
+      direction: 0
+      paso: 4
+    speedMultiplier: 4.75
     moveLock: 1
     lunge: 1.2
+    attackStateIndex: 1
+    launch: 0
+    launchImpulse: 0
   - input: 0
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
     clip: {fileID: 7400000, guid: 85076d6996781cb4fb69144b3d0654a0, type: 2}
-    duracion: 2.133
+    duracion: 2.133333
     hitNorm: {x: 0.15, y: 0.35}
     dano: 6
     knockback: 0.5
-    hitstopMs: 40
-    hitboxRadius: 1.5
-    hitboxOffset: {x: 0, y: 0.1, z: 1.5}
+    hitstopMs: 70
+    hitboxRadius: 0.95
+    hitboxOffset: {x: 0, y: 0.5, z: 0.95}
+    hitboxHalfHeight: 0.6
+    maxTargets: 1
     cancelNorm: {x: 0.55, y: 0.85}
     cancelHitNorm: {x: 0.15, y: 0.85}
     siguiente:
-      input: 1
+      input: 0
+      direction: 0
       paso: 2
-    speedMultiplier: 6
+    branches:
+    - input: 1
+      direction: 0
+      paso: 5
+    speedMultiplier: 4.75
     moveLock: 1
     lunge: 1.2
+    attackStateIndex: 2
+    launch: 0
+    launchImpulse: 0
+  - input: 0
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 0814d9be54a045f48990c3c889b989f9, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.15, y: 0.35}
+    dano: 6
+    knockback: 0.5
+    hitstopMs: 70
+    hitboxRadius: 0.95
+    hitboxOffset: {x: 0, y: 0.5, z: 0.95}
+    hitboxHalfHeight: 0.6
+    maxTargets: 1
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 0
+      direction: 0
+      paso: 6
+    branches:
+    - input: 1
+      direction: 0
+      paso: 3
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 1.2
+    attackStateIndex: 1
+    launch: 0
+    launchImpulse: 0
   - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
     clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
     duracion: 2.5
     hitNorm: {x: 0.2, y: 0.4}
     dano: 9
-    knockback: 1
-    hitstopMs: 90
+    knockback: 1.0
+    hitstopMs: 80
     hitboxRadius: 1.7
     hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
     cancelNorm: {x: 0.55, y: 0.85}
     cancelHitNorm: {x: 0.15, y: 0.85}
     siguiente:
       input: 1
+      direction: 0
       paso: -1
-    speedMultiplier: 7
+    branches:
+    - input: 1
+      direction: 0
+      paso: 12
+    speedMultiplier: 4.75
     moveLock: 1
-    lunge: 2
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 0
+      direction: 0
+      paso: 7
+    branches:
+    - input: 1
+      direction: 0
+      paso: 8
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches:
+    - input: 1
+      direction: 0
+      paso: 11
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 0
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches: []
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 0
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 0814d9be54a045f48990c3c889b989f9, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.15, y: 0.35}
+    dano: 6
+    knockback: 0.5
+    hitstopMs: 70
+    hitboxRadius: 0.95
+    hitboxOffset: {x: 0, y: 0.5, z: 0.95}
+    hitboxHalfHeight: 0.6
+    maxTargets: 1
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches:
+    - input: 1
+      direction: 0
+      paso: 9
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 1.2
+    attackStateIndex: 1
+    launch: 0
+    launchImpulse: 0
+  - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches:
+    - input: 1
+      direction: 0
+      paso: 10
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches: []
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches: []
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches: []
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
+  - input: 1
+    direction: 0
+    stepType: 0
+    abilityRef: {fileID: 0}
+    clip: {fileID: 7400000, guid: 22d534c3ce0765a4dadfffd50eaedc62, type: 2}
+    duracion: 2.5
+    hitNorm: {x: 0.2, y: 0.4}
+    dano: 9
+    knockback: 1.0
+    hitstopMs: 80
+    hitboxRadius: 1.7
+    hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    hitboxHalfHeight: 0.0
+    maxTargets: 3
+    cancelNorm: {x: 0.55, y: 0.85}
+    cancelHitNorm: {x: 0.15, y: 0.85}
+    siguiente:
+      input: 1
+      direction: 0
+      paso: -1
+    branches: []
+    speedMultiplier: 4.75
+    moveLock: 1
+    lunge: 2.0
+    attackStateIndex: 3
+    launch: 0
+    launchImpulse: 0
   dashCancelsAll: 1

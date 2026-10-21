@@ -36,8 +36,11 @@ namespace MK.Rebuild
         [Tooltip("Archetype data. All gameplay numbers come from here — never hardcoded per enemy.")]
         [SerializeField] private EnemyDefinition definition;
 
-        [Tooltip("Transform scaled by the death routine. Defaults to this transform.")]
+        [Tooltip("Legacy grey-box visual root, scaled only when no CharacterVisual is present. Defaults to this transform.")]
         [SerializeField] private Transform visualRoot;
+
+        [Tooltip("X Bot animation facade. Resolved from the children when left empty.")]
+        [SerializeField] private CharacterVisual characterVisual;
 
         [Tooltip("Projectile prefab spawned by Ranged archetypes (Tirador). Optional for other kinds.")]
         [SerializeField] private EnemyProjectile projectilePrefab;
@@ -68,6 +71,13 @@ namespace MK.Rebuild
         private bool dead;
         private bool warnedMissingDefinition;
 
+        /// <summary>
+        /// Debug seam: freezes this enemy's AI without disabling the component, so the
+        /// HitReceiver <c>Damaged</c>/<c>OnDied</c> subscriptions stay alive. Set by the
+        /// debug overlay only; false in normal play.
+        /// </summary>
+        public bool Frozen { get; set; }
+
         // Backstab archetype (EnemyAttackKind.Backstab).
         private float fleeTimer;
 
@@ -81,6 +91,7 @@ namespace MK.Rebuild
         private void Awake()
         {
             if (visualRoot == null) visualRoot = transform;
+            if (characterVisual == null) characterVisual = GetComponentInChildren<CharacterVisual>(true);
             rb = GetComponent<Rigidbody>();
             receiver = GetComponent<HitReceiver>();
             bodyCollider = GetComponent<Collider>();
@@ -99,6 +110,8 @@ namespace MK.Rebuild
         private void OnEnable()
         {
             if (!Active.Contains(this)) Active.Add(this);
+            if (characterVisual == null) characterVisual = GetComponentInChildren<CharacterVisual>(true);
+            if (characterVisual != null) characterVisual.PlaySpawn();
         }
 
         private void OnDisable()
@@ -141,6 +154,16 @@ namespace MK.Rebuild
             }
 
             ResolveRefs();
+
+            // Debug AI freeze: stop acting without losing event subscriptions. Release
+            // any held token so the fight does not soft-lock while frozen.
+            if (Frozen)
+            {
+                ReleaseToken();
+                ReleaseRangedToken();
+                StopHorizontal();
+                return;
+            }
 
             float dt = Time.fixedDeltaTime;
             if (cooldownTimer > 0f) cooldownTimer -= dt;
@@ -212,6 +235,7 @@ namespace MK.Rebuild
         private void EnterChase()
         {
             state = State.Chase;
+            if (characterVisual != null) characterVisual.SetMoving(true, definition.moveSpeed);
 
             // Ring slots only shape the melee crowd. Ranged and backstab
             // archetypes use their own spacing/stalk behaviour instead.
@@ -229,6 +253,8 @@ namespace MK.Rebuild
 
         private void TickChase(float dt)
         {
+            if (characterVisual != null) characterVisual.SetMoving(true, definition.moveSpeed);
+
             Vector3 playerPosition = player.transform.position;
             Vector3 toPlayer = FlatDirectionTo(playerPosition);
             Face(toPlayer, dt);
@@ -331,6 +357,11 @@ namespace MK.Rebuild
             rangedShotApplied = false;
             StopHorizontal();
             Face(FlatDirectionTo(player.transform.position), Time.fixedDeltaTime);
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.PlayAim();
+            }
             if (music != null) music.NotifyCombat();
         }
 
@@ -358,6 +389,7 @@ namespace MK.Rebuild
 
         private void FireProjectile(Vector3 toPlayer)
         {
+            if (characterVisual != null) characterVisual.PlayShoot();
             if (projectilePrefab == null) return;
 
             Vector3 direction = toPlayer.sqrMagnitude > 0.000001f ? toPlayer : transform.forward;
@@ -460,6 +492,11 @@ namespace MK.Rebuild
             backstabHitApplied = false;
             StopHorizontal();
             Face(FlatDirectionTo(player.transform.position), dt);
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.PlayStab();
+            }
             if (music != null) music.NotifyCombat();
         }
 
@@ -494,6 +531,8 @@ namespace MK.Rebuild
 
         private void TickFlee(float dt)
         {
+            if (characterVisual != null) characterVisual.PlayFlee();
+
             Vector3 away = -FlatDirectionTo(player.transform.position);
             if (away.sqrMagnitude < 0.000001f) away = -transform.forward;
 
@@ -528,6 +567,11 @@ namespace MK.Rebuild
             attackTimer = 0f;
             attackHitApplied = false;
             StopHorizontal();
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.PlayMelee();
+            }
             if (music != null) music.NotifyCombat();
         }
 
@@ -573,6 +617,11 @@ namespace MK.Rebuild
             chargeDir = FlatDirectionTo(player.transform.position);
             if (chargeDir.sqrMagnitude < 0.000001f) chargeDir = transform.forward;
             StopHorizontal();
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.PlayCharge();
+            }
             if (music != null) music.NotifyCombat();
         }
 
@@ -653,6 +702,7 @@ namespace MK.Rebuild
         private void EnterRecovery()
         {
             StopHorizontal();
+            if (characterVisual != null) characterVisual.SetMoving(false, 0f);
             ReleaseToken();
             cooldownTimer = definition.attackCooldown;
             recoveryTimer = definition.attackRecovery;
@@ -670,6 +720,7 @@ namespace MK.Rebuild
         {
             // Deliberately does NOT write horizontal velocity: knockback/steering
             // momentum plays out while staggering.
+            if (characterVisual != null) characterVisual.SetMoving(false, 0f);
             staggerTimer -= dt;
             if (staggerTimer <= 0f) state = State.Chase;
         }
@@ -679,6 +730,7 @@ namespace MK.Rebuild
         private void OnDamaged(int damage, Vector3 dir, float launchImpulse)
         {
             if (dead || definition == null) return;
+            if (characterVisual != null) characterVisual.PlayHit();
             if (damage >= definition.poiseThreshold) EnterStagger();
         }
 
@@ -690,6 +742,11 @@ namespace MK.Rebuild
             ReleaseToken();
             ReleaseRangedToken();
             StopHorizontal();
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.PlayHit();
+            }
             state = State.Stagger;
             staggerTimer = definition.staggerDuration;
         }
@@ -706,6 +763,8 @@ namespace MK.Rebuild
 
             if (music != null) music.NotifyCombatEnd();
 
+            if (characterVisual != null) characterVisual.PlayDeath();
+
             if (bodyCollider != null) bodyCollider.enabled = false;
             if (rb != null)
             {
@@ -717,28 +776,61 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Grey-box death: scales the visual to 0.05 over <c>deathDelay</c> on
-        /// UNSCALED time (reads during hitstop), then destroys the object. No
-        /// animation, no ragdoll.
+        /// Death cleanup on UNSCALED time (reads during hitstop). With an animated
+        /// <see cref="CharacterVisual"/>, the Death clip plays for its full length
+        /// (or <c>deathDelay</c>, whichever is longer) and the corpse is destroyed.
+        /// Without one, the legacy grey-box scale-down is kept unchanged.
         /// </summary>
         private IEnumerator DeathRoutine()
         {
-            Transform target = visualRoot != null ? visualRoot : transform;
-            Vector3 startScale = target.localScale;
-            Vector3 endScale = Vector3.one * 0.05f;
+            float animationDuration = characterVisual != null ? characterVisual.DeathDuration : 0f;
             float duration = definition != null ? Mathf.Max(0f, definition.deathDelay) : 0.35f;
-            float elapsed = 0f;
+            duration = Mathf.Max(duration, animationDuration);
 
-            while (elapsed < duration)
+            if (characterVisual == null)
             {
-                elapsed += Time.unscaledDeltaTime;
-                float t = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 1f;
-                target.localScale = Vector3.Lerp(startScale, endScale, t);
-                yield return null;
+                Transform target = visualRoot != null ? visualRoot : transform;
+                Vector3 startScale = target.localScale;
+                Vector3 endScale = Vector3.one * 0.05f;
+                float elapsed = 0f;
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 1f;
+                    target.localScale = Vector3.Lerp(startScale, endScale, t);
+                    yield return null;
+                }
+
+                target.localScale = endScale;
+            }
+            else
+            {
+                float elapsed = 0f;
+                while (elapsed < duration)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    yield return null;
+                }
             }
 
-            target.localScale = endScale;
             Destroy(gameObject);
+        }
+
+        /// <summary>
+        /// Player-death reset seam (the spawner currently recreates enemies, so this
+        /// is only used by callers that keep a live instance). Repositions the enemy,
+        /// clears steering and replays the spawn animation.
+        /// </summary>
+        public void ResetForRespawn(Vector3 spawnPosition)
+        {
+            if (dead) return;
+
+            transform.position = spawnPosition;
+            StopHorizontal();
+            state = State.Idle;
+
+            if (characterVisual != null) characterVisual.PlaySpawn();
         }
 
         // --- Movement helpers ------------------------------------------------

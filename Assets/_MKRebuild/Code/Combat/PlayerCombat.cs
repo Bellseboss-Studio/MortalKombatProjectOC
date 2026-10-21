@@ -62,6 +62,9 @@ namespace MK.Rebuild
         [Tooltip("Soft trajectory corrector (aim-assist): at attack entry, turn the facing toward the nearest alive target inside the frontal cone + range. Drags lunge + hitbox (single point: visual.Facing). Null/disabled = forward-only (current behavior).")]
         [SerializeField] private AimAssistDefinition aimAssist;
 
+        [Tooltip("LIVE COMBAT TUNING source (DebugWindow F1 sliders): attack speed / reach / hitstop / cancel-start scales and the victim-cap override. Null = fall back to the PlayerMotor's own params asset, so the sliders work even when this slot is empty.")]
+        [SerializeField] private PlayerParams paramsAsset;
+
         // Active combo (the one currently running), resolved by SelectRoot at entry.
         private ComboDefinition activeCombo;
 
@@ -113,6 +116,12 @@ namespace MK.Rebuild
         // so the body can re-orient between steps without the lunge drifting mid-step.
         private Vector3 lungeDir;
 
+        // Reused candidate buffer for the step probe (combat honesty): the probe collects
+        // the receivers that pass the vertical band + forward filter BEFORE hitting, then
+        // applies the targeting policy (up to maxTargets victims, best-aligned first).
+        // Never allocates per frame.
+        private readonly List<HitReceiver> probeCandidates = new List<HitReceiver>(8);
+
         // Combo state (decision b: one combo at a time).
         private bool comboActive;
         private int stepIndex = -1;             // index into combo.steps
@@ -130,6 +139,13 @@ namespace MK.Rebuild
         // with the buffer, so a mid-combo branch matches the direction the player pressed
         // even if the stick is released before the cancel window opens (follow-up slice).
         private AttackDirection bufferedDirection;
+
+        // ROOT VARIANT "FLICK" GATE: a stick direction held longer than
+        // PlayerParams.directionFlickWindow is ordinary movement, not a deliberate
+        // variant input. Walking toward the enemy with the stick held must keep the
+        // neutral combo; only a fresh flick selects Forward/Side/Back roots.
+        private AttackDirection heldDirection = AttackDirection.Neutral;
+        private float heldDirectionTime;
 
         // Hitstop state.
         private float hitstopRemaining;          // unscaled seconds left frozen
@@ -261,6 +277,7 @@ namespace MK.Rebuild
             }
 
             UpdateAimCorrection();
+            UpdateDirectionHold();
 
             if (comboActive) UpdateCombo();
             else UpdateIdle();
@@ -377,7 +394,7 @@ namespace MK.Rebuild
             // the FRAME OF THE PRESS and classify it. Done HERE, before StartCombo ->
             // ApplyAimAssist: the direction picks WHICH attack (root), the aim-assist
             // then corrects WHICH WAY the body faces (different axes, no conflict).
-            AttackDirection direction = ReadAttackDirection();
+            AttackDirection direction = ReadRootDirection();
 
             // Impact cue for this attack (a heavy press selects the heavy hit, even when
             // it falls through to a light/standalone path). Set BEFORE any path starts.
@@ -454,11 +471,13 @@ namespace MK.Rebuild
             if (LightPressedThisFrame())
             {
                 lightBuffer = inputBufferSeconds;
+                heavyBuffer = 0f; // LAST PRESS WINS: a branching tree resolves the newest input
                 bufferedDirection = ReadAttackDirection();
             }
             if (HeavyPressedThisFrame())
             {
                 heavyBuffer = inputBufferSeconds;
+                lightBuffer = 0f; // LAST PRESS WINS (see above)
                 bufferedDirection = ReadAttackDirection();
             }
 
@@ -582,12 +601,18 @@ namespace MK.Rebuild
             if (activeCombo == null) return;
 
             CancelWindowBounds(out float c0, out float c1);
-            if (stepTime < c0 || stepTime > c1) return;
+            if (stepTime < c0) return;
 
-            // Continuation keyed by (input, direction): the scalar 'siguiente' plus any
-            // extra 'branches'. A finisher (paso < 0) is not a candidate, so a step with
-            // no live matching link simply ends as before.
-            if (!TryResolveContinuation(currentStep, out ComboLink link)) return;
+            // B1 — NO STALE BUFFER: once the step is PAST its cancel window, or the
+            // buffered input does NOT match a live continuation, the press is DEAD
+            // (unmatched button). Otherwise it would survive into idle and start a
+            // fresh attack (e.g. X then Y = one jab, then a Heavy).
+            if (stepTime > c1 || !TryResolveContinuation(currentStep, out ComboLink link))
+            {
+                lightBuffer = 0f;
+                heavyBuffer = 0f;
+                return;
+            }
 
             lightBuffer = 0f; // consume the tap (both — only one can match)
             heavyBuffer = 0f;
@@ -696,10 +721,52 @@ namespace MK.Rebuild
         /// </summary>
         private AttackDirection ReadAttackDirection()
         {
+            return ClassifyAttackDirection();
+        }
+
+        /// <summary>
+        /// Raw stick classification at THIS frame (relative to the facing). Used for
+        /// buffered continuations, where a directional branch must still match even if
+        /// the stick is held.
+        /// </summary>
+        private AttackDirection ClassifyAttackDirection()
+        {
             if (input == null) return AttackDirection.Neutral;
             if (cameraTransform == null) RefreshCamera();
             return AttackDirectionClassifier.FromStick(
                 input.Player.Move.ReadValue<Vector2>(), FacingVector(), cameraTransform);
+        }
+
+        /// <summary>
+        /// Tracks how long the current stick direction has been held. A direction that
+        /// just changed (or was just entered) has <see cref="heldDirectionTime"/> ~ 0,
+        /// which is what marks a deliberate "flick" for root selection.
+        /// </summary>
+        private void UpdateDirectionHold()
+        {
+            AttackDirection current = ClassifyAttackDirection();
+            if (current != heldDirection)
+            {
+                heldDirection = current;
+                heldDirectionTime = 0f;
+            }
+            else
+            {
+                heldDirectionTime += Time.unscaledDeltaTime;
+            }
+        }
+
+        /// <summary>
+        /// Direction used to pick a combo ROOT. Walking (stick held longer than
+        /// <see cref="PlayerParams.directionFlickWindow"/>) reads as Neutral so the
+        /// neutral combo keeps chaining; a flick selects the directional variant.
+        /// </summary>
+        private AttackDirection ReadRootDirection()
+        {
+            AttackDirection current = ClassifyAttackDirection();
+            if (current == AttackDirection.Neutral) return current;
+            float flick = Params != null ? Params.directionFlickWindow : 0.22f;
+            return heldDirectionTime <= flick ? current : AttackDirection.Neutral;
         }
 
         private void StartCombo(ComboDefinition definition, bool dashOpener = false)
@@ -750,6 +817,10 @@ namespace MK.Rebuild
             connectedThisStep = false;
             hitThisStep.Clear();
             ClearAimAssist();
+            // B1 — a combo end must never leak a buffered press into idle (the root
+            // cause of "X then Y starts a fresh Heavy after the jab").
+            lightBuffer = 0f;
+            heavyBuffer = 0f;
             ReleaseAttackToken(); // release the attack token -> wish control returns
             if (visual is AnimatorVisual animatorVisual)
             {
@@ -832,6 +903,10 @@ namespace MK.Rebuild
                 return;
             }
 
+            // LIVE tuning: the clip retime must equal the value EffectiveDuration divides by,
+            // so the animation and the hit/cancel windows stay locked together at any scale.
+            float clipSpeed = AttackSpeed(def);
+
             if (dashAttackActive)
             {
                 // DASH-ATTACK opener: its OWN clip slot (Attack_Dash state). Enter it
@@ -840,7 +915,7 @@ namespace MK.Rebuild
                 // renders with whatever locomotion pose is live (no pose freeze).
                 // The step's speedMultiplier rides in as the state's retime (slice 2).
                 if (def.clip != null)
-                    animatorVisual.PlayDashAttack(Mathf.Max(0f, crossFadeDuration), def.speedMultiplier);
+                    animatorVisual.PlayDashAttack(Mathf.Max(0f, crossFadeDuration), clipSpeed);
                 return;
             }
 
@@ -850,7 +925,7 @@ namespace MK.Rebuild
             // clip-less state (no pose freeze). speedMultiplier rides in as the retime (slice 2).
             if (def.launch && def.clip != null)
             {
-                animatorVisual.PlayLauncher(Mathf.Max(0f, crossFadeDuration), def.speedMultiplier);
+                animatorVisual.PlayLauncher(Mathf.Max(0f, crossFadeDuration), clipSpeed);
                 return;
             }
 
@@ -858,7 +933,7 @@ namespace MK.Rebuild
             // combo can play a deeper clip (Combo_H -> Attack_P3).
             int state = def.attackStateIndex > 0 ? def.attackStateIndex : step;
             animatorVisual.PlayAttack(state, Mathf.Max(0f, crossFadeDuration));
-            animatorVisual.SetAttackSpeed(state, def.speedMultiplier);
+            animatorVisual.SetAttackSpeed(state, clipSpeed);
         }
 
         // ------------------------------------------------------------------
@@ -950,6 +1025,77 @@ namespace MK.Rebuild
         }
 
         // ------------------------------------------------------------------
+        // LIVE combat tuning (WU6): global scales that MULTIPLY the per-step data.
+        // The data stays AUTHORITATIVE (speedMultiplier, hitboxRadius/Offset,
+        // hitstopMs, cancel windows, maxTargets); scale 1 + override 0 reproduce it
+        // exactly, so this is a pure multiplier layer. The values live on
+        // PlayerParams and the DebugWindow edits them during Play Mode (no recompile).
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Tuning source: this component's own asset, else the motor's params asset.
+        /// Null (no asset anywhere) = every scale is 1 and the override is 0.
+        /// </summary>
+        private PlayerParams Params => paramsAsset != null ? paramsAsset : (motor != null ? motor.Params : null);
+
+        /// <summary>Global attack-cadence multiplier (1 = data).</summary>
+        private float SpeedScale => Params != null ? Params.attackSpeedScale : 1f;
+
+        /// <summary>Global reach multiplier on BOTH the radius and the offset (1 = data).</summary>
+        private float ReachScale => Params != null ? Params.attackReachScale : 1f;
+
+        /// <summary>Global hitstop multiplier (1 = data, 0 = no freeze).</summary>
+        private float HitstopScale => Params != null ? Params.hitstopScale : 1f;
+
+        /// <summary>Cancel-START divisor (&gt; 1 opens the cancel window EARLIER; 1 = data).</summary>
+        private float CancelStartScale => Params != null ? Params.cancelStartScale : 1f;
+
+        /// <summary>Victim-cap override; 0 = use each step's own maxTargets (data).</summary>
+        private int TargetsOverride => Params != null ? Params.maxTargetsOverride : 0;
+
+        /// <summary>
+        /// Debug readout: cancel-window START of the ACTIVE step, normalized (0..1), or
+        /// -1 when no combo step is running. Pre-scale value (the live divisor is applied
+        /// by <see cref="CancelWindowBounds"/>), so the overlay can show both.
+        /// </summary>
+        public float ActiveCancelStartNormalized =>
+            comboActive
+                ? Mathf.Clamp01((connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm).x)
+                : -1f;
+
+        /// <summary>The step's REAL clip retime: the data's speedMultiplier x the live scale.</summary>
+        private float AttackSpeed(in ComboStep step) => Mathf.Max(0.01f, step.speedMultiplier * SpeedScale);
+
+        /// <summary>
+        /// Victims this step may damage: the live override when set, else the data cap
+        /// (clamped to &gt;= 1 — an absent serialized key reads 0).
+        /// </summary>
+        private int Targets(in ComboStep step)
+        {
+            int over = TargetsOverride;
+            return over > 0 ? over : Mathf.Max(1, step.maxTargets);
+        }
+
+        /// <summary>
+        /// Scales the step hitbox ONCE, at the call site, so the probe and the gizmo
+        /// consume the SAME radius/offset (what you see is what the probe tests).
+        /// </summary>
+        private void ScaledHitbox(in ComboStep step, out float radius, out Vector3 offset)
+        {
+            float reach = ReachScale;
+            radius = step.hitboxRadius * reach;
+            offset = step.hitboxOffset * reach;
+        }
+
+        /// <summary>Same scaling for the grey-box standalone swing definition.</summary>
+        private void ScaledHitbox(AttackDefinition def, out float radius, out Vector3 offset)
+        {
+            float reach = ReachScale;
+            radius = def.hitboxRadius * reach;
+            offset = def.hitboxOffset * reach;
+        }
+
+        // ------------------------------------------------------------------
         // Shared hitbox probe (slice-1 seam extended 1:1 to combo steps)
         // ------------------------------------------------------------------
 
@@ -969,8 +1115,11 @@ namespace MK.Rebuild
         {
             Vector2 window = connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm;
             float duration = EffectiveDuration(currentStep);
-            c0 = Mathf.Clamp01(window.x) * duration;
+            // LIVE tuning: only the START moves (window.x / cancelStartScale), so > 1
+            // opens the cancel EARLIER; the END stays on the data. Never invert.
+            c0 = Mathf.Clamp01(Mathf.Clamp01(window.x) / Mathf.Max(0.01f, CancelStartScale)) * duration;
             c1 = Mathf.Clamp01(window.y) * duration;
+            c0 = Mathf.Min(c0, c1);
         }
 
         /// <summary>True while the active step is inside its cancel window (scaled time).</summary>
@@ -982,14 +1131,16 @@ namespace MK.Rebuild
 
         /// <summary>
         /// Effective step duration in SCALED seconds. The clip plays at
-        /// <c>speedMultiplier</c> (Animator state speed, decision c), so the hit
-        /// window, the cancel windows and the step end must be measured against
-        /// <c>duracion / speedMultiplier</c> — NOT the raw clip length — or the
-        /// logic would outlive the accelerated clip by a full speed factor.
+        /// <c>speedMultiplier</c> (Animator state speed, decision c) x the LIVE
+        /// <c>attackSpeedScale</c>, so the hit window, the cancel windows and the
+        /// step end must be measured against
+        /// <c>duracion / (speedMultiplier x scale)</c> — NOT the raw clip length —
+        /// or the logic would outlive the accelerated clip by a full speed factor.
+        /// Instance method (not static): the duration now depends on the live tuning.
         /// </summary>
-        private static float EffectiveDuration(in ComboStep step)
+        private float EffectiveDuration(in ComboStep step)
         {
-            return step.duracion / Mathf.Max(0.01f, step.speedMultiplier);
+            return step.duracion / AttackSpeed(step);
         }
 
         private bool IsInsideActiveWindow()
@@ -1006,13 +1157,24 @@ namespace MK.Rebuild
         /// Returns true when at least one target was hit.
         /// <paramref name="moveKey"/> (style-meter seam): when non-null, every NEWLY
         /// hit receiver fires <see cref="OnStepConnected"/> once with it.
+        /// <paramref name="halfHeight"/> (B2, combat honesty): when &gt; 0, the probe is a
+        /// CYLINDER — a victim only counts when its collider bounds overlap
+        /// <c>origin.y ± halfHeight</c>. 0 = legacy sphere (no vertical filter), so old
+        /// assets that omit the field keep their behavior.
+        /// <paramref name="maxTargets"/> (B2): the step's victim CAP. 1 = ONE victim per
+        /// step (best aim-lock / nearest in front); N &gt; 1 = cleave up to N victims.
+        /// The probe COLLECTS before hitting, so a step can never damage more victims
+        /// than its cap across frames because the first one stayed inside the sphere.
         /// </summary>
-        private bool ProbeAt(Vector3 origin, float radius, int damage, float knockback, float launchImpulse, string moveKey = null)
+        private bool ProbeAt(Vector3 origin, float radius, int damage, float knockback, float launchImpulse,
+            string moveKey = null, float halfHeight = 0f, int maxTargets = 1)
         {
             Collider[] cols = Physics.OverlapSphere(
                 origin, radius, Physics.AllLayers, QueryTriggerInteraction.Ignore);
 
-            bool connected = false;
+            probeCandidates.Clear();
+
+            Vector3 forwardAxis = lungeDir.sqrMagnitude > 0.0001f ? lungeDir : FacingVector();
             for (int i = 0; i < cols.Length; i++)
             {
                 var col = cols[i];
@@ -1021,20 +1183,49 @@ namespace MK.Rebuild
 
                 var receiver = col.GetComponentInParent<HitReceiver>();
                 if (receiver == null) continue;
-                if (!hitThisStep.Add(receiver)) continue; // one hit per target per step/swing
+                if (hitThisStep.Contains(receiver)) continue;     // already hit this step/swing
+                if (probeCandidates.Contains(receiver)) continue; // two colliders -> one candidate
+
+                // VERTICAL BAND (cylinder): reject victims whose collider is entirely
+                // above/below the band around the sphere centre. 0 = off (legacy).
+                if (halfHeight > 0f)
+                {
+                    Bounds bounds = col.bounds;
+                    if (bounds.max.y < origin.y - halfHeight || bounds.min.y > origin.y + halfHeight)
+                        continue;
+                }
 
                 Vector3 to = receiver.transform.position - transform.position;
                 to.y = 0f;
-                if (to.sqrMagnitude < 0.0001f) to = FacingVector();
+                if (to.sqrMagnitude < 0.0001f) to = forwardAxis;
                 to.Normalize();
 
-                // LAUNCHER (slice 3nonies): the vertical impulse is passed SEPARATELY
-                // (not baked into the XZ push) so HitReceiver can drive the juggle-lite
-                // arc (rise -> fall -> land) with its own gravity. 0 = normal hit.
-                receiver.TakeHit(damage, to * knockback, launchImpulse);
-                if (moveKey != null) OnStepConnected?.Invoke(moveKey);
-                connected = true;
+                // FORWARD-ONLY: the committed step axis (aim-assist result at entry) is
+                // the targeting axis, so a target behind the swing never counts.
+                if (Vector3.Dot(to, forwardAxis) < 0f) continue;
+
+                probeCandidates.Add(receiver);
             }
+
+            // CAP (default 1): once a victim landed this step, never pick a SECOND one on a
+            // later frame (the old loop could cleave across frames).
+            if (maxTargets <= 1 && hitThisStep.Count > 0) return false;
+
+            // Budget = the step's remaining cap (victims already hit this step already
+            // consumed it). Select best-aligned first, swap-removing as we go: O(1) per
+            // pick, no Sort, no LINQ, no per-frame allocation.
+            int budget = Mathf.Max(0, Mathf.Max(1, maxTargets) - hitThisStep.Count);
+            int hits = 0;
+            while (hits < budget && probeCandidates.Count > 0)
+            {
+                int i = SelectBestIndex(forwardAxis);
+                if (i < 0) break;
+                HitReceiver pick = probeCandidates[i];
+                probeCandidates[i] = probeCandidates[probeCandidates.Count - 1];
+                probeCandidates.RemoveAt(probeCandidates.Count - 1);
+                if (HitCandidate(pick, damage, knockback, launchImpulse, moveKey)) hits++;
+            }
+            bool connected = hits > 0;
 
             // One impact per probe call (not per receiver).
             if (connected) AudioDirector.Play(hitCue, transform.position);
@@ -1042,25 +1233,81 @@ namespace MK.Rebuild
             return connected;
         }
 
+        /// <summary>
+        /// Applies the hit to ONE receiver (dedup via <see cref="hitThisStep"/>) and fires
+        /// the style seam. Returns false when the receiver was already hit this step.
+        /// </summary>
+        private bool HitCandidate(HitReceiver receiver, int damage, float knockback, float launchImpulse, string moveKey)
+        {
+            if (!hitThisStep.Add(receiver)) return false; // one hit per target per step/swing
+
+            Vector3 to = receiver.transform.position - transform.position;
+            to.y = 0f;
+            if (to.sqrMagnitude < 0.0001f) to = FacingVector();
+            to.Normalize();
+
+            // LAUNCHER (slice 3nonies): the vertical impulse is passed SEPARATELY
+            // (not baked into the XZ push) so HitReceiver can drive the juggle-lite
+            // arc (rise -> fall -> land) with its own gravity. 0 = normal hit.
+            receiver.TakeHit(damage, to * knockback, launchImpulse);
+            if (moveKey != null) OnStepConnected?.Invoke(moveKey);
+            return true;
+        }
+
+        /// <summary>
+        /// Targeting policy (B2): the best candidate is the one most aligned with the
+        /// committed step axis (aim-soft-lock first, else nearest in the swing); a tie on
+        /// the alignment breaks on the NEAREST (<c>sqrMagnitude</c>). Returns the INDEX in
+        /// <see cref="probeCandidates"/> so the caller can swap-remove it in O(1); -1 when
+        /// the buffer is empty.
+        /// </summary>
+        private int SelectBestIndex(Vector3 forwardAxis)
+        {
+            int bestIndex = -1;
+            float bestDot = float.NegativeInfinity;
+            float bestSqr = float.PositiveInfinity;
+            for (int i = 0; i < probeCandidates.Count; i++)
+            {
+                HitReceiver candidate = probeCandidates[i];
+                Vector3 to = candidate.transform.position - transform.position;
+                to.y = 0f;
+                float sqr = to.sqrMagnitude;
+                Vector3 dir = sqr > 0.0001f ? to / Mathf.Sqrt(sqr) : forwardAxis;
+                float dot = Vector3.Dot(dir, forwardAxis);
+
+                if (bestIndex < 0 || dot > bestDot || (Mathf.Approximately(dot, bestDot) && sqr < bestSqr))
+                {
+                    bestIndex = i;
+                    bestDot = dot;
+                    bestSqr = sqr;
+                }
+            }
+            return bestIndex;
+        }
+
         private void ProbeHitboxStep()
         {
             float launch = currentStep.launch ? Mathf.Max(0f, currentStep.launchImpulse) : 0f;
             string moveKey = activeCombo != null ? activeCombo.name + "#" + stepIndex : null;
-            if (ProbeAt(HitboxOrigin(currentStep.hitboxRadius, currentStep.hitboxOffset),
-                    currentStep.hitboxRadius, currentStep.dano, currentStep.knockback, launch, moveKey))
+            // LIVE reach: the SAME scaled geometry feeds the probe and the gizmo.
+            ScaledHitbox(currentStep, out float radius, out Vector3 offset);
+            if (ProbeAt(HitboxOrigin(radius, offset),
+                    radius, currentStep.dano, currentStep.knockback, launch, moveKey,
+                    currentStep.hitboxHalfHeight, Targets(currentStep)))
             {
                 connectedThisStep = true; // wider cancel window (hit-cancel)
-                BeginHitstop(currentStep.hitstopMs);
+                BeginHitstop(currentStep.hitstopMs * HitstopScale);
             }
         }
 
         private void ProbeHitbox()
         {
             string moveKey = current != null ? current.name + "#0" : null;
-            if (ProbeAt(HitboxOrigin(current.hitboxRadius, current.hitboxOffset),
-                    current.hitboxRadius, current.damage, current.knockback, 0f, moveKey))
+            ScaledHitbox(current, out float radius, out Vector3 offset);
+            if (ProbeAt(HitboxOrigin(radius, offset),
+                    radius, current.damage, current.knockback, 0f, moveKey, 0f, 1))
             {
-                BeginHitstop(current.hitstopMs);
+                BeginHitstop(current.hitstopMs * HitstopScale);
             }
         }
 
@@ -1069,6 +1316,7 @@ namespace MK.Rebuild
             current = def;
             swingTime = 0f;
             hitThisSwing.Clear();
+            hitThisStep.Clear(); // standalone swings must not inherit the previous swing's victims
             ApplyAimAssist();
         }
 
@@ -1077,6 +1325,7 @@ namespace MK.Rebuild
             current = null;
             swingTime = 0f;
             hitThisSwing.Clear();
+            hitThisStep.Clear(); // next swing starts with a clean victim set
             ClearAimAssist();
         }
 
@@ -1150,16 +1399,27 @@ namespace MK.Rebuild
                 Gizmos.color = IsInsideStepWindow()
                     ? Color.red
                     : new Color(1f, 0.6f, 0.1f, 0.6f);
-                Gizmos.DrawWireSphere(HitboxOrigin(currentStep.hitboxRadius, currentStep.hitboxOffset),
-                    currentStep.hitboxRadius);
+                // LIVE reach: the gizmo consumes the SAME scaled geometry as the probe.
+                ScaledHitbox(currentStep, out float stepRadius, out Vector3 stepOffset);
+                Vector3 origin = HitboxOrigin(stepRadius, stepOffset);
+                Gizmos.DrawWireSphere(origin, stepRadius);
+                // CYLINDER (B2): draw the vertical band so the gizmo stays honest about
+                // the elevated-target rejection the probe applies.
+                if (currentStep.hitboxHalfHeight > 0f)
+                {
+                    Gizmos.DrawWireCube(origin, new Vector3(
+                        stepRadius * 2f,
+                        currentStep.hitboxHalfHeight * 2f,
+                        stepRadius * 2f));
+                }
                 return;
             }
             if (current == null) return;
             Gizmos.color = IsInsideActiveWindow()
                 ? Color.red
                 : new Color(1f, 0.6f, 0.1f, 0.6f);
-            Gizmos.DrawWireSphere(HitboxOrigin(current.hitboxRadius, current.hitboxOffset),
-                current.hitboxRadius);
+            ScaledHitbox(current, out float swingRadius, out Vector3 swingOffset);
+            Gizmos.DrawWireSphere(HitboxOrigin(swingRadius, swingOffset), swingRadius);
         }
 
         private void OnDrawGizmosSelected()
@@ -1173,7 +1433,8 @@ namespace MK.Rebuild
         {
             if (def == null) return;
             Gizmos.color = color;
-            Gizmos.DrawWireSphere(HitboxOrigin(def.hitboxRadius, def.hitboxOffset), def.hitboxRadius);
+            ScaledHitbox(def, out float radius, out Vector3 offset);
+            Gizmos.DrawWireSphere(HitboxOrigin(radius, offset), radius);
         }
     }
 }

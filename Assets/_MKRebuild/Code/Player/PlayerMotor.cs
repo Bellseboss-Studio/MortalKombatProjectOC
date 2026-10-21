@@ -33,6 +33,7 @@ namespace MK.Rebuild
         private CapsuleCollider body;
         private ICharacterVisual visual;
         private PlayerInput input;
+        private PlayerDash dash;
 
         private Vector2 moveInput;
         private Vector3 wishDir; // cached camera-relative input direction (XZ unit, zero = no input)
@@ -89,6 +90,13 @@ namespace MK.Rebuild
         private bool holdingWallJumpFacing; // scripted turn held through the whole flight
         private Vector3 wallJumpFacing;     // destination-wall direction (+wallNormal at the jump)
         private Vector3 lastWallNormal;     // last wall normal, for coyote wall-jumps
+
+        /// <summary>
+        /// The motor's serialized parameter asset (read-only seam). PlayerCombat and the
+        /// DebugWindow resolve the LIVE combat tuning scales through this, so there is a
+        /// single source of truth for the tuning values.
+        /// </summary>
+        public PlayerParams Params => paramsAsset;
 
         /// <summary>True while facing is state-driven (wall/ledge/flight) and input cannot steer it.</summary>
         public bool FacingLocked => facingLocked;
@@ -236,6 +244,7 @@ namespace MK.Rebuild
             rb = GetComponent<Rigidbody>();
             body = GetComponent<CapsuleCollider>();
             visual = GetComponent<ICharacterVisual>();
+            dash = GetComponent<PlayerDash>();
             // One-time params seam for the concrete driver (turnSpeed stays data-driven).
             if (visual is AnimatorVisual animatorVisual) animatorVisual.Bind(paramsAsset);
 
@@ -291,7 +300,21 @@ namespace MK.Rebuild
             if (paramsAsset == null || input == null) return;
             moveInput = input.Player.Move.ReadValue<Vector2>();
             if (input.Player.Jump.WasPressedThisFrame())
-                bufferTimer = paramsAsset.jumpBuffer;
+            {
+                // DASH -> JUMP: only a jump inside the dash's cancel window may cancel
+                // it. A jump pressed before that window (e.g. dash+jump together) is
+                // DISCARDED, not buffered — otherwise it fires the instant the dash ends
+                // and reads as "dash, then immediately jump".
+                if (dash != null && dash.IsDashing)
+                {
+                    if (!dash.TryCancelByJump()) bufferTimer = 0f;
+                    else bufferTimer = paramsAsset.jumpBuffer;
+                }
+                else
+                {
+                    bufferTimer = paramsAsset.jumpBuffer;
+                }
+            }
             // Mario variable height: release while ascending cuts upward velocity.
             if (input.Player.Jump.WasReleasedThisFrame() && verticalVel > 0f)
                 verticalVel *= paramsAsset.jumpCutMultiplier;
@@ -303,9 +326,11 @@ namespace MK.Rebuild
             if (cameraTransform == null) RefreshCamera();
 
             float dt = Time.fixedDeltaTime;
-            // A jump pressed during the dash must survive it as a buffer (dash holds
-            // the body, so the buffered press cannot fire until the token releases).
-            if (BodyOwner != BodyPriority.Dash) bufferTimer = Mathf.Max(0f, bufferTimer - dt);
+            // A jump pressed during the dash is NOT held: it is either the deliberate
+            // jump-cancel (applied in Update) or discarded. Hold the buffer only through
+            // the landing lockout so a jump pressed while recovering fires when it ends.
+            bool holdBuffer = grounded && jumpLockoutTimer > 0f;
+            if (!holdBuffer) bufferTimer = Mathf.Max(0f, bufferTimer - dt);
             jumpLockoutTimer = Mathf.Max(0f, jumpLockoutTimer - dt);
 
             // Mantle: animation-driven timed warp. Owns the root while active; input is
@@ -429,8 +454,11 @@ namespace MK.Rebuild
                 wallCoyoteTimer = Mathf.Max(0f, wallCoyoteTimer - dt);
 
             // Down while hanging: detach with a small up+away hop. Checked first
-            // so it never fights the jump/mantle branches.
-            if (hanging && moveInput.y <= paramsAsset.wallReleaseThreshold)
+            // so it never fights the jump/mantle branches — except when Jump was
+            // pressed: a buffered jump must win over the Down-release, so
+            // Down+Jump wall-jumps (8 up / 6 push-off) instead of hopping (3).
+            // Down with no Jump still drops.
+            if (hanging && moveInput.y <= paramsAsset.wallReleaseThreshold && bufferTimer <= 0f)
             {
                 verticalVel = paramsAsset.wallReleaseHop;
                 lockHoriz = HangAwayDir() * paramsAsset.wallReleaseHop;
@@ -767,11 +795,15 @@ namespace MK.Rebuild
                 Physics.AllLayers, QueryTriggerInteraction.Ignore);
             float best = float.MaxValue;
             bool any = false;
+            float minUp = paramsAsset != null ? paramsAsset.groundNormalMinDot : 0.7f;
             for (int i = 0; i < hits.Length; i++)
             {
                 var c = hits[i].collider;
                 if (c == null || c == capsule) continue;
                 if (hits[i].rigidbody == rb) continue; // own Face / children
+                // Walls, shoulders and capsule sides are not ground. Even after a
+                // downward ray, a steeply tilted normal is a perch — reject it.
+                if (hits[i].normal.y < minUp) continue;
                 if (hits[i].distance < best) { best = hits[i].distance; any = true; }
             }
             if (any) endpoint = origin + Vector3.down * best;
@@ -799,31 +831,57 @@ namespace MK.Rebuild
             Vector3 prevNormal = wallNormal;
             wallNormal = Vector3.zero;
 
-            Vector3 probe;
-            if (wallGrabHeld && prevNormal.sqrMagnitude > 0.000001f)
+            Collider foundCol = null;
+            Vector3 foundNormal = Vector3.zero;
+
+            // Candidate probes in priority order. A later candidate is tried ONLY
+            // when the previous one found nothing, so the sticky grab still wins and
+            // movement input still beats a flush takeoff. Grab permission stays
+            // FacingTowardWall(): the fallbacks change WHO finds the wall, never
+            // whether it may be grabbed.
+            bool found = wallGrabHeld
+                && prevNormal.sqrMagnitude > 0.000001f
+                && TryFindWall(-prevNormal, out foundCol, out foundNormal);
+
+            // 2. Movement input (camera-relative), the normal approach.
+            if (!found)
+                found = TryFindWall(CameraRelative(moveInput), out foundCol, out foundNormal);
+
+            // 3. Horizontal velocity: direction-independent re-grab while drifting.
+            if (!found)
             {
-                // Sticky grab: keep probing into the wall being held so contact
-                // persists with no movement input.
-                probe = -prevNormal;
+                Vector3 velProbe = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+                found = TryFindWall(velProbe, out foundCol, out foundNormal);
             }
-            else
+
+            // 4. Facing: a flush takeoff, or a collision-stopped arrival at a
+            // destination wall, still probes into the wall the character faces.
+            // The directionality test inside TryFindWall keeps a back-to-wall from
+            // counting as contact.
+            if (!found)
             {
-                probe = CameraRelative(moveInput);
-                if (probe.sqrMagnitude < 0.000001f)
-                    probe = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-                // Facing fallback: with no input and no horizontal velocity — a flush
-                // takeoff, or a collision-stopped arrival at a destination wall — still
-                // probe into the wall the character faces. The directionality test
-                // below (Dot(probe, normal) >= 0) keeps a back-to-wall from grabbing.
-                if (probe.sqrMagnitude < 0.000001f)
-                {
-                    Vector3 f = visual != null ? visual.Facing : transform.forward;
-                    f.y = 0f;
-                    probe = f;
-                }
-                if (probe.sqrMagnitude < 0.000001f) return;
+                Vector3 facing = visual != null ? visual.Facing : transform.forward;
+                found = TryFindWall(facing, out foundCol, out foundNormal);
             }
+
+            if (!found) return;
+            wallContact = true;
+            wallNormal = foundNormal;
+            wallCollider = foundCol;
+        }
+
+        /// <summary>
+        /// One wall-band pass along a single probe direction. Returns the nearest
+        /// Grabbable face the probe points INTO, or false when this probe finds
+        /// nothing. Callers try the next candidate probe only on false.
+        /// </summary>
+        private bool TryFindWall(Vector3 probe, out Collider col, out Vector3 normal)
+        {
+            col = null;
+            normal = Vector3.zero;
+
             probe.y = 0f;
+            if (probe.sqrMagnitude < 0.000001f) return false;
             probe.Normalize();
 
             GetWallBandVolume(body, out Vector3 bandCenter, out Vector3 half);
@@ -835,29 +893,29 @@ namespace MK.Rebuild
             float best = float.MaxValue;
             for (int i = 0; i < cols.Length; i++)
             {
-                var col = cols[i];
-                if (col == null || col == body) continue;
-                if (col.attachedRigidbody == rb) continue; // Face / own children
+                var candidate = cols[i];
+                if (candidate == null || candidate == body) continue;
+                if (candidate.attachedRigidbody == rb) continue; // Face / own children
                 // Re-grab ban: ignore the exact wall we just wall-jumped from until
                 // grounded or a different wall/ledge is grabbed.
-                if (col == lastWallJumpedFrom) continue;
-                if (col.GetComponentInParent<Grabbable>() == null) continue; // only Grabbable sides
+                if (candidate == lastWallJumpedFrom) continue;
+                if (candidate.GetComponentInParent<Grabbable>() == null) continue; // only Grabbable sides
                 // The box gives WHICH collider, not the surface normal: recover it
                 // with a short ray into the wall, then keep the horizontal test.
-                if (!TryGetWallNormal(bandCenter, probe, col, out Vector3 normal, out float dist)) continue;
+                if (!TryGetWallNormal(bandCenter, probe, candidate, out Vector3 n, out float dist)) continue;
                 // Directionality preserved from the old ray: the collider only counts
                 // while probing INTO it (probe points against the face normal). A box
                 // has no intrinsic direction, so this explicit test keeps the
                 // move-into-wall semantics the center ray had (band catches sideways
                 // overlap, not backpedal-by-a-wall).
-                if (Vector3.Dot(probe, normal) >= 0f) continue;
-                if (Mathf.Abs(normal.y) >= paramsAsset.wallNormalThreshold) continue; // floor/ceiling
+                if (Vector3.Dot(probe, n) >= 0f) continue;
+                if (Mathf.Abs(n.y) >= paramsAsset.wallNormalThreshold) continue; // floor/ceiling
                 if (dist >= best) continue;
                 best = dist;
-                wallContact = true;
-                wallNormal = normal;
-                wallCollider = col;
+                col = candidate;
+                normal = n;
             }
+            return col != null;
         }
 
         /// <summary>

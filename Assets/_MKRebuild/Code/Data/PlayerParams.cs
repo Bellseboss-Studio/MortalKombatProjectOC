@@ -95,6 +95,42 @@ namespace MK.Rebuild
                  "1 = natural playback of the 0.40 s impact clip (peak lean + 2-frame hold).")]
         public float hitReactionClipSpeed = 1.0f;
 
+        [Header("Combat tuning (live)")]
+        [Tooltip("LIVE attack cadence multiplier (DebugWindow F1 sliders). Multiplies every combo step's " +
+                  "speedMultiplier, so the effective step duration becomes duracion / (speed * this). " +
+                  "1 = data as authored; 2 = double speed (half duration).")]
+        [Range(0.5f, 2f)]
+        public float attackSpeedScale = 1f;
+
+        [Tooltip("LIVE attack reach multiplier (DebugWindow F1 sliders). Multiplies BOTH the hitbox " +
+                  "radius and its forward offset, so the sphere edge (radius + offset.z) grows with it. " +
+                  "1 = data as authored; 1.5 = 50% more reach.")]
+        [Range(0.5f, 1.5f)]
+        public float attackReachScale = 1f;
+
+        [Tooltip("LIVE hitstop multiplier (DebugWindow F1 sliders). Multiplies every step's hitstopMs " +
+                  "freeze on connect. 1 = data as authored; 0 = no freeze at all.")]
+        [Range(0f, 2f)]
+        public float hitstopScale = 1f;
+
+        [Tooltip("LIVE cancel-window start multiplier (DebugWindow F1 sliders). The cancel START is " +
+                  "divided by this (window.x / scale), so > 1 opens the cancel EARLIER. The cancel END " +
+                  "is untouched. 1 = data as authored.")]
+        [Range(0.5f, 1.5f)]
+        public float cancelStartScale = 1f;
+
+        [Tooltip("LIVE victim cap override (DebugWindow F1 sliders). 0 = use each step's own " +
+                  "maxTargets (data as authored); N > 0 = every step may damage up to N victims.")]
+        [Range(0, 6)]
+        public int maxTargetsOverride = 0;
+
+        [Tooltip("Seconds a stick direction must be held longer than this to stop counting as a " +
+                  "deliberate attack variant. A flick (direction entered within this window) selects " +
+                  "Forward/Side/Back roots; walking with the stick held uses the neutral combo. " +
+                  "Fixes 'holding toward the enemy interrupts the combo'.")]
+        [Range(0.05f, 0.5f)]
+        public float directionFlickWindow = 0.22f;
+
         [Header("Feel (tunables)")]
         [Tooltip("Seconds to reach full speed (ground).")]
         public float accelTime = 0.08f;
@@ -114,6 +150,12 @@ namespace MK.Rebuild
                   "footprint (±offset in X and ±offset in Z around the center). Near the " +
                   "capsule radius; tune if the rays sit too far from or too close to the center.")]
         public float groundRayOffset = 0.4f;
+
+        [Tooltip("Minimum surface normal Y for a ground ray hit to count as ground. " +
+                  "Walls, shoulders and capsule sides are not ground; flat floors and " +
+                  "slopes up to 45 degrees still are (0.7).")]
+        [Range(0f, 1f)]
+        public float groundNormalMinDot = 0.7f;
 
         [Header("Wall motion (M0)")]
         [Tooltip("Forward probe distance for wall contact (m). Used as the SHORT ray " +

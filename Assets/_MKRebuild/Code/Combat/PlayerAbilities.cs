@@ -81,6 +81,12 @@ namespace MK.Rebuild
         private AbilityDefinition active;
         private bool activeProjectile;
         private bool busy;
+
+        // B5 AIR DENIAL: the ability holds the Attack body token for its whole window,
+        // so the motor's jump guards deny a jump regardless of input order (jump->spin
+        // and spin->jump). Acquired in StartAbility, released in Stop (never leaked).
+        private BodyOwnership.Token bodyToken;
+
         private bool hitFired;
         private float time;
         private float duration;
@@ -101,6 +107,22 @@ namespace MK.Rebuild
 
         /// <summary>True while an ability window is running (read-only seam).</summary>
         public bool IsBusy => busy;
+
+        /// <summary>
+        /// True while the active ability is inside its dash-cancel window
+        /// (<see cref="AbilityDefinition.cancelNorm"/>). Empty window (y &lt;= x) = never.
+        /// </summary>
+        public bool CanBeCancelled
+        {
+            get
+            {
+                if (!busy || active == null) return false;
+                Vector2 window = active.cancelNorm;
+                if (window.y <= window.x) return false;
+                float t = duration > 0.0001f ? time / duration : 1f;
+                return t >= window.x && t <= window.y;
+            }
+        }
 
         /// <summary>Unscaled seconds left before H1 is ready again (0 = ready). Read-only seam.</summary>
         public float CooldownRemaining1 => cooldown1Timer;
@@ -247,9 +269,13 @@ namespace MK.Rebuild
         /// </summary>
         public void Stop()
         {
-            if (!busy && active == null) return;
+            // The bodyToken term is REQUIRED: a failed/partial start can leave a token
+            // without busy/active, and returning early here would leak the Attack lock.
+            if (!busy && active == null && bodyToken == null) return;
             busy = false;
             active = null;
+            if (motor != null && motor.Body != null) motor.Body.Release(bodyToken);
+            bodyToken = null;
             hitFired = false;
             time = 0f;
             HideRing();
@@ -261,6 +287,22 @@ namespace MK.Rebuild
             active = def;
             activeProjectile = projectile;
             busy = true;
+
+            // B5 AIR DENIAL: take the Attack token for the WHOLE ability window. The motor
+            // runs its jump branch in FixedUpdate under the same arbiter, so a jump is
+            // denied in every input order while the spin plays. Dash(2) still outranks it.
+            if (motor != null && motor.Body != null && bodyToken == null)
+                bodyToken = motor.Body.Acquire(BodyPriority.Attack);
+
+            // ROOT: the motor PRESERVES horizontal velocity while the body is locked, so a
+            // cast made while running would slide. Rooted abilities kill the run momentum
+            // explicitly (H1 projectile); mobile abilities leave rootMovement = false.
+            if (def.rootMovement && rb != null)
+            {
+                Vector3 v = rb.linearVelocity;
+                rb.linearVelocity = new Vector3(0f, v.y, 0f);
+            }
+
             hitFired = false;
             time = 0f;
 

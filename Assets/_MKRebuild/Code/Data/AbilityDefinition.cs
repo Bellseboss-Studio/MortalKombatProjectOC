@@ -74,5 +74,11 @@ namespace MK.Rebuild
 
         [Tooltip("Ability animation retime: Animator state speed multiplier for the ability clip (H1 tarkatan_shoot / H2 spinEdge). The ability WINDOW = clip.length / this, keeping the hit-window aligned with the visible impact. 1 = normal.")]
         public float clipSpeedMultiplier = 1f;
+
+        [Tooltip("Roots the player for the ability window: horizontal velocity is zeroed on start (the Attack body token already locks the input). H1 projectile = true; leave false for abilities that should keep momentum.")]
+        public bool rootMovement;
+
+        [Tooltip("Dash-cancel window as NORMALIZED time of the ability window: x = earliest, y = latest. The DASH cancels the ability inside this window (e.g. after the projectile fired). y <= x = not cancellable.")]
+        public Vector2 cancelNorm;
     }
 }

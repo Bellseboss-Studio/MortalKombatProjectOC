@@ -22,16 +22,18 @@ MonoBehaviour:
     hitNorm: {x: 0.15, y: 0.35}
     dano: 7
     knockback: 0.6
-    hitstopMs: 40
-    hitboxRadius: 1.5
-    hitboxOffset: {x: 0, y: 0.1, z: 1.5}
+    hitstopMs: 70
+    hitboxRadius: 0.95
+    hitboxOffset: {x: 0, y: 0.5, z: 0.95}
+    hitboxHalfHeight: 0.6
+    maxTargets: 1
     cancelNorm: {x: 0.55, y: 0.85}
     cancelHitNorm: {x: 0.15, y: 0.85}
     siguiente:
       input: 1
       direction: 0
       paso: 1
-    speedMultiplier: 6
+    speedMultiplier: 4.75
     moveLock: 1
     lunge: 1.6
     attackStateIndex: 0
@@ -44,16 +46,17 @@ MonoBehaviour:
     hitNorm: {x: 0.2, y: 0.4}
     dano: 10
     knockback: 1.1
-    hitstopMs: 90
+    hitstopMs: 80
     hitboxRadius: 1.7
     hitboxOffset: {x: 0, y: 0.15, z: 1.6}
+    maxTargets: 3
     cancelNorm: {x: 0.55, y: 0.85}
     cancelHitNorm: {x: 0.15, y: 0.85}
     siguiente:
       input: 1
       direction: 0
       paso: -1
-    speedMultiplier: 7
+    speedMultiplier: 4.75
     moveLock: 1
     lunge: 2.2
     attackStateIndex: 0

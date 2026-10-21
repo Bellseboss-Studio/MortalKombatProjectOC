@@ -87,6 +87,7 @@ namespace MK.Rebuild
         private Rigidbody rb;
         private PlayerMotor motor;
         private PlayerCombat combat;
+        private PlayerAbilities abilities;
         private ICharacterVisual visual;
         private AnimatorVisual animatorVisual;
 
@@ -128,6 +129,7 @@ namespace MK.Rebuild
             rb = GetComponent<Rigidbody>();
             motor = GetComponent<PlayerMotor>();
             combat = GetComponent<PlayerCombat>();
+            abilities = GetComponent<PlayerAbilities>();
             visual = GetComponent<ICharacterVisual>();
             // Real-art dash clip seam (anim-packs-integration slice 1): the Dash
             // state now has a clip (anim_dash2_north). Cache the concrete driver
@@ -175,9 +177,22 @@ namespace MK.Rebuild
             // dash-cancels-attack behavior.
             if (motor != null && motor.Body != null && !motor.Body.CanAcquire(BodyPriority.Dash)) return;
 
-            // Dash as INTERRUPTOR: cancel the active combo/swing, then dash.
-            if (combat != null && combat.Attacking) combat.CancelCombo();
-            StartDash();
+            // ABILITY CANCEL WINDOW: a dash may cancel a cast only inside its window
+            // (e.g. after the projectile fired). Outside it, the dash is denied (the tap
+            // is already consumed, so it cannot leak into a later frame).
+            if (abilities != null && abilities.IsBusy)
+            {
+                if (!abilities.CanBeCancelled) return;
+                abilities.Stop();
+            }
+
+            // Dash as INTERRUPTOR: cancel the active combo/swing, then dash. The lunge
+            // velocity already written to the body must NOT become the dash base (it
+            // would resume after the dash and read as a roll), so an attack-cancel dash
+            // starts from zero base.
+            bool cancelledAttack = combat != null && combat.Attacking;
+            if (cancelledAttack) combat.CancelCombo();
+            StartDash(cancelledAttack);
         }
 
         /// <summary>Curve impulse while the dash runs: keep the vertical velocity
@@ -215,7 +230,7 @@ namespace MK.Rebuild
             rb.linearVelocity = v;
         }
 
-        private void StartDash()
+        private void StartDash(bool zeroBase = false)
         {
             isDashing = true;
             AudioDirector.Play(AudioCueId.Dash, transform.position);
@@ -253,7 +268,9 @@ namespace MK.Rebuild
             // Run + dash keeps this base through the whole dash and hands back control
             // at ~base speed at dash end; stand + dash captures ~0 (burst from zero).
             if (rb != null)
-                baseVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+                baseVelocity = zeroBase
+                    ? Vector3.zero
+                    : new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
             else
                 baseVelocity = Vector3.zero;
 
@@ -276,6 +293,20 @@ namespace MK.Rebuild
         /// lets PlayerCombat's attack entry take over immediately.
         /// </summary>
         public bool TryCancelByAttack()
+        {
+            if (!isDashing) return false;
+            if (dashElapsed < minCancelTime) return false;
+            EndDash();
+            return true;
+        }
+
+        /// <summary>
+        /// Jump-cancel seam: a jump pressed inside the dash's cancel window
+        /// (&gt;= <see cref="minCancelTime"/>) cuts the dash so the motor's buffered jump
+        /// fires immediately. Before the window the motor DISCARDS the press (dash+jump
+        /// together must not become "dash then jump the instant it ends").
+        /// </summary>
+        public bool TryCancelByJump()
         {
             if (!isDashing) return false;
             if (dashElapsed < minCancelTime) return false;

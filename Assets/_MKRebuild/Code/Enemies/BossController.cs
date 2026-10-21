@@ -29,8 +29,11 @@ namespace MK.Rebuild
         [Tooltip("Boss data. All gameplay numbers come from here — never hardcoded.")]
         [SerializeField] private BossDefinition definition;
 
-        [Tooltip("Transform scaled by the death routine. Defaults to this transform.")]
+        [Tooltip("Legacy grey-box visual root, scaled only when no CharacterVisual is present. Defaults to this transform.")]
         [SerializeField] private Transform visualRoot;
+
+        [Tooltip("X Bot animation facade. Resolved from the children when left empty.")]
+        [SerializeField] private CharacterVisual characterVisual;
 
         [Tooltip("Grey-box Esbirro spawned at the phase transition (M3.5a).")]
         [SerializeField] private EnemyController minionPrefab;
@@ -92,6 +95,7 @@ namespace MK.Rebuild
         private void Awake()
         {
             if (visualRoot == null) visualRoot = transform;
+            if (characterVisual == null) characterVisual = GetComponentInChildren<CharacterVisual>(true);
             rb = GetComponent<Rigidbody>();
             receiver = GetComponent<HitReceiver>();
             bodyCollider = GetComponent<Collider>();
@@ -99,6 +103,7 @@ namespace MK.Rebuild
             if (definition != null) receiver.Configure(definition.phaseHp);
 
             receiver.LethalHit += OnLethalHit;
+            receiver.Damaged += OnDamaged;
             receiver.OnDied += OnDied;
 
             if (rb != null) rb.freezeRotation = true;
@@ -111,6 +116,7 @@ namespace MK.Rebuild
             playerMotor = FindFirstObjectByType<PlayerMotor>();
             BossArena.Instance?.Bind(this);
             BossHealthBar.Instance?.Bind(this);
+            if (characterVisual != null) characterVisual.PlaySpawn();
         }
 
         private void OnDisable()
@@ -139,6 +145,7 @@ namespace MK.Rebuild
         {
             if (receiver == null) return;
             receiver.LethalHit -= OnLethalHit;
+            receiver.Damaged -= OnDamaged;
             receiver.OnDied -= OnDied;
         }
 
@@ -184,6 +191,7 @@ namespace MK.Rebuild
                 {
                     state = State.Approach;
                     Face(toCenter, dt);
+                    if (characterVisual != null) characterVisual.SetMoving(true, definition.moveSpeed * mult);
                     Steer(toCenter, definition.moveSpeed * mult);
                     return;
                 }
@@ -228,6 +236,8 @@ namespace MK.Rebuild
 
         private void TickApproach(float dt, float mult)
         {
+            if (characterVisual != null) characterVisual.SetMoving(true, definition.moveSpeed * mult);
+
             Vector3 playerPosition = player.transform.position;
             Vector3 toPlayer = FlatDirectionTo(playerPosition);
             Face(toPlayer, dt);
@@ -257,6 +267,11 @@ namespace MK.Rebuild
             shockwaveSpawned = false;
             StopHorizontal();
             Face(FlatDirectionTo(player.transform.position), Time.fixedDeltaTime);
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.PlaySlam();
+            }
         }
 
         private void TickSlam(float dt, float mult)
@@ -362,6 +377,11 @@ namespace MK.Rebuild
             chargeDir = FlatDirectionTo(player.transform.position);
             if (chargeDir.sqrMagnitude < 0.000001f) chargeDir = transform.forward;
             StopHorizontal();
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.PlayCharge();
+            }
         }
 
         private void TickCharge(float dt, float mult)
@@ -402,6 +422,7 @@ namespace MK.Rebuild
                 ChargeBlocked())
             {
                 StopHorizontal();
+                if (characterVisual != null) characterVisual.SetMoving(false, 0f);
                 cooldownTimer = definition.attackCooldown / mult;
                 recoveryTimer = definition.chargeRecovery / mult;
                 state = State.Recovery;
@@ -463,6 +484,12 @@ namespace MK.Rebuild
             receiver.Invulnerable = true;
             StopHorizontal();
             state = State.Roar;
+            if (characterVisual != null)
+            {
+                characterVisual.SetMoving(false, 0f);
+                characterVisual.SetPlaybackSpeed(definition.phase2SpeedMultiplier);
+                characterVisual.PlayRoar();
+            }
 
             // M3.5a: the exit is revealed (visual only; the collider stays) and the
             // brute calls two Esbirros while the roar plays.
@@ -519,6 +546,13 @@ namespace MK.Rebuild
             if (music != null) music.NotifyCombat();
         }
 
+        /// <summary>Non-lethal damage feedback: play the X Bot hit reaction.</summary>
+        private void OnDamaged(int damage, Vector3 dir, float launchImpulse)
+        {
+            if (IsDead || definition == null) return;
+            if (characterVisual != null) characterVisual.PlayHit();
+        }
+
         private void OnDied()
         {
             if (IsDead) return;
@@ -526,8 +560,10 @@ namespace MK.Rebuild
             state = State.Dead;
 
             BossHealthBar.Instance?.Hide();
-            BossArena.Instance?.Open();
+            BossArena.Instance?.UnlockExit();
             ClearMinions();
+
+            if (characterVisual != null) characterVisual.PlayDeath();
 
             StopHorizontal();
             if (bodyCollider != null) bodyCollider.enabled = false;
@@ -542,26 +578,44 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Grey-box death: scales the visual to 0.05 over <c>deathDelay</c> on
-        /// UNSCALED time, then destroys the object. No animation, no ragdoll.
+        /// Death cleanup on UNSCALED time. With an animated <see cref="CharacterVisual"/>,
+        /// the Death clip plays for its full length (or <c>deathDelay</c>, whichever is
+        /// longer) and the boss is destroyed. Without one, the legacy grey-box
+        /// scale-down is kept unchanged.
         /// </summary>
         private IEnumerator DeathRoutine()
         {
-            Transform target = visualRoot != null ? visualRoot : transform;
-            Vector3 startScale = target.localScale;
-            Vector3 endScale = Vector3.one * 0.05f;
+            float animationDuration = characterVisual != null ? characterVisual.DeathDuration : 0f;
             float duration = definition != null ? Mathf.Max(0f, definition.deathDelay) : 1.5f;
-            float elapsed = 0f;
+            duration = Mathf.Max(duration, animationDuration);
 
-            while (elapsed < duration)
+            if (characterVisual == null)
             {
-                elapsed += Time.unscaledDeltaTime;
-                float t = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 1f;
-                target.localScale = Vector3.Lerp(startScale, endScale, t);
-                yield return null;
+                Transform target = visualRoot != null ? visualRoot : transform;
+                Vector3 startScale = target.localScale;
+                Vector3 endScale = Vector3.one * 0.05f;
+                float elapsed = 0f;
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 1f;
+                    target.localScale = Vector3.Lerp(startScale, endScale, t);
+                    yield return null;
+                }
+
+                target.localScale = endScale;
+            }
+            else
+            {
+                float elapsed = 0f;
+                while (elapsed < duration)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    yield return null;
+                }
             }
 
-            target.localScale = endScale;
             Destroy(gameObject);
         }
 
@@ -605,6 +659,13 @@ namespace MK.Rebuild
             state = State.Approach;
 
             if (visualRoot != null) visualRoot.localScale = originalScale;
+
+            if (characterVisual != null)
+            {
+                characterVisual.SetPlaybackSpeed(
+                    phase == 2 && definition != null ? definition.phase2SpeedMultiplier : 1f);
+                characterVisual.PlaySpawn();
+            }
 
             BossHealthBar.Instance?.Bind(this);
         }
