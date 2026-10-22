@@ -49,7 +49,12 @@ namespace MK.Rebuild
             if (spawnOnStart) SpawnBoss();
         }
 
-        /// <summary>Spawns one boss if none is live. Safe to call repeatedly.</summary>
+        /// <summary>
+        /// Spawns one boss if none is live. Safe to call repeatedly.
+        /// The instance starts DORMANT (frozen): <see cref="BossController"/> begins in its
+        /// Approach state, so without this it would walk to the player during the intro beat
+        /// and the whole exploration phase, before the fight has even been announced.
+        /// </summary>
         public void SpawnBoss()
         {
             if (Current != null) return;
@@ -57,7 +62,11 @@ namespace MK.Rebuild
 
             Transform point = spawnPoint != null ? spawnPoint : transform;
             Current = Instantiate(prefab, point.position, point.rotation, transform);
-            if (Current != null) Spawned?.Invoke(Current);
+            if (Current != null)
+            {
+                Current.Frozen = true;
+                Spawned?.Invoke(Current);
+            }
         }
 
         /// <summary>

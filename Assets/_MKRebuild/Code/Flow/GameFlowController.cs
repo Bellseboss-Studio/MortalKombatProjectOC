@@ -200,11 +200,23 @@ namespace MK.Rebuild
 
                 case FlowState.Intro:
                 case FlowState.Beat:
-                case FlowState.BossIntro:
                 case FlowState.BossTransition:
                 case FlowState.DemoEnd:
-                    if (next == FlowState.BossIntro) SubscribeBoss();
                     PlayOrAdvance(DefinitionFor(next));
+                    break;
+
+                // The fight has not started yet: the intro PRESENTS the boss, so it must hold
+                // its pose while the beat plays instead of walking at the player.
+                case FlowState.BossIntro:
+                    SubscribeBoss();
+                    if (boss != null) boss.Frozen = true;
+                    PlayOrAdvance(DefinitionFor(next));
+                    break;
+
+                // Fight is live: every timer, steer and attack is allowed again.
+                case FlowState.BossFight:
+                case FlowState.BossPhase2:
+                    if (boss != null) boss.Frozen = false;
                     break;
             }
         }
@@ -268,6 +280,11 @@ namespace MK.Rebuild
         private void HandlePlayerDied()
         {
             if (!IsBossState(state)) return;
+
+            // BEFORE ApplyEnter: leaving the boss states unsubscribes and NULLS the boss
+            // reference, so freezing after the transition would silently do nothing and the
+            // reset boss would walk at the player during the next exploration phase.
+            if (boss != null) boss.Frozen = true;
 
             ApplyEnter(FlowState.Exploration); // drops the boss subscriptions on the way out
             if (bossTrigger != null) bossTrigger.Rearm();

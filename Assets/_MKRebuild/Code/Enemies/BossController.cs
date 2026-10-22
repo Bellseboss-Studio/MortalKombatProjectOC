@@ -17,8 +17,9 @@ namespace MK.Rebuild
     /// around the spawn point keeps the brute inside the arena; a charge stops on
     /// solid geometry/props but ignores the player and other enemies.
     ///
-    /// Player death resets only the CURRENT phase HP and position
-    /// (<see cref="ResetForRespawn"/>), never the whole fight.
+    /// Player death restarts the WHOLE encounter from phase 1
+    /// (<see cref="ResetForRespawn"/>): the boss intro replays on re-entry, so the
+    /// fight has to start over instead of resuming mid-phase.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody), typeof(HitReceiver))]
@@ -664,8 +665,13 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Player-death reset: restore only the CURRENT phase HP and the boss
-        /// position. The phase (and therefore the fight structure) is preserved.
+        /// Player-death reset: a FULL encounter retry, not a current-phase restore.
+        /// The boss goes back to phase 1 (full phase-1 HP, 1x animation speed), its
+        /// summoned Esbirros are destroyed, the arena is opened and it is placed back
+        /// on the spawn point. <see cref="GameFlowController"/> already forces
+        /// <see cref="FlowState.Exploration"/> and rearms the encounter trigger on
+        /// death, so re-entering the arena replays the intro — and an intro that
+        /// presents the fight cannot be followed by a boss already in phase 2.
         /// A fully dead boss stays dead.
         /// </summary>
         public void ResetForRespawn(Vector3 spawnPosition)
@@ -679,6 +685,13 @@ namespace MK.Rebuild
             DestroyShockwave();
 
             transform.position = spawnPosition;
+
+            // Teleport the BODY too, not only the transform: with autoSyncTransforms off
+            // (the project default) a plain transform write is not pushed to PhysX, which
+            // then snaps the transform back on the next physics step. Without this the boss
+            // "resets" to wherever it was standing when the player died.
+            if (rb != null) rb.position = spawnPosition;
+
             leashCenter = spawnPosition;
 
             if (rb != null)
@@ -686,6 +699,9 @@ namespace MK.Rebuild
                 rb.linearVelocity = Vector3.zero;
                 rb.isKinematic = false;
             }
+
+            // BEFORE Configure: the HP that gets restored must be the PHASE-1 pool.
+            phase = 1;
 
             if (receiver != null)
             {
@@ -712,6 +728,11 @@ namespace MK.Rebuild
             }
 
             BossHealthBar.Instance?.Bind(this);
+
+            // Dormant again: the encounter only restarts when the flow re-enters BossFight.
+            // Without this the boss would resume Approach after the respawn and walk to the
+            // player while the flow is still Exploration, before the intro replays.
+            Frozen = true;
         }
 
         // --- Movement helpers ------------------------------------------------
