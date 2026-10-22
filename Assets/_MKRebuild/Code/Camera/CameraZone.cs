@@ -1,5 +1,8 @@
 using Unity.Cinemachine;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace MK.Rebuild
 {
@@ -67,6 +70,11 @@ namespace MK.Rebuild
         private bool hasActivated;   // OncePerLoad latch
         private bool warnedNoDirector;
         private bool warnedNoVcam;
+
+        // Authoring warnings latch until the offending condition clears, so OnValidate can
+        // run on every inspector keystroke without flooding the console.
+        private bool warnedYawDeviation;
+        private bool warnedPriorityOverlap;
 
         /// <summary>Arbitration priority while this zone is active.</summary>
         public int Priority => priority;
@@ -197,6 +205,153 @@ namespace MK.Rebuild
             if (vcam == null) return;
             vcam.Priority.Value = value;
             vcam.Priority.Enabled = true;
+        }
+
+        // --- Authoring validation (WU5) --------------------------------------
+
+        /// <summary>
+        /// Flat (XZ) angle in degrees between this zone's vcam forward and the base vcam
+        /// forward. Returns -1 when either camera is missing (nothing to compare). The Y
+        /// component is ignored on purpose: pitch never rotates the movement basis, only
+        /// yaw does.
+        /// </summary>
+        public float ComputeYawDeviationDegrees()
+        {
+            if (vcam == null) return -1f;
+
+            CinemachineCamera baseCamera = ResolveBaseCamera();
+            if (baseCamera == null) return -1f;
+
+            return Vector3.Angle(
+                FlatForward(vcam.transform.forward),
+                FlatForward(baseCamera.transform.forward));
+        }
+
+        /// <summary>
+        /// Authoring guard. Two mistakes are cheap to make and expensive to debug at play
+        /// time, so the inspector flags them instead:
+        /// 1. a room yaw outside <see cref="maxYawDeviation"/> — the input basis stays on the
+        ///    base vcam, so a wider angle makes the view and the controls disagree;
+        /// 2. an overlapping neighbour with the same <see cref="priority"/> — equal priorities
+        ///    resolve by most recent entry, so the winner depends on walk order.
+        /// Runtime behaviour is untouched: this only logs.
+        /// </summary>
+        private void OnValidate()
+        {
+            // Prefab-asset edits have no scene peers (and no base camera) to compare against.
+            if (!gameObject.scene.IsValid()) return;
+
+            ValidateYawDeviation();
+            ValidatePriorityOverlap();
+        }
+
+        private void ValidateYawDeviation()
+        {
+            if (vcam == null) return;
+
+            float deviation = ComputeYawDeviationDegrees();
+            if (deviation > maxYawDeviation)
+            {
+                if (warnedYawDeviation) return;
+                warnedYawDeviation = true;
+                Debug.LogWarning(
+                    $"[{nameof(CameraZone)}] '{name}' sits {deviation:0.#}° off the base camera " +
+                    $"(authoring band ±{maxYawDeviation:0}°). The input basis stays on the base vcam, " +
+                    "so a wider angle makes the view and the controls disagree.",
+                    this);
+                return;
+            }
+
+            warnedYawDeviation = false; // condition cleared: a later break warns again
+        }
+
+        private void ValidatePriorityOverlap()
+        {
+            Collider own = volume != null ? volume : GetComponent<Collider>();
+            if (own == null) return;
+
+            CameraZone[] zones = FindObjectsByType<CameraZone>(FindObjectsSortMode.None);
+            for (int i = 0; i < zones.Length; i++)
+            {
+                CameraZone other = zones[i];
+                if (other == null || other == this) continue;
+                if (other.priority != priority) continue;
+
+                Collider otherVolume = other.volume != null ? other.volume : other.GetComponent<Collider>();
+                if (otherVolume == null) continue;
+                if (!own.bounds.Intersects(otherVolume.bounds)) continue;
+
+                if (warnedPriorityOverlap) return;
+                warnedPriorityOverlap = true;
+                Debug.LogWarning(
+                    $"[{nameof(CameraZone)}] '{name}' shares priority {priority} with overlapping zone " +
+                    $"'{other.name}'. Equal priorities resolve by most recent entry, so the winner " +
+                    "depends on walk order — give them distinct priorities or separate volumes.",
+                    this);
+                return;
+            }
+
+            warnedPriorityOverlap = false;
+        }
+
+        /// <summary>
+        /// Scene-view authoring aid: the trigger volume plus a flat-forward comparison between
+        /// this zone's vcam and the base vcam. Green = inside the ±band, red = out of band,
+        /// amber = can't compare (a camera is unassigned). Runtime behaviour is untouched.
+        /// </summary>
+        private void OnDrawGizmosSelected()
+        {
+            Collider collider = volume != null ? volume : GetComponent<Collider>();
+            if (collider == null) return;
+
+            Bounds bounds = collider.bounds;
+            CinemachineCamera zoneCamera = vcam;
+            CinemachineCamera baseCamera = ResolveBaseCamera();
+
+            float deviation = ComputeYawDeviationDegrees();
+            bool comparable = zoneCamera != null && baseCamera != null && deviation >= 0f;
+            bool outOfBand = comparable && deviation > maxYawDeviation;
+
+            Color color = !comparable
+                ? new Color(0.95f, 0.75f, 0.2f) // amber: missing camera
+                : outOfBand ? Color.red : Color.green;
+
+            Gizmos.color = color;
+            Gizmos.DrawWireCube(bounds.center, bounds.size);
+
+            if (!comparable) return;
+
+            // Draw both directions from the volume centre; the grey ray is the base vcam's
+            // (the controls' frame) and the coloured ray is this zone's authored view.
+            Vector3 zoneForward = FlatForward(zoneCamera.transform.forward);
+            Vector3 baseForward = FlatForward(baseCamera.transform.forward);
+            float rayLength = Mathf.Clamp(bounds.extents.magnitude, 1f, 4f);
+            Vector3 anchor = bounds.center;
+
+            Gizmos.color = new Color(0.45f, 0.45f, 0.45f);
+            Gizmos.DrawLine(anchor, anchor + baseForward * rayLength);
+
+            Gizmos.color = color;
+            Gizmos.DrawLine(anchor, anchor + zoneForward * rayLength);
+            Gizmos.DrawSphere(anchor + zoneForward * rayLength, 0.12f);
+
+#if UNITY_EDITOR
+            string label = $"{deviation:0.#}° / max {maxYawDeviation:0}°";
+            Handles.Label(anchor + Vector3.up * (bounds.extents.y + 0.4f), label);
+#endif
+        }
+
+        private static CinemachineCamera ResolveBaseCamera()
+        {
+            CameraDirector director = CameraDirector.Instance;
+            if (director == null) director = FindFirstObjectByType<CameraDirector>();
+            return director != null ? director.BaseCamera : null;
+        }
+
+        private static Vector3 FlatForward(Vector3 forward)
+        {
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
         }
     }
 }

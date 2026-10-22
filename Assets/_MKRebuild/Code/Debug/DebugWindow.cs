@@ -11,7 +11,8 @@ namespace MK.Rebuild.Debugging
     /// M0 debug window — an ISOLATED dev module (own assembly <c>MK.Rebuild.Debug</c>,
     /// <c>autoReferenced:false</c>). It ADHERES to the game read-only: it never
     /// drives gameplay, it only observes it. The only things it writes are the
-    /// <see cref="ControlLock"/> base scale (F6) and the grey dummies it spawns.
+    /// <see cref="ControlLock"/> base scale (F6), the grey dummies it spawns, and the
+    /// demo flow jumps (F9-F11), which go through <see cref="GameFlowController"/>.
     ///
     /// Boot: a manual component on a <c>Debug</c> GameObject in <c>Gym.unity</c>
     /// (NO <c>[RuntimeInitializeOnLoadMethod]</c> — the debug stays in the gym).
@@ -23,6 +24,7 @@ namespace MK.Rebuild.Debugging
     ///   F3 PLAYER  · F5 reset tuning · F6 log tuning · F7 states · F8 invuln
     ///              · F9 test damage · F10 kill
     ///   F4 ETC     · F5 dummy · F6 timeScale · F7 clear dummies · F8 teleport
+    ///              · F9 flow back · F10 flow forward · F11 restart level
     /// Reserved slots are true no-ops. <c>B</c> stays a global alias for spawn boss.
     /// Input System only — legacy Input is dead, activeInputHandler:1.
     /// </summary>
@@ -214,7 +216,8 @@ namespace MK.Rebuild.Debugging
             if (keyboard.f8Key.wasPressedThisFrame) { ExecuteSlot(8); return; }
             if (keyboard.f9Key.wasPressedThisFrame) { ExecuteSlot(9); return; }
             if (keyboard.f10Key.wasPressedThisFrame) { ExecuteSlot(10); return; }
-            // F11/F12 are reserved: intentionally no-op.
+            if (keyboard.f11Key.wasPressedThisFrame) { ExecuteSlot(11); return; }
+            // F12 is reserved: intentionally no-op.
         }
 
         private void ToggleTab(DebugTab tab)
@@ -284,7 +287,10 @@ namespace MK.Rebuild.Debugging
                 case 6: CycleTimeScale(); break;
                 case 7: ClearDummies(); break;
                 case 8: TeleportPlayerToStart(); break;
-                // 9-12 reserved.
+                case 9: JumpFlow(-1); break;
+                case 10: JumpFlow(1); break;
+                case 11: RestartFlow(); break;
+                // 12 reserved.
             }
         }
 
@@ -414,6 +420,42 @@ namespace MK.Rebuild.Debugging
                 body.linearVelocity = Vector3.zero;
                 body.angularVelocity = Vector3.zero;
             }
+        }
+
+        /// <summary>
+        /// ETC F9/F10 — walks the flow one state back/forward in <see cref="FlowState"/>
+        /// order. Uses <see cref="GameFlowController.JumpTo"/>, the debug escape hatch that
+        /// ignores the transition table, so every one of the nine states is reachable. A
+        /// scene without a flow controller is a silent no-op.
+        ///
+        /// The index is CLAMPED, not wrapped: <see cref="FlowState.Boot"/> is the reload
+        /// anchor and <see cref="FlowState.DemoEnd"/> is the end of the script, so pressing
+        /// past either end must do nothing. NOTE: Boot self-advances to Intro (its authored
+        /// boot chain), so a jump to Boot lands on Intro — that is the flow's design, not a
+        /// lost jump.
+        /// </summary>
+        private void JumpFlow(int delta)
+        {
+            GameFlowController flow = GameFlowController.Instance;
+            if (flow == null) return;
+
+            int last = Enum.GetValues(typeof(FlowState)).Length - 1;
+            int target = Mathf.Clamp((int)flow.State + delta, 0, last);
+            if (target == (int)flow.State) return; // already at an end: no self-jump
+
+            flow.JumpTo((FlowState)target);
+        }
+
+        /// <summary>
+        /// ETC F11 — clean restart through the flow owner: it stops the running beat, drops
+        /// every control handle, unmutes audio and reloads the scene, so the demo boots at
+        /// <c>timeScale == 1</c>. No flow controller = no-op.
+        /// </summary>
+        private void RestartFlow()
+        {
+            GameFlowController flow = GameFlowController.Instance;
+            if (flow == null) return;
+            flow.RestartLevel();
         }
 
         private static Material CreateGreyMaterial()
@@ -668,11 +710,24 @@ namespace MK.Rebuild.Debugging
         private void DrawEtcTab()
         {
             GUILayout.Label("ETC · [F5] dummy  [F6] timeScale  [F7] clear dummies  [F8] teleport", labelStyle);
-            GUILayout.Label("[F9-F12] reservado", labelStyle);
+            GUILayout.Label("[F9] flow <  [F10] flow >  [F11] restart level  ·  [F12] reservado", labelStyle);
 
             GUILayout.Space(4f);
             float fps = 1f / Mathf.Max(0.0001f, Time.unscaledDeltaTime);
             GUILayout.Label($"timeScale: {Time.timeScale:0.##}   [F6]", labelStyle);
+
+            // ControlLock is the only writer of Time.timeScale; EffectiveScale is what the
+            // lock actually applied (0 while paused/hitstop, base scale otherwise).
+            string lockSuffix = ControlLock.IsPaused ? "   PAUSED" : string.Empty;
+            GUILayout.Label($"controlLock: {ControlLock.EffectiveScale:0.##}{lockSuffix}", labelStyle);
+
+            // Flow readout (WU5): the state is the demo script's position; F9/F10 move it.
+            GameFlowController flow = GameFlowController.Instance;
+            GUILayout.Label(
+                flow != null ? $"flow: {flow.State}   [F9] <  [F10] >" : "flow: <none>   [F9] <  [F10] >",
+                labelStyle);
+            GUILayout.Label($"restart: [F11]", labelStyle);
+
             GUILayout.Label($"dummies: {spawned.Count}/{MaxDummies}   [F7] clear", labelStyle);
             GUILayout.Label($"scene: {gameObject.scene.name}", labelStyle);
             GUILayout.Label($"FPS: {fps:0}", labelStyle);
