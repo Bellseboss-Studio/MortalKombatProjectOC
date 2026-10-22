@@ -37,6 +37,18 @@ namespace MK.Rebuild
             if (col != null) col.isTrigger = true;
         }
 
+        /// <summary>
+        /// Allows the encounter to fire again WITHOUT reloading the scene. A player death
+        /// retries the fight (the flow drops back to Exploration but the trigger's
+        /// <c>fired</c> flag would otherwise stay set for the whole scene load), so the
+        /// re-entry must be able to start the boss intro a second time. Spawning is still
+        /// delegated to <see cref="BossSpawner"/>, which is a no-op while a live boss exists.
+        /// </summary>
+        public void Rearm()
+        {
+            fired = false;
+        }
+
         private void OnTriggerEnter(Collider other)
         {
             if (once && fired) return;

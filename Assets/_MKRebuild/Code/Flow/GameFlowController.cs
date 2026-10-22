@@ -53,6 +53,9 @@ namespace MK.Rebuild
         [Tooltip("Optional music owner. Boss states switch it to the boss bed.")]
         [SerializeField] private MusicStateController music;
 
+        [Tooltip("Player hurt path. A death re-arms the boss encounter. Auto-resolved from the scene when empty.")]
+        [SerializeField] private PlayerDamage playerDamage;
+
         private FlowState state = FlowState.Boot;
         private bool started;
         private BossController boss;
@@ -80,10 +83,25 @@ namespace MK.Rebuild
 
             if (music == null) music = FindFirstObjectByType<MusicStateController>();
 
+            // Death must be heard even before Start: the player can die on any frame and the
+            // boss encounter has to become retryable (design: death re-arms the encounter).
+            if (playerDamage == null) playerDamage = FindFirstObjectByType<PlayerDamage>();
+            if (playerDamage != null) playerDamage.OnDied += HandlePlayerDied;
+
             // Subscribed BEFORE the boot chain: a trigger that fires during the first frame
             // must still start the boss intro instead of being missed.
             if (bossTrigger != null) bossTrigger.Triggered += HandleBossTriggered;
 
+        }
+
+        /// <summary>
+        /// The boot chain runs in Start, not Awake. This component is ordered at -200, so its
+        /// Awake runs BEFORE <see cref="PlayerMotor"/>.Awake creates the body ownership, and
+        /// the intro would throw on its first body token. Start is the first callback where
+        /// every Awake has already run.
+        /// </summary>
+        private void Start()
+        {
             Enter(FlowState.Boot);
         }
 
@@ -91,6 +109,7 @@ namespace MK.Rebuild
         {
             if (bossTrigger != null) bossTrigger.Triggered -= HandleBossTriggered;
             if (cinematics != null) cinematics.Completed -= HandleCinematicCompleted;
+            if (playerDamage != null) playerDamage.OnDied -= HandlePlayerDied;
 
             UnsubscribeBoss();
 
@@ -233,6 +252,25 @@ namespace MK.Rebuild
         private void HandleBossTriggered()
         {
             Enter(FlowState.BossIntro);
+        }
+
+        /// <summary>
+        /// Player death DURING the encounter returns the flow to free exploration and makes the
+        /// entry volume retryable, so walking back in replays the boss intro.
+        ///
+        /// WHY the table is bypassed: death is not an authored arrow, and the boss states have
+        /// no path back to Exploration. This is a forced INTERNAL transition — it must not read
+        /// as an illegal transition in the log. The death itself plays no beat: respawn is
+        /// owned by <see cref="CheckpointSystem"/>, and the next BossIntro is started by the
+        /// re-armed trigger. Every other state is left untouched, so a death outside the arena
+        /// changes nothing here.
+        /// </summary>
+        private void HandlePlayerDied()
+        {
+            if (!IsBossState(state)) return;
+
+            ApplyEnter(FlowState.Exploration); // drops the boss subscriptions on the way out
+            if (bossTrigger != null) bossTrigger.Rearm();
         }
 
         private void HandleBossPhaseChanged(int phase)

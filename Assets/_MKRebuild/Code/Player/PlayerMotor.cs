@@ -131,6 +131,24 @@ namespace MK.Rebuild
         public bool IsGrounded => grounded;
 
         /// <summary>
+        /// When true the motor keeps simulating but stops pushing locomotion into the
+        /// visual, because a cinematic owns the presentation. Without this the locked
+        /// body still reports the held move input, so the Animator would enter the run
+        /// state mid-cutscene. The owner must clear it when the beat ends.
+        /// </summary>
+        public bool VisualSuppressed { get; set; }
+
+        /// <summary>
+        /// Hard motion freeze for a cinematic. A locked body still PRESERVES its current
+        /// horizontal velocity (see <see cref="InputLocked"/>), so the player keeps
+        /// sliding while the animation is frozen. This flag zeroes the velocity the
+        /// motor writes instead: the beat owns the body, so the motor must not carry
+        /// stale momentum into (or out of) the cutscene. Grounded/state probes still
+        /// run. The owner must clear it when the beat ends.
+        /// </summary>
+        public bool MotionFrozen { get; set; }
+
+        /// <summary>
         /// Current logical movement state (last committed in FixedUpdate). Single source
         /// for BOTH the visual and the action gate (<see cref="CanPerform"/>).
         /// </summary>
@@ -680,7 +698,17 @@ namespace MK.Rebuild
                     target, ref smoothVel, Mathf.Max(0.0001f, smoothTime), Mathf.Infinity, dt);
             }
 
+            // A cinematic owns the body: discard every resolved motion source (wish,
+            // preserved lock velocity, jump/gravity) so the frozen pose cannot drift.
+            if (MotionFrozen)
+            {
+                horizontal = Vector3.zero;
+                smoothVel = Vector3.zero;
+                verticalVel = 0f;
+            }
+
             rb.linearVelocity = new Vector3(horizontal.x, verticalVel, horizontal.z);
+            if (MotionFrozen) rb.angularVelocity = Vector3.zero;
 
             // --- State-driven facing contract (animation readiness) -------------
             // Locked states face geometry (input cannot steer); Free follows input.
@@ -714,7 +742,7 @@ namespace MK.Rebuild
             facingLocked = locked;
             desiredFacing = faceDir;
 
-            if (visual != null)
+            if (visual != null && !VisualSuppressed)
             {
                 if (faceDir.sqrMagnitude > 0.000001f) visual.SetFacing(faceDir);
                 visual.SetGrounded(grounded);

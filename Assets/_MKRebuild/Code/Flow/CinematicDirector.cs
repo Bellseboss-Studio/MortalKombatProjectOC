@@ -48,11 +48,16 @@ namespace MK.Rebuild
         [Tooltip("Player motor that owns the body token. Null = first PlayerMotor in the scene.")]
         [SerializeField] private PlayerMotor motor;
 
+        [Tooltip("Player-side raw-clip player for cinematic poses. Null = first CinematicActor under the motor's GameObject.")]
+        [SerializeField] private CinematicActor playerActor;
+
         [Tooltip("Player damage used for the invulnerability window. Null = first PlayerDamage in the scene.")]
         [SerializeField] private PlayerDamage playerDamage;
 
         private readonly List<EnemyController> frozenEnemies = new List<EnemyController>();
         private readonly List<bool> frozenStates = new List<bool>();
+        private readonly List<BossController> frozenBosses = new List<BossController>();
+        private readonly List<bool> frozenBossStates = new List<bool>();
 
         private CinematicDefinition currentDefinition;
         private PlayableDirector currentDirector;
@@ -63,6 +68,8 @@ namespace MK.Rebuild
         private bool hudCaptured;
         private bool hudWasActive;
         private bool isPlaying;
+        private bool[] fired = Array.Empty<bool>();
+        private CinematicContext context;
 
         /// <summary>True between a successful <see cref="Play"/> and the beat's end.</summary>
         public bool IsPlaying => isPlaying;
@@ -84,6 +91,35 @@ namespace MK.Rebuild
             if (!isPlaying) return;
             if (currentDirector != null) currentDirector.stopped -= HandleStopped;
             ReleaseEverything();
+        }
+
+        private void Update()
+        {
+            if (!isPlaying || currentDirector == null || currentDefinition == null) return;
+
+            CinematicEvent[] events = currentDefinition.Events;
+            if (events == null) return;
+
+            // The director clock is the single timer: GameTime advances only while the
+            // beat plays, so pausing the beat freezes events for free (no wall clock,
+            // no coroutines). Array order is the authoring order for same-time events.
+            float t = (float)currentDirector.time;
+            for (int i = 0; i < events.Length && i < fired.Length; i++)
+            {
+                if (fired[i] || events[i].time > t) continue;
+                fired[i] = true;
+
+                ICinematicAction action = events[i].action as ICinematicAction;
+                if (action == null)
+                {
+                    Debug.LogWarning(
+                        $"[{nameof(CinematicDirector)}] Event {i} on '{currentDefinition.name}' has an action that does not implement {nameof(ICinematicAction)}; skipping.",
+                        this);
+                    continue;
+                }
+
+                action.Execute(context);
+            }
         }
 
         /// <summary>
@@ -121,6 +157,12 @@ namespace MK.Rebuild
             activeBrain = brain;
             savedBlend = brain.DefaultBlend;
 
+            // Per-play state: every event re-arms, and the context is built ONCE so all
+            // actions of this beat see the same references.
+            CinematicEvent[] events = definition.Events;
+            fired = events != null ? new bool[events.Length] : Array.Empty<bool>();
+            context = new CinematicContext(definition, GameFlowController.Instance, motor, cameras);
+
             // Authored shots are cuts, not camera moves.
             brain.DefaultBlend = new CinemachineBlendDefinition
             {
@@ -145,6 +187,17 @@ namespace MK.Rebuild
 
                 controlHandle = ControlLock.Acquire(ControlReason.Cinematic);
             }
+
+            // The beat owns the presentation from here: stop the motor from pushing the
+            // held move input into the Animator, then give the pose to the raw-clip actor.
+            // MotionFrozen also zeroes the preserved velocity, so the body cannot keep
+            // sliding while the pose is frozen.
+            if (motor != null)
+            {
+                motor.VisualSuppressed = true;
+                motor.MotionFrozen = true;
+            }
+            if (playerActor != null) playerActor.Play(definition.ActorClip);
 
             if ((definition.Locks & CinematicLockFlags.Ai) != 0)
             {
@@ -192,6 +245,7 @@ namespace MK.Rebuild
         {
             if (cameras == null) cameras = CameraDirector.Instance;
             if (motor == null) motor = FindFirstObjectByType<PlayerMotor>();
+            if (playerActor == null && motor != null) playerActor = motor.GetComponentInChildren<CinematicActor>(true);
             if (playerDamage == null) playerDamage = FindFirstObjectByType<PlayerDamage>();
         }
 
@@ -261,6 +315,20 @@ namespace MK.Rebuild
                 frozenStates.Add(enemies[i].Frozen);
                 enemies[i].Frozen = true;
             }
+
+            // The boss is not an EnemyController, so it needs its own pass. Without it a
+            // boss beat would freeze only the minions while the brute kept charging.
+            frozenBosses.Clear();
+            frozenBossStates.Clear();
+
+            BossController[] bosses = FindObjectsByType<BossController>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < bosses.Length; i++)
+            {
+                frozenBosses.Add(bosses[i]);
+                frozenBossStates.Add(bosses[i].Frozen);
+                bosses[i].Frozen = true;
+            }
         }
 
         private void HandleStopped(PlayableDirector director)
@@ -296,8 +364,24 @@ namespace MK.Rebuild
             frozenEnemies.Clear();
             frozenStates.Clear();
 
+            for (int i = 0; i < frozenBosses.Count; i++)
+            {
+                if (frozenBosses[i] != null) frozenBosses[i].Frozen = frozenBossStates[i];
+            }
+            frozenBosses.Clear();
+            frozenBossStates.Clear();
+
             if (hudCaptured && hudRoot != null) hudRoot.SetActive(hudWasActive);
             hudCaptured = false;
+
+            // Return the presentation before the body so the first unlocked frame pushes
+            // locomotion again (and an interrupted beat can never freeze the visual).
+            if (playerActor != null) playerActor.Stop();
+            if (motor != null)
+            {
+                motor.VisualSuppressed = false;
+                motor.MotionFrozen = false;
+            }
 
             if (motor != null && bodyToken != null)
             {
@@ -314,6 +398,7 @@ namespace MK.Rebuild
             currentDefinition = null;
             currentDirector = null;
             isPlaying = false;
+            fired = Array.Empty<bool>();
         }
     }
 }

@@ -55,11 +55,29 @@ namespace MK.Rebuild
         [Tooltip("ReturnToPrevious = self-contained beat; AdvanceFlow = the flow controller takes over.")]
         [SerializeField] private CinematicOnComplete onComplete = CinematicOnComplete.AdvanceFlow;
 
+        [Tooltip("Optional raw clip played on the player outside her Animator Controller while this beat runs. Null = freeze the current pose.")]
+        [SerializeField] private AnimationClip actorClip;
+
+        [Tooltip("Timed actions fired from the beat's own clock. Time 0 = as soon as the beat begins.")]
+        [SerializeField] private CinematicEvent[] events = Array.Empty<CinematicEvent>();
+
         [Tooltip("Human-readable name used by debug overlays and validation logs.")]
         [SerializeField] private string debugLabel = string.Empty;
 
         /// <summary>Timeline this definition plays; also supplies the invulnerability duration.</summary>
         public TimelineAsset Timeline => timeline;
+
+        /// <summary>
+        /// Raw clip for <see cref="CinematicActor"/> to play outside the Animator Controller.
+        /// Null means the actor freezes on its current pose instead.
+        /// </summary>
+        public AnimationClip ActorClip => actorClip;
+
+        /// <summary>
+        /// Timed actions for this beat, in array order. Fired against the director's
+        /// playback clock, so a pause stops them automatically.
+        /// </summary>
+        public CinematicEvent[] Events => events;
 
         /// <summary>Gameplay systems borrowed for the duration of the beat.</summary>
         public CinematicLockFlags Locks => locks;
