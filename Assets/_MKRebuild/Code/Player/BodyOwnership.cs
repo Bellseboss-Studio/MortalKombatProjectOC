@@ -15,6 +15,14 @@ namespace MK.Rebuild
         HitRecovery = 3,
         Death = 4,
         Knockback = 5,
+
+        /// <summary>
+        /// Scripted beat (cutscene) control. Sits ABOVE every gameplay verb on purpose:
+        /// while a Timeline runs, no attack, dash, knockback or death reaction may steal
+        /// the body back. <see cref="CinematicDirector"/> acquires it for the beat and
+        /// releases it when playback ends, so the player is never left without control.
+        /// </summary>
+        Cinematic = 6,
     }
 
     /// <summary>
