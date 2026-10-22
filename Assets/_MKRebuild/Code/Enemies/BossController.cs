@@ -38,6 +38,9 @@ namespace MK.Rebuild
         [Tooltip("Grey-box Esbirro spawned at the phase transition (M3.5a).")]
         [SerializeField] private EnemyController minionPrefab;
 
+        [Tooltip("External freeze flag. Cinematics raise it; FixedUpdate then skips movement, attacks AND timers.")]
+        [SerializeField] private bool frozen;
+
         private readonly List<EnemyController> minions = new();
 
         private Rigidbody rb;
@@ -97,6 +100,26 @@ namespace MK.Rebuild
         /// death routine start. WU2 uses it to drop boss camera mode; WU4 drives the flow.
         /// </summary>
         public event System.Action Died;
+
+        /// <summary>
+        /// Raised right after a phase becomes live, once its minions are already spawned:
+        /// the phase-transition beat must freeze those minions, not the ones that would
+        /// appear a frame later.
+        /// </summary>
+        public event System.Action<int> PhaseChanged;
+
+        /// <summary>
+        /// External freeze (scripted beat / flow). While true <see cref="FixedUpdate"/>
+        /// returns before every timer, steering and attack, so the boss holds its pose
+        /// without the cinematic having to know anything about boss internals.
+        /// Serialized so the flag is visible and inspectable, but owned by the borrower
+        /// (save/restore is the borrower's job, design §5).
+        /// </summary>
+        public bool Frozen
+        {
+            get => frozen;
+            set => frozen = value;
+        }
 
         private void Awake()
         {
@@ -164,6 +187,15 @@ namespace MK.Rebuild
 
         private void FixedUpdate()
         {
+            // External freeze: no timers, no steering, no attacks. StopHorizontal keeps a
+            // committed charge from sliding through the beat.
+            if (frozen)
+            {
+                StopHorizontal();
+                if (characterVisual != null) characterVisual.SetMoving(false, 0f);
+                return;
+            }
+
             if (definition == null)
             {
                 if (!warnedMissingDefinition)
@@ -502,6 +534,10 @@ namespace MK.Rebuild
             BossArena.Instance?.BreakExitWall();
             BossHealthBar.Instance?.Bind(this);
             SummonMinions();
+
+            // Fired AFTER the minions exist: the phase-transition beat freezes whatever is
+            // already in the scene, so spawning them later would leave two live Esbirros.
+            PhaseChanged?.Invoke(phase);
 
             StartCoroutine(RoarRoutine());
         }
