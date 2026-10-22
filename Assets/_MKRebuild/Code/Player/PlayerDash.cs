@@ -139,6 +139,11 @@ namespace MK.Rebuild
 
         private void Update()
         {
+            // PAUSE GATE: Time.timeScale = 0 does not stop these UNSCALED timers, so a
+            // paused game would silently refund cooldowns (and let a live dash finish).
+            // Hitstop deliberately does NOT gate: the dash must recover during a freeze.
+            if (ControlLock.IsPaused) return;
+
             // Unscaled timers: cooldown/invuln survive hitstop timeScale = 0.
             if (cooldownTimer > 0f) cooldownTimer = Mathf.Max(0f, cooldownTimer - Time.unscaledDeltaTime);
             if (invulnTimer > 0f) invulnTimer = Mathf.Max(0f, invulnTimer - Time.unscaledDeltaTime);

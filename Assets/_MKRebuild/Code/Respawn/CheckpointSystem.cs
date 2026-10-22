@@ -186,7 +186,9 @@ namespace MK.Rebuild
         /// </summary>
         private IEnumerator RespawnRoutine()
         {
-            yield return new WaitForSeconds(Mathf.Max(0f, RespawnDelay));
+            // REALTIME: a pause (timeScale = 0) must not hang the respawn behind the
+            // death clip's scaled delay; the corpse stays locked until this completes.
+            yield return new WaitForSecondsRealtime(Mathf.Max(0f, RespawnDelay));
 
             if (sectionReset != null) sectionReset.ResetSection();
             if (motor != null) motor.Teleport(checkpointPosition, checkpointFacing);

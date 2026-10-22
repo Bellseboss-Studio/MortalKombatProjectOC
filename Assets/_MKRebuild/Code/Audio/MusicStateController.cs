@@ -27,6 +27,9 @@ namespace MK.Rebuild
 
         private void Update()
         {
+            // PAUSE GATE: the combat-bed expiry uses unscaled time, so it would keep
+            // counting and swap the track mid-pause. Resume continues the same window.
+            if (ControlLock.IsPaused) return;
             if (debugOverride || current != MusicState.Combat) return;
             if (Time.unscaledTime >= combatUntil) Apply(exploration);
         }

@@ -10,8 +10,8 @@ namespace MK.Rebuild.Debugging
     /// <summary>
     /// M0 debug window — an ISOLATED dev module (own assembly <c>MK.Rebuild.Debug</c>,
     /// <c>autoReferenced:false</c>). It ADHERES to the game read-only: it never
-    /// drives gameplay, it only observes it. The only things it writes are
-    /// <see cref="Time.timeScale"/> and the grey dummies it spawns.
+    /// drives gameplay, it only observes it. The only things it writes are the
+    /// <see cref="ControlLock"/> base scale (F6) and the grey dummies it spawns.
     ///
     /// Boot: a manual component on a <c>Debug</c> GameObject in <c>Gym.unity</c>
     /// (NO <c>[RuntimeInitializeOnLoadMethod]</c> — the debug stays in the gym).
@@ -35,8 +35,8 @@ namespace MK.Rebuild.Debugging
 
         // timeScale cycle: 0 → 0.25 → 0.5 → 1 → 2. Starts at 1x (index 3).
         // NOTE: timeScale = 0 freezes the Animator + FixedUpdate; this OnGUI overlay
-        // keeps rendering because OnGUI is not tied to scaled time. A real PauseManager
-        // is deferred debt — this is a direct Time.timeScale write, nothing more.
+        // keeps rendering because OnGUI is not tied to scaled time. This is the LOCK's
+        // base scale: hitstop/pause still own the live value and restore this on release.
         private static readonly float[] TimeScales = { 0f, 0.25f, 0.5f, 1f, 2f };
         // F6 (Música) cycles this ring; the ambience clips themselves live in AudioCatalog.asset.
         private static readonly AmbienceState[] AmbienceCycle =
@@ -424,11 +424,16 @@ namespace MK.Rebuild.Debugging
             return new Material(shader) { color = new Color(0.55f, 0.55f, 0.55f, 1f) };
         }
 
-        /// <summary>Cycles Time.timeScale through 0 → 0.25 → 0.5 → 1 → 2.</summary>
+        /// <summary>
+        /// Cycles the CONTROL LOCK base scale through 0 → 0.25 → 0.5 → 1 → 2.
+        /// Must go through <see cref="ControlLock"/>: a raw <c>Time.timeScale</c> write
+        /// here would be overwritten by the next hitstop release (which restores the
+        /// base, not the live value).
+        /// </summary>
         private void CycleTimeScale()
         {
             timeScaleIndex = (timeScaleIndex + 1) % TimeScales.Length;
-            Time.timeScale = TimeScales[timeScaleIndex];
+            ControlLock.SetBaseTimeScale(TimeScales[timeScaleIndex]);
         }
 
         /// <summary>Cycles ambience Parkour → Combat → City → Menu → None → Parkour.</summary>

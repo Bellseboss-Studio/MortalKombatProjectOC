@@ -235,6 +235,17 @@ namespace MK.Rebuild
             }
         }
 
+        /// <summary>
+        /// Drops a buffered jump so a press made just before a scripted lock does not
+        /// fire the instant control returns (a pause/cinematic must not eat a phantom
+        /// jump). WU4 calls this on cinematic and pause acquire AND release; exposed
+        /// here now because those owners do not exist yet.
+        /// </summary>
+        public void FlushJumpBuffer()
+        {
+            bufferTimer = 0f;
+        }
+
         private void Awake()
         {
             // Body ownership first: every sibling component reads Body in its own

@@ -148,6 +148,10 @@ namespace MK.Rebuild
 
         private void Update()
         {
+            // PAUSE GATE: the cooldowns below are UNSCALED, so without this they keep
+            // counting while the game is paused. Hitstop must keep them ticking.
+            if (ControlLock.IsPaused) return;
+
             // Unscaled ability cooldowns (change ability-cancel-window): they survive the
             // hitstop freeze (timeScale = 0) and count down during the ability window too,
             // so a fired ability is never immediately re-fireable.

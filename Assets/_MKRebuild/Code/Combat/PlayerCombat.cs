@@ -22,8 +22,9 @@ namespace MK.Rebuild
     /// controller's landing-mirror exits return to locomotion.
     ///
     /// Hit-cancel: <c>cancelHitNorm</c> (wider) applies when the step connected;
-    /// <c>cancelNorm</c> (narrower) on whiff. Hitstop (decision h): saves and
-    /// restores the CURRENT <c>Time.timeScale</c>, never hardcodes 1 (debug F4).
+    /// <c>cancelNorm</c> (narrower) on whiff. Hitstop (decision h): acquires and
+    /// releases a <see cref="ControlLock"/> Hitstop handle, so the scale restored on
+    /// expiry is whatever the stack says — never a stale saved value (debug F6 base).
     /// Swing timing is SCALED (hitstop freezes the swing); the hitstop countdown,
     /// the input buffer and the victim feedback run UNSCALED.
     ///
@@ -148,8 +149,8 @@ namespace MK.Rebuild
         private float heldDirectionTime;
 
         // Hitstop state.
-        private float hitstopRemaining;          // unscaled seconds left frozen
-        private float savedTimeScale;            // the EXACT previous value to restore
+        private float hitstopRemaining;                    // unscaled seconds left frozen
+        private ControlLock.Handle hitstopHandle;          // lock token owned by this freeze
 
         private bool warnedMissingDefinition;
         private AudioCueId hitCue = AudioCueId.LightHit;
@@ -241,25 +242,28 @@ namespace MK.Rebuild
         {
             if (input != null) input.Player.Disable();
             ReleaseAttackToken(); // never leave a stale attack token
+            ReleaseHitstop();     // a disabled combat component must not pin the time lock
         }
 
         private void OnDestroy()
         {
+            ReleaseHitstop();     // domain/scene teardown must not leave Time.timeScale at 0
             if (input != null) input.Dispose();
         }
 
         private void Update()
         {
-            // Hitstop owns the frame: consume unscaled time, restore the PREVIOUS
-            // timeScale on expiry, and ignore new input while frozen. The input
-            // buffers do NOT decay here either — they survive the freeze (decision d).
+            // Hitstop owns the frame: consume unscaled time, release the time lock on
+            // expiry, and ignore new input while frozen. The input buffers do NOT decay
+            // here either — they survive the freeze (decision d).
             if (hitstopRemaining > 0f)
             {
                 hitstopRemaining -= Time.unscaledDeltaTime;
                 if (hitstopRemaining <= 0f)
                 {
-                    Time.timeScale = savedTimeScale;
                     hitstopRemaining = 0f;
+                    ControlLock.Release(hitstopHandle);
+                    hitstopHandle = null;
                 }
                 return;
             }
@@ -1332,9 +1336,23 @@ namespace MK.Rebuild
         private void BeginHitstop(float hitstopMs)
         {
             if (hitstopRemaining > 0f) return; // one freeze per swing/step
-            savedTimeScale = Time.timeScale;   // may be 0.25 / 0.5 / 2 — restore THIS
-            Time.timeScale = 0f;
+            // The lock keeps the debug base scale (F6) intact; releasing it restores
+            // that base instead of the value that happened to be live before the swing.
+            hitstopHandle = ControlLock.Acquire(ControlReason.Hitstop);
             hitstopRemaining = Mathf.Max(0.001f, hitstopMs / 1000f);
+        }
+
+        /// <summary>
+        /// Drops the hitstop freeze and its lock token. Safe when idle; used by the
+        /// expiry path, <see cref="OnDisable"/> and <see cref="OnDestroy"/> so a
+        /// disabled/swapped combat component can never leave time at 0.
+        /// </summary>
+        private void ReleaseHitstop()
+        {
+            hitstopRemaining = 0f;
+            if (hitstopHandle == null) return;
+            ControlLock.Release(hitstopHandle);
+            hitstopHandle = null;
         }
 
         // ------------------------------------------------------------------
