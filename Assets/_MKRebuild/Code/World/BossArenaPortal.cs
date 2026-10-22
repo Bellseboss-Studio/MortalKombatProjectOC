@@ -35,10 +35,22 @@ namespace MK.Rebuild
             var motor = player.GetComponent<PlayerMotor>();
             if (motor == null) return;
 
+            // Capture the pose BEFORE the move: warping after the teleport yields a zero
+            // delta (the target already sits at the destination) and the camera drags.
+            Vector3 previousPosition = motor.transform.position;
             motor.Teleport(destination.position, destination.forward);
+            Vector3 delta = destination.position - previousPosition;
 
-            var rig = FindFirstObjectByType<CameraRig>();
-            rig?.WarpTo(destination.position);
+            CameraDirector director = CameraDirector.Instance;
+            if (director != null)
+            {
+                director.WarpBy(delta);
+            }
+            else
+            {
+                var rig = FindFirstObjectByType<CameraRig>();
+                rig?.WarpBy(delta);
+            }
 
             nextUse = Time.time + cooldownSeconds;
             nextGlobalUse = nextUse;

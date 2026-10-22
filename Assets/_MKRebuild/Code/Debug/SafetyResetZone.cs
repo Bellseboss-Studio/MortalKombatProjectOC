@@ -30,8 +30,24 @@ namespace MK.Rebuild.Debugging
             if (motor == null) return;
             var rb = motor.GetComponent<Rigidbody>();
             if (rb == null) return;
+
+            // Capture before the move: WarpBy needs the delta, and after the teleport the
+            // target already sits at the destination (zero delta).
+            Vector3 previousPosition = motor.transform.position;
             rb.position = respawnPosition;
             rb.linearVelocity = Vector3.zero;
+
+            Vector3 delta = respawnPosition - previousPosition;
+            CameraDirector director = CameraDirector.Instance;
+            if (director != null)
+            {
+                director.WarpBy(delta);
+            }
+            else
+            {
+                var rig = FindFirstObjectByType<CameraRig>();
+                rig?.WarpBy(delta);
+            }
         }
     }
 }

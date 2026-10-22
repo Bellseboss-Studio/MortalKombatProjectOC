@@ -46,15 +46,26 @@ namespace MK.Rebuild
             vcam.LookAt = newTarget;
         }
 
-        /// <summary>Teleport seam: shifts the vcam by the same delta as the target, then invalidates the previous state.</summary>
-        public void WarpTo(Vector3 worldPosition)
+        /// <summary>
+        /// Teleport seam in delta form: shifts the vcam by the same delta the tracked target
+        /// moved. Callers must capture the delta BEFORE moving the player: an absolute warp
+        /// after the move computes zero and the camera drags across the level.
+        /// </summary>
+        public void WarpBy(Vector3 delta)
         {
             if (vcam == null) return;
             Transform t = Target;
             if (t == null) return;
-            Vector3 delta = worldPosition - t.position;
             vcam.OnTargetObjectWarped(t, delta);
             vcam.PreviousStateIsValid = false;
+        }
+
+        /// <summary>Teleport seam: shifts the vcam by the same delta as the target, then invalidates the previous state.</summary>
+        public void WarpTo(Vector3 worldPosition)
+        {
+            Transform t = Target;
+            if (t == null) return;
+            WarpBy(worldPosition - t.position);
         }
     }
 }

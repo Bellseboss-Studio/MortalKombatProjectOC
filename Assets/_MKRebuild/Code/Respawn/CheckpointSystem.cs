@@ -191,10 +191,24 @@ namespace MK.Rebuild
             yield return new WaitForSecondsRealtime(Mathf.Max(0f, RespawnDelay));
 
             if (sectionReset != null) sectionReset.ResetSection();
+
+            // Capture the pose BEFORE the teleport: the warp needs the delta the player
+            // actually travelled. Warping to an absolute pose after the move is a no-op.
+            Vector3 previousPosition = motor != null ? motor.transform.position : checkpointPosition;
             if (motor != null) motor.Teleport(checkpointPosition, checkpointFacing);
-            // Shift the vcam by the same delta as the teleport BEFORE the next camera
-            // update, so the respawn does not glide across the level (or through geometry).
-            if (cameraRig != null) cameraRig.WarpTo(checkpointPosition);
+            Vector3 delta = checkpointPosition - previousPosition;
+
+            // Shift every camera by the same delta BEFORE the next camera update, so the
+            // respawn does not glide across the level (or through geometry).
+            CameraDirector director = CameraDirector.Instance;
+            if (director != null)
+            {
+                director.WarpBy(delta);
+            }
+            else if (cameraRig != null)
+            {
+                cameraRig.WarpBy(delta);
+            }
             if (damage != null)
             {
                 damage.Heal();
