@@ -30,18 +30,23 @@ namespace MK.Rebuild
 
         private static readonly Color DimColor = new Color(0f, 0f, 0f, 0.72f);
         private static readonly Color ButtonColor = new Color(0.12f, 0.12f, 0.15f, 0.95f);
+        private static readonly Color ButtonHighlighted = new Color(0.32f, 0.36f, 0.42f, 1f);
+        private static readonly Color ButtonSelected = new Color(0.24f, 0.55f, 0.85f, 1f);
+        private static readonly Color ButtonPressed = new Color(0.07f, 0.07f, 0.09f, 1f);
 
         private static Font cachedFont;
 
         private GameObject panel;
         private Text title;
         private Button resumeButton;
+        private Button restartButton;
 
         private PlayerMotor motor;
         private BodyOwnership.Token bodyToken;
         private ControlLock.Handle pauseHandle;
 
         private bool isOpen;
+        private bool restartOnly;
         private CursorLockMode previousLock;
         private bool previousCursorVisible;
 
@@ -57,6 +62,8 @@ namespace MK.Rebuild
 
         private void Update()
         {
+            EnsureSelection();
+
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
@@ -119,6 +126,7 @@ namespace MK.Rebuild
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             AudioListener.pause = true;
+            SelectDefault();
         }
 
         /// <summary>
@@ -131,6 +139,10 @@ namespace MK.Rebuild
 
             isOpen = false;
             if (panel != null) panel.SetActive(false);
+
+            // Drop the focus with the card. An inactive button cannot be navigated, but a
+            // lingering selection would keep routing UI submit events at a hidden menu.
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
 
             ReleaseGameplay();
 
@@ -175,14 +187,56 @@ namespace MK.Rebuild
             pauseHandle = null;
         }
 
-        private void SetRestartOnly(bool restartOnly)
+        private void SetRestartOnly(bool value)
         {
-            if (resumeButton != null) resumeButton.gameObject.SetActive(!restartOnly);
+            restartOnly = value;
+
+            if (resumeButton != null) resumeButton.gameObject.SetActive(!value);
 
             if (title != null)
             {
-                title.text = restartOnly ? "DEMO COMPLETE" : "PAUSED";
+                title.text = value ? "DEMO COMPLETE" : "PAUSED";
             }
+        }
+
+        /// <summary>
+        /// Focuses the button the card starts on, so D-pad/stick (Navigate) and A/Submit work
+        /// the moment it opens. A canvas with an input module but NO selected object silently
+        /// swallows both, which is why the menu used to be mouse-only.
+        /// The selection is cleared first on purpose: re-selecting the object that is already
+        /// selected is a no-op in the EventSystem, so without the <c>null</c> step the
+        /// highlight would not re-apply after the card was hidden and shown again.
+        /// </summary>
+        private void SelectDefault()
+        {
+            if (!isOpen || EventSystem.current == null) return;
+
+            Button preferred = restartOnly ? restartButton : resumeButton;
+            Button fallback = restartOnly ? resumeButton : restartButton;
+
+            Button target = IsActive(preferred) ? preferred : fallback;
+            if (!IsActive(target)) return;
+
+            EventSystem.current.SetSelectedGameObject(null);
+            EventSystem.current.SetSelectedGameObject(target.gameObject);
+        }
+
+        /// <summary>
+        /// Self-heals a lost focus (a click on the dim layer, or the module clearing the
+        /// selection when the focused object disappears). Without it the card would silently
+        /// fall back to mouse-only input after the first stray click.
+        /// </summary>
+        private void EnsureSelection()
+        {
+            if (!isOpen || EventSystem.current == null) return;
+            if (EventSystem.current.currentSelectedGameObject != null) return;
+
+            SelectDefault();
+        }
+
+        private static bool IsActive(Button button)
+        {
+            return button != null && button.gameObject.activeInHierarchy;
         }
 
         // --- Runtime UI ------------------------------------------------------
@@ -219,6 +273,7 @@ namespace MK.Rebuild
 
             Button restart = CreateButton(panel.transform, "Restart", "RESTART", new Vector2(0f, -120f));
             restart.onClick.AddListener(Restart);
+            restartButton = restart;
         }
 
         /// <summary>
@@ -278,6 +333,22 @@ namespace MK.Rebuild
 
             Button button = go.AddComponent<Button>();
             button.targetGraphic = background;
+
+            // The card must be readable as "this is focused" from the couch, so the selected
+            // state is a bright accent rather than the default barely-visible tint. Automatic
+            // navigation is what turns D-pad/stick into movement between the two buttons.
+            ColorBlock colors = button.colors;
+            colors.normalColor = ButtonColor;
+            colors.highlightedColor = ButtonHighlighted;
+            colors.selectedColor = ButtonSelected;
+            colors.pressedColor = ButtonPressed;
+            colors.colorMultiplier = 1f;
+            colors.fadeDuration = 0.05f;
+            button.colors = colors;
+
+            Navigation navigation = button.navigation;
+            navigation.mode = Navigation.Mode.Automatic;
+            button.navigation = navigation;
 
             RectTransform rect = (RectTransform)go.transform;
             rect.anchorMin = new Vector2(0.5f, 0.5f);
