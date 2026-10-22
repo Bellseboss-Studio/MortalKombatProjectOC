@@ -36,6 +36,13 @@ namespace MK.Rebuild
 
         public static BossArena Instance { get; private set; }
 
+        /// <summary>
+        /// Read-only seam: the single source of truth for "the player is in the boss
+        /// zone". Presentation systems (e.g. <see cref="BossHealthBar"/>) must use this
+        /// instead of guessing from distance.
+        /// </summary>
+        public bool PlayerInside => IsPlayerInside();
+
         private BossController boss;
         private PlayerDamage player;
         private bool closed;

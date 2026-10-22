@@ -27,6 +27,13 @@ namespace MK.Rebuild
         /// <summary>First scene spawner (convenience for the debug window).</summary>
         public static BossSpawner Instance { get; private set; }
 
+        /// <summary>
+        /// Raised at the end of <see cref="SpawnBoss"/> only when an instance was actually
+        /// created. This is the single spawn signal: a trigger, the debug key and any
+        /// future flow all end up here, so consumers never depend on HOW the fight started.
+        /// </summary>
+        public event System.Action<BossController> Spawned;
+
         private void Awake()
         {
             if (Instance == null) Instance = this;
@@ -50,6 +57,7 @@ namespace MK.Rebuild
 
             Transform point = spawnPoint != null ? spawnPoint : transform;
             Current = Instantiate(prefab, point.position, point.rotation, transform);
+            if (Current != null) Spawned?.Invoke(Current);
         }
 
         /// <summary>

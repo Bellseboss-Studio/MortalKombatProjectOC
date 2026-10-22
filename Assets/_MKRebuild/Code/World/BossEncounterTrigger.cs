@@ -23,6 +23,13 @@ namespace MK.Rebuild
 
         private bool fired;
 
+        /// <summary>
+        /// Raised after the boss spawns, only on the accepted fire (never on the
+        /// <see cref="once"/> early-out). WU4's flow controller uses it for the encounter
+        /// flow; camera consumers subscribe to <see cref="BossSpawner.Spawned"/> instead.
+        /// </summary>
+        public event System.Action Triggered;
+
         /// <summary>Editor convenience: an entry zone is always a trigger volume.</summary>
         private void Reset()
         {
@@ -41,6 +48,7 @@ namespace MK.Rebuild
 
             target.SpawnBoss();
             fired = true;
+            Triggered?.Invoke();
         }
     }
 }

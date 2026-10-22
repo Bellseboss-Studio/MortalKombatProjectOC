@@ -92,6 +92,12 @@ namespace MK.Rebuild
         /// <summary>True after the final (phase-2) death blow.</summary>
         public bool IsDead { get; private set; }
 
+        /// <summary>
+        /// Raised at the very end of the death path, after combat-end bookkeeping and the
+        /// death routine start. WU2 uses it to drop boss camera mode; WU4 drives the flow.
+        /// </summary>
+        public event System.Action Died;
+
         private void Awake()
         {
             if (visualRoot == null) visualRoot = transform;
@@ -575,6 +581,8 @@ namespace MK.Rebuild
 
             NotifyCombatEndOnce();
             StartCoroutine(DeathRoutine());
+
+            Died?.Invoke();
         }
 
         /// <summary>
