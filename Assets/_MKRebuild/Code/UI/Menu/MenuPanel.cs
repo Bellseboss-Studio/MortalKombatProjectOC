@@ -20,6 +20,10 @@ namespace MK.Rebuild
         private static readonly Color Highlight = new Color(0.32f, 0.36f, 0.42f, 1f);
         private static readonly Color Selected = new Color(0.24f, 0.55f, 0.85f, 1f);
         private static readonly Color Pressed = new Color(0.07f, 0.07f, 0.09f, 1f);
+        private static readonly Color RowNormal = new Color(0.08f, 0.08f, 0.10f, 0f);
+        private static readonly Color RowHighlight = new Color(0.18f, 0.20f, 0.26f, 0.85f);
+        private static readonly Color RowSelected = new Color(0.24f, 0.55f, 0.85f, 0.55f);
+        private static readonly Color RowPressed = new Color(0.10f, 0.14f, 0.20f, 0.9f);
 
         private static Font cachedFont;
 
@@ -98,22 +102,36 @@ namespace MK.Rebuild
             Vector2 position,
             UnityEngine.Events.UnityAction<float> onChanged)
         {
+            // The row is the visual focus target: a slider alone has no obvious "selected" look,
+            // and the player cannot tell which option the D-pad is on.
+            var row = new GameObject(label + "Row", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            var rowRect = (RectTransform)row.transform;
+            rowRect.anchorMin = rowRect.anchorMax = new Vector2(0.5f, 0.5f);
+            rowRect.pivot = new Vector2(0.5f, 0.5f);
+            rowRect.sizeDelta = new Vector2(820f, 70f);
+            rowRect.anchoredPosition = position;
+
+            var rowBackground = row.AddComponent<Image>();
+            rowBackground.color = RowNormal;
+            rowBackground.raycastTarget = false;
+
             CreateText(
-                parent,
+                row.transform,
                 label + "Label",
                 label,
                 30,
-                position + new Vector2(-300f, 0f),
-                new Vector2(220f, 60f),
+                new Vector2(-280f, 0f),
+                new Vector2(240f, 60f),
                 TextAnchor.MiddleLeft);
 
             var go = new GameObject(label + "Slider", typeof(RectTransform));
-            go.transform.SetParent(parent, false);
+            go.transform.SetParent(row.transform, false);
             var rect = (RectTransform)go.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.sizeDelta = new Vector2(420f, 40f);
-            rect.anchoredPosition = position + new Vector2(120f, 0f);
+            rect.anchoredPosition = new Vector2(100f, 0f);
 
             var background = new GameObject("Background", typeof(RectTransform)).AddComponent<Image>();
             background.transform.SetParent(go.transform, false);
@@ -139,7 +157,8 @@ namespace MK.Rebuild
             handle.color = Color.white;
 
             var slider = go.AddComponent<Slider>();
-            slider.targetGraphic = handle;
+            // Tint the ROW, not the handle: the focus state must be readable at a glance.
+            slider.targetGraphic = rowBackground;
             slider.fillRect = fillRect;
             slider.handleRect = handleRect;
             slider.direction = Slider.Direction.LeftToRight;
@@ -147,6 +166,14 @@ namespace MK.Rebuild
             slider.maxValue = 1f;
             slider.value = Mathf.Clamp01(value);
             slider.onValueChanged.AddListener(onChanged);
+
+            ColorBlock colors = slider.colors;
+            colors.normalColor = RowNormal;
+            colors.highlightedColor = RowHighlight;
+            colors.selectedColor = RowSelected;
+            colors.pressedColor = RowPressed;
+            colors.fadeDuration = 0.05f;
+            slider.colors = colors;
 
             Navigation navigation = slider.navigation;
             navigation.mode = Navigation.Mode.Automatic;
