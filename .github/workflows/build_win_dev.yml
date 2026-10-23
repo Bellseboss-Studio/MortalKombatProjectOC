@@ -17,6 +17,11 @@ on:
         required: true
         default: true
         type: boolean
+      publish_itch:
+        description: "Publish the build to itch.io (release build, no -Development)"
+        required: true
+        default: false
+        type: boolean
   pull_request:
     branches:
       - develop
@@ -32,7 +37,7 @@ jobs:
   # for a release, so pull-request builds never touch tags.
   version:
     name: Compute release version
-    if: github.event_name == 'workflow_dispatch' && inputs.create_release
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.create_release == 'true' || github.event.inputs.publish_itch == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -114,6 +119,18 @@ jobs:
       - name: Clean up
         uses: jlumbroso/free-disk-space@v1.2.0
 
+      # Cheap guard: the player must boot into the demo chain. If a scene is
+      # missing from EditorBuildSettings the build would silently start at
+      # Playground (or fail at runtime), so fail the build before compiling.
+      - name: Guard - demo scene chain in Build Settings
+        run: |
+          set -euo pipefail
+          for scene in Intro00 Intro01 MainMenu_ Playground; do
+            grep -q "Assets/_MKRebuild/Scenes/${scene}.unity" ProjectSettings/EditorBuildSettings.asset \
+              || { echo "::error::${scene} is missing from EditorBuildSettings"; exit 1; }
+          done
+          echo "Build Settings contain the full demo chain."
+
       - name: Build project
         uses: game-ci/unity-builder@v4
         env:
@@ -123,10 +140,10 @@ jobs:
         with:
           targetPlatform: StandaloneWindows64
           buildName: MortalKombatProjectOC
-          # Tester build must be a Development build so DebugWindow /
-          # PlayerDamageTestDriver activate in the player.
-          customParameters: |
-            -Development
+          # Tester builds keep the Development flag so DebugWindow /
+          # PlayerDamageTestDriver activate. An itch publication is a release
+          # build, so the flag is dropped when publish_itch is requested.
+          customParameters: ${{ github.event.inputs.publish_itch == 'true' && '' || '-Development' }}
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -149,7 +166,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [build, version]
-    if: github.event_name == 'workflow_dispatch' && inputs.create_release
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -192,23 +209,58 @@ jobs:
           fail_on_unmatched_files: true
           files: MortalKombat-Windows-*.zip
 
-      # ---------------------------------------------------------------------
-      # Itch.io deployment - DISABLED until we have a release-quality build.
-      # To enable: uncomment, fill in ITCH_USER / ITCH_GAME for this project,
-      # add the BUTLER_CREDENTIALS secret and a channel per platform.
-      # ---------------------------------------------------------------------
-      # - name: Unpack for Butler
-      #   run: |
-      #     set -euo pipefail
-      #     mkdir -p itch/Windows
-      #     unzip -q "MortalKombat-Windows-${TAG}-${SHA7}.zip" -d itch/Windows
-      #     ls -R itch | head -n 100 || true
-      #
-      # - name: Deploy Windows
-      #   uses: josephbmanley/butler-publish-itchio-action@master
-      #   env:
-      #     BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-      #     CHANNEL: windows
-      #     ITCH_GAME: <itch-game-slug>
-      #     ITCH_USER: <itch-user>
-      #     PACKAGE: itch/Windows
+      # Itch.io deployment lives in the `itch` job below. It is opt-in via the
+      # `publish_itch` dispatch input (default false), so PR builds and tester
+      # artifacts never touch the public page.
+
+  # ---------------------------------------------------------------------------
+  # Itch.io publication (opt-in). Uses the official butler client so the
+  # SemVer tag is the uploaded version and the package is pushed unpacked
+  # (butler does delta patching; a zip would be re-uploaded whole every time).
+  # Requires the BUTLER_CREDENTIALS secret (itch.io API key).
+  # ---------------------------------------------------------------------------
+  itch:
+    name: Publish to itch.io
+    needs: [build, version]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_itch == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-Windows
+          path: artifacts
+
+      - name: Locate package
+        id: package
+        run: |
+          set -euo pipefail
+          if [ -d "artifacts/StandaloneWindows64" ]; then
+            SRC="artifacts/StandaloneWindows64"
+          else
+            SRC="artifacts"
+          fi
+          if [ ! -f "$SRC/MortalKombatProjectOC.exe" ]; then
+            echo "::error::Expected $SRC/MortalKombatProjectOC.exe was not produced by the build."
+            exit 1
+          fi
+          echo "path=$SRC" >> "$GITHUB_OUTPUT"
+
+      - name: Install butler
+        run: |
+          set -euo pipefail
+          curl -fsSL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip
+          chmod +x butler
+          ./butler -V
+
+      - name: Push to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_CREDENTIALS }}
+          PACKAGE: ${{ steps.package.outputs.path }}
+          VERSION: ${{ needs.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ./butler push "$PACKAGE" bellseboss/mkoc-rise-of-leena:windows --userversion "$VERSION"
