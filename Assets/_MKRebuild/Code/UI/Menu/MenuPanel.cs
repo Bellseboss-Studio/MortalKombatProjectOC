@@ -20,10 +20,7 @@ namespace MK.Rebuild
         private static readonly Color Highlight = new Color(0.32f, 0.36f, 0.42f, 1f);
         private static readonly Color Selected = new Color(0.24f, 0.55f, 0.85f, 1f);
         private static readonly Color Pressed = new Color(0.07f, 0.07f, 0.09f, 1f);
-        private static readonly Color RowNormal = new Color(0.08f, 0.08f, 0.10f, 0f);
-        private static readonly Color RowHighlight = new Color(0.18f, 0.20f, 0.26f, 0.85f);
-        private static readonly Color RowSelected = new Color(0.24f, 0.55f, 0.85f, 0.55f);
-        private static readonly Color RowPressed = new Color(0.10f, 0.14f, 0.20f, 0.9f);
+        private static readonly Color RowNormal = new Color(0.08f, 0.08f, 0.10f, 0.35f);
 
         private static Font cachedFont;
 
@@ -94,7 +91,11 @@ namespace MK.Rebuild
 
         public void Hide() => gameObject.SetActive(false);
 
-        /// <summary>Creates a labelled 0..1 slider and wires its value to <paramref name="onChanged"/>.</summary>
+        /// <summary>
+        /// Creates a labelled 0..1 slider inside a focusable row. The row (not the thin slider
+        /// handle) is what changes when focused: a bright accent bar, a blue background and a
+        /// white label, so the player can see where the D-pad is at a glance.
+        /// </summary>
         public static Slider CreateSlider(
             Transform parent,
             string label,
@@ -102,21 +103,29 @@ namespace MK.Rebuild
             Vector2 position,
             UnityEngine.Events.UnityAction<float> onChanged)
         {
-            // The row is the visual focus target: a slider alone has no obvious "selected" look,
-            // and the player cannot tell which option the D-pad is on.
             var row = new GameObject(label + "Row", typeof(RectTransform));
             row.transform.SetParent(parent, false);
             var rowRect = (RectTransform)row.transform;
             rowRect.anchorMin = rowRect.anchorMax = new Vector2(0.5f, 0.5f);
             rowRect.pivot = new Vector2(0.5f, 0.5f);
-            rowRect.sizeDelta = new Vector2(820f, 70f);
+            rowRect.sizeDelta = new Vector2(820f, 76f);
             rowRect.anchoredPosition = position;
 
             var rowBackground = row.AddComponent<Image>();
             rowBackground.color = RowNormal;
             rowBackground.raycastTarget = false;
 
-            CreateText(
+            var accent = new GameObject("Accent", typeof(RectTransform)).AddComponent<Image>();
+            accent.transform.SetParent(row.transform, false);
+            var accentRect = accent.rectTransform;
+            accentRect.anchorMin = accentRect.anchorMax = new Vector2(0f, 0.5f);
+            accentRect.pivot = new Vector2(0f, 0.5f);
+            accentRect.sizeDelta = new Vector2(10f, 64f);
+            accentRect.anchoredPosition = Vector2.zero;
+            accent.color = new Color(0.30f, 0.70f, 1f, 1f);
+            accent.gameObject.SetActive(false);
+
+            var labelText = CreateText(
                 row.transform,
                 label + "Label",
                 label,
@@ -157,8 +166,7 @@ namespace MK.Rebuild
             handle.color = Color.white;
 
             var slider = go.AddComponent<Slider>();
-            // Tint the ROW, not the handle: the focus state must be readable at a glance.
-            slider.targetGraphic = rowBackground;
+            slider.targetGraphic = handle;
             slider.fillRect = fillRect;
             slider.handleRect = handleRect;
             slider.direction = Slider.Direction.LeftToRight;
@@ -167,17 +175,12 @@ namespace MK.Rebuild
             slider.value = Mathf.Clamp01(value);
             slider.onValueChanged.AddListener(onChanged);
 
-            ColorBlock colors = slider.colors;
-            colors.normalColor = RowNormal;
-            colors.highlightedColor = RowHighlight;
-            colors.selectedColor = RowSelected;
-            colors.pressedColor = RowPressed;
-            colors.fadeDuration = 0.05f;
-            slider.colors = colors;
-
             Navigation navigation = slider.navigation;
             navigation.mode = Navigation.Mode.Automatic;
             slider.navigation = navigation;
+
+            var highlight = go.AddComponent<MenuRowHighlight>();
+            highlight.Configure(rowBackground, accent.gameObject, labelText);
 
             return slider;
         }
@@ -272,6 +275,42 @@ namespace MK.Rebuild
             // Unity 6 removed Arial.ttf; the legacy runtime face is the supported built-in.
             if (cachedFont == null) cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             return cachedFont;
+        }
+    }
+
+    /// <summary>
+    /// Focus feedback for a slider row. The Selectable tint alone is too subtle over the slider's
+    /// opaque background, so the row background, a bright accent bar and the label are driven
+    /// explicitly from the select/deselect events.
+    /// </summary>
+    public sealed class MenuRowHighlight : MonoBehaviour, ISelectHandler, IDeselectHandler
+    {
+        private static readonly Color NormalBackground = new Color(0.08f, 0.08f, 0.10f, 0.35f);
+        private static readonly Color SelectedBackground = new Color(0.24f, 0.55f, 0.85f, 0.55f);
+        private static readonly Color NormalLabel = new Color(0.85f, 0.85f, 0.90f, 1f);
+        private static readonly Color SelectedLabel = Color.white;
+
+        private Graphic background;
+        private GameObject accent;
+        private Text label;
+
+        public void Configure(Graphic backgroundGraphic, GameObject accentObject, Text labelText)
+        {
+            background = backgroundGraphic;
+            accent = accentObject;
+            label = labelText;
+            Apply(false);
+        }
+
+        public void OnSelect(BaseEventData eventData) => Apply(true);
+
+        public void OnDeselect(BaseEventData eventData) => Apply(false);
+
+        private void Apply(bool selected)
+        {
+            if (background != null) background.color = selected ? SelectedBackground : NormalBackground;
+            if (accent != null) accent.SetActive(selected);
+            if (label != null) label.color = selected ? SelectedLabel : NormalLabel;
         }
     }
 }
