@@ -154,7 +154,7 @@ VideoPlayer:
   m_TargetMaterialProperty: <noninit>
   m_RenderMode: 2
   m_AspectRatio: 2
-  m_DataSource: 0
+  m_DataSource: 1
   m_TimeUpdateMode: 2
   m_PlaybackSpeed: 1
   m_AudioOutputMode: 2
@@ -319,7 +319,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.IntroVideoBoot
   videoPlayer: {fileID: 545197350}
-  clip: {fileID: 32900000, guid: c2f79deee58d57445ba27fd2ce3c1c43, type: 3}
+  streamingVideoFile: Goro_intro00.mp4
+  clip: {fileID: 0}
   fallbackSeconds: 10
   prepareTimeoutSeconds: 5
   skipAction: {fileID: 11400000, guid: 1ce19431ba17f1c41a24a7d481ad393a, type: 2}

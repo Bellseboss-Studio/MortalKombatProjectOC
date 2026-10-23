@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -9,11 +10,10 @@ namespace MK.Rebuild
     /// <summary>
     /// Intro00 boot: plays the opening cinematic and then hands control back to the flow.
     ///
-    /// WHY a VideoClip and not a URL: the legacy scene loaded
-    /// <c>StreamingAssets/Goro_intro00.mp4</c> through <c>Path.Combine</c> at runtime, which keeps
-    /// the video outside the asset database and outside the flow's dependency graph. The clip now
-    /// lives under <c>Migrated/Intro00/Video/</c>, so it is imported once, referenced by GUID and
-    /// audited like every other asset. No path string exists in this class.
+    /// WHY StreamingAssets and not an imported VideoClip: the VideoClip reference played in the
+    /// editor but the player build did not ship/play it. StreamingAssets is the one path Unity
+    /// ships raw without the VideoClip importer, so the build always has the file. The clip field
+    /// remains as an optional fallback for scenes that use a VideoClip directly.
     ///
     /// WHY the clip is re-assigned from this component's own field: a scene author can leave the
     /// <see cref="VideoPlayer"/> clip empty by accident. Assigning the fallback clip keeps a broken
@@ -38,7 +38,10 @@ namespace MK.Rebuild
         [Tooltip("Player that renders the cinematic. Its clip is used unless it is empty.")]
         [SerializeField] private VideoPlayer videoPlayer;
 
-        [Tooltip("Fallback clip assigned when the player has none.")]
+        [Tooltip("File name inside StreamingAssets. When set, the player is driven by URL and the clip is ignored.")]
+        [SerializeField] private string streamingVideoFile = "Goro_intro00.mp4";
+
+        [Tooltip("Fallback clip assigned when the player has neither a streaming file nor a clip.")]
         [SerializeField] private VideoClip clip;
 
         [Tooltip("How long to wait when the clip reports a length of zero.")]
@@ -84,13 +87,24 @@ namespace MK.Rebuild
                 return;
             }
 
-            if (videoPlayer.clip == null) videoPlayer.clip = clip;
-
-            if (videoPlayer.clip == null)
+            if (!string.IsNullOrEmpty(streamingVideoFile))
             {
-                Debug.LogWarning($"[{nameof(IntroVideoBoot)}] No VideoClip assigned; advancing instead of stalling.", this);
-                Finish();
-                return;
+                // StreamingAssets is the one path Unity ships raw and does not run through the
+                // VideoClip importer. The player build was silently dropping the imported clip,
+                // so the URL path is the reliable one for a player.
+                videoPlayer.source = VideoSource.Url;
+                videoPlayer.url = Path.Combine(Application.streamingAssetsPath, streamingVideoFile);
+            }
+            else
+            {
+                if (videoPlayer.clip == null) videoPlayer.clip = clip;
+
+                if (videoPlayer.clip == null)
+                {
+                    Debug.LogWarning($"[{nameof(IntroVideoBoot)}] No streaming file and no VideoClip assigned; advancing instead of stalling.", this);
+                    Finish();
+                    return;
+                }
             }
 
             videoPlayer.playOnAwake = false;
