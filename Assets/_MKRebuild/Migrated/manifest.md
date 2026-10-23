@@ -313,3 +313,21 @@ rows remain untouched. Intro00/Intro01 leftovers remain `pending` (out of scope)
 
 Rollback: reverse each row with `AssetDatabase.MoveAsset(destination, source)`. The GUIDs
 are unchanged, so both the legacy scene and the rebuilt scenes keep resolving.
+
+## WU4b applied moves (menu scene rebuild)
+
+WU4a recorded the scene `Volume.sharedProfile` fields as null; they were in fact assigned to
+two URP `VolumeProfile` assets that define the menu's post-processing look. They were moved
+(with their only external dependency, `desertMK.png`) instead of nulled, so the cinematic
+keeps its authored grading.
+
+| class | source | dest | guid | status |
+|---|---|---|---|---|
+| `share` | `Assets/PostProccesing/Post_Menu.asset` | `Assets/_MKRebuild/Migrated/MainMenu/Environment/Volumes/Post_Menu.asset` | `9764131318b41a742b4e785baa2d1902` | moved |
+| `share` | `Assets/PostProccesing/Post_Menu_Local_Leena.asset` | `Assets/_MKRebuild/Migrated/MainMenu/Environment/Volumes/Post_Menu_Local_Leena.asset` | `801f3e0ab22371f4dbed6797f13df045` | moved |
+| `share` | `Assets/HDRI/desertMK.png` | `Assets/_MKRebuild/Migrated/MainMenu/Environment/Volumes/desertMK.png` | `a543131990aa88f4abeef86bd5583935` | moved |
+
+Rollback: `AssetDatabase.MoveAsset` each row back to its source. Baked GI was cleared in the
+new scene (`m_LightingDataAsset: 0`, `Lightmaps = 0`) per the accepted GI-loss decision; the
+legacy `mainMenu_edenia_bake_ilumination/` folder was not touched, so the legacy scene still
+has its bake.
