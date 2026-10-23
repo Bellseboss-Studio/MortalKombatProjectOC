@@ -44,7 +44,7 @@ since. This file is the rollback ledger: reversing a `moved` row moves the asset
 | `share` | `Assets/Fonts/Extras.png` | `443ec188c93046348ac9944c14715250` | png | mainMenu_.unity | pending |
 | `share` | `Assets/Fonts/Extras02.png` | `a368b91e3a57da9438f961396c80eed5` | png | mainMenu_.unity | pending |
 | `share` | `Assets/Fonts/ExtrasOn.png` | `77126be11ceea1a499e557d1014df2e2` | png | mainMenu_.unity | pending |
-| `share` | `Assets/Fonts/F_PunkRocker.ttf` | `2c4891e3984c01d478d0570943e2b569` | ttf | intro01.unity | pending |
+| `share` | `Assets/Fonts/F_PunkRocker.ttf` | `2c4891e3984c01d478d0570943e2b569` | ttf | intro01.unity | moved |
 | `share` | `Assets/Fonts/Options.png` | `8f8c7bf84fda3ef4d9889ecebde8acab` | png | mainMenu_.unity | pending |
 | `share` | `Assets/Fonts/Options02.png` | `95bdd51ebcc3a0d46ab231667d9721b6` | png | mainMenu_.unity | pending |
 | `share` | `Assets/Fonts/OptionsOn.png` | `9a8e40c116fbecd428d5247b76d31496` | png | mainMenu_.unity | pending |
@@ -85,7 +85,7 @@ since. This file is the rollback ledger: reversing a `moved` row moves the asset
 | `share` | `Assets/Terrain/Desert_Edenian_Ruins.asset` | `f3a5593e1fd643c4fb94244892f6a360` | asset | mainMenu_.unity | pending |
 | `share` | `Assets/Timelines/TL_Menu/TL_Menu.playable` | `c2bf21a228f65664e98e13e3825442e3` | playable | mainMenu_.unity | pending |
 | `share` | `Assets/Timelines/TL_intros/TIMELINE_intro00_goroWalk_BELLSEBOSS.playable` | `007909bee35aa7d42bff15ba0218e394` | playable | intro00.unity | pending |
-| `share` | `Assets/Timelines/TL_intros/TIMELINE_intro01_Text.playable` | `c4c50d88e9ad00f419c80ef8eabfd3dd` | playable | intro01.unity | pending |
+| `share` | `Assets/Timelines/TL_intros/TIMELINE_intro01_Text.playable` | `c4c50d88e9ad00f419c80ef8eabfd3dd` | playable | intro01.unity | moved |
 | `share` | `Assets/_Animations/A_Canvas/UI/MainMenu/Extras.controller` | `0a8e68df1f0f2df408189d4f43ca0cb5` | controller | mainMenu_.unity | pending |
 | `share` | `Assets/_Animations/A_Canvas/UI/MainMenu/Extras/ContainerOfExtra.anim` | `a8dd747ba6188554ca61ac3694174cdb` | anim | mainMenu_.unity | pending |
 | `share` | `Assets/_Animations/A_Canvas/UI/MainMenu/Extras/ExtrasContainer.controller` | `33439856724ebfc4d8cb85018e06f181` | controller | mainMenu_.unity | pending |
@@ -194,3 +194,17 @@ Only the cinematic was moved for WU2. The legacy fade is now a code `CanvasGroup
 
 Rollback: `AssetDatabase.MoveAsset` back to `Assets/StreamingAssets/Goro_intro00.mp4`; the GUID
 above is unchanged, so the legacy scene keeps working if it is restored.
+
+## WU3 applied moves — Intro01
+
+Both assets were moved with `AssetDatabase.MoveAsset`, so the `.meta` travelled with them and the
+GUIDs are unchanged. The legacy `intro01.unity` keeps resolving both references; the new
+`_MKRebuild/Scenes/Intro01.unity` points at the same GUIDs.
+
+| Class | Source (before) | Destination (now) | GUID | Type | Referenced by | Status |
+|---|---|---|---|---|---|---|
+| `share` | `Assets/Fonts/F_PunkRocker.ttf` | `Assets/_MKRebuild/Migrated/Intro01/Fonts/F_PunkRocker.ttf` | `2c4891e3984c01d478d0570943e2b569` | ttf | `_MKRebuild/Scenes/Intro01.unity` | moved |
+| `share` | `Assets/Timelines/TL_intros/TIMELINE_intro01_Text.playable` | `Assets/_MKRebuild/Migrated/Intro01/Timelines/TIMELINE_intro01_Text.playable` | `c4c50d88e9ad00f419c80ef8eabfd3dd` | playable | `_MKRebuild/Scenes/Intro01.unity` | moved |
+
+Rollback: reverse each row with `AssetDatabase.MoveAsset` back to the source path. The GUIDs are
+unchanged, so both the rebuilt and the legacy scene survive the reversal.
