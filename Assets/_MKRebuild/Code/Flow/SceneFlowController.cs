@@ -29,6 +29,9 @@ namespace MK.Rebuild
         [Tooltip("Ordered scene chain. Loads are rejected when the target is not listed.")]
         [SerializeField] private SceneFlow flow;
 
+        [Tooltip("Folder that holds the flow scenes. Used to resolve a scene's build index without hardcoding indices.")]
+        [SerializeField] private string sceneFolder = "Assets/_MKRebuild/Scenes";
+
         private CanvasGroup fadeGroup;
         private bool isLoading;
 
@@ -74,17 +77,50 @@ namespace MK.Rebuild
             }
 
             string current = SceneManager.GetActiveScene().name;
-            string next = flow.NextAfter(current);
+            string next = NextLoadableAfter(current);
 
             if (string.IsNullOrEmpty(next))
             {
                 Debug.LogError(
-                    $"[{nameof(SceneFlowController)}] Scene '{current}' has no successor in flow '{flow.name}'.",
+                    $"[{nameof(SceneFlowController)}] Scene '{current}' has no loadable successor in flow '{flow.name}'.",
                     this);
                 return;
             }
 
             Load(next);
+        }
+
+        /// <summary>
+        /// Walks the flow from <paramref name="current"/> until it finds a scene that is actually
+        /// in the build list. The Sync Build Settings tool already skips scenes that do not exist;
+        /// the runtime must agree, otherwise a half-migrated chain hard-errors instead of advancing.
+        /// </summary>
+        private string NextLoadableAfter(string current)
+        {
+            string next = flow.NextAfter(current);
+            int guard = flow.Scenes.Count;
+            while (!string.IsNullOrEmpty(next) && guard-- > 0)
+            {
+                if (CanLoad(next)) return next;
+
+                Debug.LogWarning(
+                    $"[{nameof(SceneFlowController)}] Skipping '{next}': not in Build Settings.",
+                    this);
+                next = flow.NextAfter(next);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// True when the scene is in the build list. Uses the build index resolved from the
+        /// scene path: <c>Application.CanStreamedLevelBeLoaded</c> always returns false in the
+        /// editor, so it cannot guard an editor play session.
+        /// </summary>
+        private bool CanLoad(string sceneName)
+        {
+            string path = sceneFolder + "/" + sceneName + ".unity";
+            return SceneUtility.GetBuildIndexByScenePath(path) >= 0;
         }
 
         /// <summary>
