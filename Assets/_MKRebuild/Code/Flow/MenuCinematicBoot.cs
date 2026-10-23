@@ -79,8 +79,12 @@ namespace MK.Rebuild
         [Tooltip("Skip action from the rebuild UI map. A during the cinematic jumps to the last frame.")]
         [SerializeField] private InputActionReference skipAction;
 
+        [Tooltip("Seconds of the timeline after which the menu becomes interactive even if the cinematic keeps playing. The 5:31 timeline is ambiance; the intro animation is over much earlier.")]
+        [SerializeField, Min(0f)] private float menuReadyTime = 12f;
+
         private bool begun;
         private Coroutine loopRoutine;
+        private Coroutine menuReadyRoutine;
 
         /// <summary>True while the cinematic is still playing (skip is allowed).</summary>
         public bool IsPlaying { get; private set; }
@@ -128,6 +132,20 @@ namespace MK.Rebuild
             IsPlaying = true;
             director.stopped += OnStopped;
             EnableSkip();
+            menuReadyRoutine = StartCoroutine(WaitForMenuReady());
+        }
+
+        /// <summary>
+        /// The 5:31 timeline is ambiance; the menu intro animation is over much earlier. Once the
+        /// timeline passes <see cref="menuReadyTime"/> the menu becomes interactive even though the
+        /// director keeps playing in the background.
+        /// </summary>
+        private IEnumerator WaitForMenuReady()
+        {
+            while (IsPlaying && director != null && director.time < menuReadyTime) yield return null;
+
+            menuReadyRoutine = null;
+            if (IsPlaying) Finish();
         }
 
         /// <summary>
@@ -143,10 +161,31 @@ namespace MK.Rebuild
             {
                 director.time = Math.Max(0d, director.duration - 0.01d);
                 director.Evaluate();
-                director.Stop();
             }
 
+            // The timeline audio dies with the director. Start the menu loop now so skipping
+            // never leaves the menu silent.
+            StartMusicLoopImmediate();
             Finish();
+        }
+
+        /// <summary>
+        /// Starts the continuity loop immediately, for the skip path where the director will not
+        /// reach the authored hand-off time.
+        /// </summary>
+        private void StartMusicLoopImmediate()
+        {
+            if (menuMusicLoop == null || menuMusicLoop.clip == null) return;
+
+            if (loopRoutine != null)
+            {
+                StopCoroutine(loopRoutine);
+                loopRoutine = null;
+            }
+
+            menuMusicLoop.playOnAwake = false;
+            menuMusicLoop.loop = true;
+            if (!menuMusicLoop.isPlaying) menuMusicLoop.Play();
         }
 
         private void OnSkip(InputAction.CallbackContext context) => Skip();
@@ -194,6 +233,12 @@ namespace MK.Rebuild
             {
                 StopCoroutine(loopRoutine);
                 loopRoutine = null;
+            }
+
+            if (menuReadyRoutine != null)
+            {
+                StopCoroutine(menuReadyRoutine);
+                menuReadyRoutine = null;
             }
         }
 

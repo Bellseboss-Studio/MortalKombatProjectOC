@@ -304,6 +304,7 @@ namespace MK.Rebuild
 
             panelOpen = true;
             panelReturn = options;
+            SetMenuInteractable(false);
             optionsPanel.Show(optionsFirst);
         }
 
@@ -327,6 +328,7 @@ namespace MK.Rebuild
 
             panelOpen = true;
             panelReturn = credits;
+            SetMenuInteractable(false);
             creditsPanel.Show(creditsPanel.Back);
         }
 
@@ -334,6 +336,7 @@ namespace MK.Rebuild
         {
             if (!panelOpen) return;
             panelOpen = false;
+            SetMenuInteractable(true);
 
             if (optionsPanel != null) optionsPanel.Hide();
             if (creditsPanel != null) creditsPanel.Hide();
@@ -343,6 +346,19 @@ namespace MK.Rebuild
                 EventSystem.current.SetSelectedGameObject(null);
                 EventSystem.current.SetSelectedGameObject(panelReturn.gameObject);
             }
+        }
+
+        /// <summary>
+        /// While a panel is open the menu buttons behind it must not be selectable: the EventSystem
+        /// keeps them in the same automatic-navigation graph, so the D-pad could jump out of the
+        /// panel and "move the menu" underneath. Extras stays disabled by design.
+        /// </summary>
+        private void SetMenuInteractable(bool value)
+        {
+            if (play != null) play.interactable = value;
+            if (options != null) options.interactable = value;
+            if (credits != null) credits.interactable = value;
+            if (quit != null) quit.interactable = value;
         }
 
         private static bool CancelPressed()
