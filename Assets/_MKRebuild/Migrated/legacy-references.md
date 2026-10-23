@@ -4,7 +4,7 @@ Read-only scan of every dependency of the `_MKRebuild` scenes and prefabs.
 Any path listed here is still outside `_MKRebuild`; the baseline is expected to
 fail before WU2-WU4 move the legacy art (the rebuild Leena prefab is the known case).
 
-- Scanned scenes: 2
+- Scanned scenes: 3
 - Scanned prefabs: 31
 - External dependencies: 44
 
