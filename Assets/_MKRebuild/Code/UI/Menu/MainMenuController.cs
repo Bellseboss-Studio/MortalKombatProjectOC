@@ -37,9 +37,26 @@ namespace MK.Rebuild
         [Tooltip("Quits the player.")]
         [SerializeField] private Button quit;
 
+        [Tooltip("Opens the Options panel.")]
+        [SerializeField] private Button options;
+
+        [Tooltip("Opens the Credits panel.")]
+        [SerializeField] private Button credits;
+
         [Header("Cinematic-only art")]
         [Tooltip("Buttons that exist for the timeline composition but have no demo behaviour.")]
         [SerializeField] private Button[] unavailable = System.Array.Empty<Button>();
+
+        [Header("Cinematic gate")]
+        [Tooltip("Menu cinematic. While it plays, A skips it and no button is selected.")]
+        [SerializeField] private MenuCinematicBoot cinematic;
+
+        [Header("Selection icon")]
+        [Tooltip("Icon that travels to the selected button (Amuleto01).")]
+        [SerializeField] private RectTransform selectionIcon;
+
+        [Tooltip("Horizontal gap between the icon and the selected button's left edge.")]
+        [SerializeField] private float iconGap = 17.31f;
 
         [Header("Controller focus")]
         [Tooltip("Frames to wait after the first selection attempt succeeds, so the canvas and the input module finish waking up.")]
@@ -50,11 +67,19 @@ namespace MK.Rebuild
 
         private Coroutine focusRoutine;
         private bool focusWarned;
+        private bool cinematicPending;
+        private bool panelOpen;
+        private MenuPanel optionsPanel;
+        private MenuPanel creditsPanel;
+        private Slider optionsFirst;
+        private Button panelReturn;
 
         private void Awake()
         {
             if (play != null) play.onClick.AddListener(Play);
             if (quit != null) quit.onClick.AddListener(Quit);
+            if (options != null) options.onClick.AddListener(OpenOptions);
+            if (credits != null) credits.onClick.AddListener(OpenCredits);
 
             for (int i = 0; i < unavailable.Length; i++)
             {
@@ -66,16 +91,35 @@ namespace MK.Rebuild
             // what turns Navigate into movement; an Explicit/None button silently ignores it.
             SetAutomaticNavigation(play);
             SetAutomaticNavigation(quit);
+            SetAutomaticNavigation(options);
+            SetAutomaticNavigation(credits);
         }
 
         private void OnEnable()
         {
             HideCursor();
+
+            if (cinematic != null && cinematic.IsPlaying)
+            {
+                cinematicPending = true;
+                cinematic.Finished += OnCinematicFinished;
+                return;
+            }
+
             focusRoutine = StartCoroutine(FocusWhenReady());
+        }
+
+        private void OnCinematicFinished()
+        {
+            cinematicPending = false;
+            if (cinematic != null) cinematic.Finished -= OnCinematicFinished;
+            if (focusRoutine == null) focusRoutine = StartCoroutine(FocusWhenReady());
         }
 
         private void OnDisable()
         {
+            if (cinematic != null) cinematic.Finished -= OnCinematicFinished;
+
             if (focusRoutine != null)
             {
                 StopCoroutine(focusRoutine);
@@ -89,13 +133,31 @@ namespace MK.Rebuild
             // OS unlocking the cursor would otherwise bring the pointer back mid-menu, and the
             // menu must never show it.
             HideCursor();
+
+            if (panelOpen)
+            {
+                if (CancelPressed()) ClosePanel();
+                return;
+            }
+
+            // While the cinematic plays, A must SKIP it, not submit the focused button. Clearing
+            // the selection is what makes the same physical button do only one thing at a time.
+            if (cinematic != null && cinematic.IsPlaying)
+            {
+                if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+                return;
+            }
+
             EnsureSelection();
+            UpdateSelectionIcon();
         }
 
         private void OnDestroy()
         {
             if (play != null) play.onClick.RemoveListener(Play);
             if (quit != null) quit.onClick.RemoveListener(Quit);
+            if (options != null) options.onClick.RemoveListener(OpenOptions);
+            if (credits != null) credits.onClick.RemoveListener(OpenCredits);
         }
 
         /// <summary>
@@ -133,6 +195,10 @@ namespace MK.Rebuild
         /// </summary>
         private IEnumerator FocusWhenReady()
         {
+            // The cinematic may start after this component's OnEnable (the boot runs in Start),
+            // so wait for it here instead of trusting the initial state.
+            while (cinematic != null && cinematic.IsPlaying) yield return null;
+
             float deadline = Time.unscaledTime + focusTimeoutSeconds;
 
             while (EventSystem.current == null || !IsActive(play))
@@ -184,11 +250,108 @@ namespace MK.Rebuild
         /// </summary>
         private void EnsureSelection()
         {
+            if (panelOpen) return;
+            if (cinematicPending) return;
             if (focusWarned) return;
             if (EventSystem.current == null) return;
             if (EventSystem.current.currentSelectedGameObject != null) return;
 
             SelectDefault();
+        }
+
+        /// <summary>
+        /// Moves the amulet icon to the selected button's left edge. The icon and the buttons share
+        /// the same parent, so anchored positions are comparable; a panel button (different parent)
+        /// leaves the icon where it was instead of teleporting it into the panel.
+        /// </summary>
+        private void UpdateSelectionIcon()
+        {
+            if (panelOpen) return;
+            if (selectionIcon == null) return;
+
+            GameObject selected = EventSystem.current != null
+                ? EventSystem.current.currentSelectedGameObject
+                : null;
+            var target = selected != null ? selected.GetComponent<RectTransform>() : null;
+            if (target == null || target.parent != selectionIcon.parent) return;
+
+            float leftEdge = target.anchoredPosition.x - target.rect.width * target.pivot.x;
+            selectionIcon.anchoredPosition = new Vector2(leftEdge - iconGap, target.anchoredPosition.y);
+        }
+
+        /// <summary>
+        /// Opens the Options panel. The sliders write straight to <see cref="AudioDirector"/>'s
+        /// static volume API, so the change is audible immediately and persists across scenes.
+        /// </summary>
+        private void OpenOptions()
+        {
+            if (panelOpen) return;
+
+            if (optionsPanel == null)
+            {
+                optionsPanel = MenuPanel.Create("OPCIONES", transform);
+                optionsFirst = MenuPanel.CreateSlider(
+                    optionsPanel.Content, "MASTER", AudioListener.volume,
+                    new Vector2(0f, 90f), value => AudioListener.volume = value);
+                MenuPanel.CreateSlider(
+                    optionsPanel.Content, "MÚSICA", AudioDirector.MusicVolume,
+                    new Vector2(0f, 0f), value => AudioDirector.MusicVolume = value);
+                MenuPanel.CreateSlider(
+                    optionsPanel.Content, "SFX", AudioDirector.SfxVolume,
+                    new Vector2(0f, -90f), value => AudioDirector.SfxVolume = value);
+                optionsPanel.Back.onClick.AddListener(ClosePanel);
+            }
+
+            panelOpen = true;
+            panelReturn = options;
+            optionsPanel.Show(optionsFirst);
+        }
+
+        /// <summary>Opens the Credits panel. The text is intentionally simple and editable here.</summary>
+        private void OpenCredits()
+        {
+            if (panelOpen) return;
+
+            if (creditsPanel == null)
+            {
+                creditsPanel = MenuPanel.Create("CRÉDITOS", transform);
+                MenuPanel.CreateBody(
+                    creditsPanel.Content,
+                    "MORTAL KOMBAT PROJECT OC\n\n" +
+                    "Demo técnica del rebuild.\n\n" +
+                    "Un homenaje fan-made, sin fines comerciales.\n\n" +
+                    "Programación y diseño: Bellseboss Studio\n" +
+                    "Personajes: NetherRealm Studios / Warner Bros.");
+                creditsPanel.Back.onClick.AddListener(ClosePanel);
+            }
+
+            panelOpen = true;
+            panelReturn = credits;
+            creditsPanel.Show(creditsPanel.Back);
+        }
+
+        private void ClosePanel()
+        {
+            if (!panelOpen) return;
+            panelOpen = false;
+
+            if (optionsPanel != null) optionsPanel.Hide();
+            if (creditsPanel != null) creditsPanel.Hide();
+
+            if (EventSystem.current != null && panelReturn != null)
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+                EventSystem.current.SetSelectedGameObject(panelReturn.gameObject);
+            }
+        }
+
+        private static bool CancelPressed()
+        {
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) return true;
+
+            var gamepad = UnityEngine.InputSystem.Gamepad.current;
+            return gamepad != null && gamepad.buttonEast.wasPressedThisFrame;
         }
 
         private static bool IsActive(Button button)

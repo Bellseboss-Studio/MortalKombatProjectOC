@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.Playables;
 using UnityEngine.Timeline;
 
@@ -74,8 +75,18 @@ namespace MK.Rebuild
         [Tooltip("Fallback start time if the music clip cannot be discovered from the timeline.")]
         [SerializeField, Min(0f)] private float fallbackMusicLoopStart = 108.8f;
 
+        [Header("Skip")]
+        [Tooltip("Skip action from the rebuild UI map. A during the cinematic jumps to the last frame.")]
+        [SerializeField] private InputActionReference skipAction;
+
         private bool begun;
         private Coroutine loopRoutine;
+
+        /// <summary>True while the cinematic is still playing (skip is allowed).</summary>
+        public bool IsPlaying { get; private set; }
+
+        /// <summary>Raised once when the cinematic ends naturally or is skipped.</summary>
+        public event Action Finished;
 
         /// <summary>
         /// Rebinds every output, resolves the shot camera and starts the cinematic. Idempotent
@@ -90,12 +101,14 @@ namespace MK.Rebuild
             if (director == null)
             {
                 Debug.LogWarning($"[{nameof(MenuCinematicBoot)}] No PlayableDirector assigned; the menu stays static.", this);
+                Finished?.Invoke();
                 return;
             }
 
             if (director.playableAsset == null)
             {
                 Debug.LogWarning($"[{nameof(MenuCinematicBoot)}] The PlayableDirector has no TimelineAsset; the menu stays static.", this);
+                Finished?.Invoke();
                 return;
             }
 
@@ -111,6 +124,57 @@ namespace MK.Rebuild
             director.Play();
 
             StartMusicLoop();
+
+            IsPlaying = true;
+            director.stopped += OnStopped;
+            EnableSkip();
+        }
+
+        /// <summary>
+        /// Jumps the cinematic to its last frame and stops it. The menu controller waits for
+        /// <see cref="Finished"/> before selecting a button, so A during the intro only skips and
+        /// never activates Play by accident.
+        /// </summary>
+        public override void Skip()
+        {
+            if (!IsPlaying) return;
+
+            if (director != null && director.playableAsset != null)
+            {
+                director.time = Math.Max(0d, director.duration - 0.01d);
+                director.Evaluate();
+                director.Stop();
+            }
+
+            Finish();
+        }
+
+        private void OnSkip(InputAction.CallbackContext context) => Skip();
+
+        private void OnStopped(PlayableDirector stoppedDirector) => Finish();
+
+        /// <summary>Single exit for "the cinematic is over", whether it ended or was skipped.</summary>
+        private void Finish()
+        {
+            if (!IsPlaying) return;
+            IsPlaying = false;
+
+            if (director != null) director.stopped -= OnStopped;
+            DisableSkip();
+            Finished?.Invoke();
+        }
+
+        private void EnableSkip()
+        {
+            if (skipAction == null || skipAction.action == null) return;
+            skipAction.action.performed += OnSkip;
+            skipAction.action.Enable();
+        }
+
+        private void DisableSkip()
+        {
+            if (skipAction == null || skipAction.action == null) return;
+            skipAction.action.performed -= OnSkip;
         }
 
         /// <summary>
@@ -124,6 +188,8 @@ namespace MK.Rebuild
 
         private void OnDestroy()
         {
+            DisableSkip();
+
             if (loopRoutine != null)
             {
                 StopCoroutine(loopRoutine);

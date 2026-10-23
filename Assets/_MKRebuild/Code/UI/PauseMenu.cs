@@ -40,6 +40,7 @@ namespace MK.Rebuild
         private Text title;
         private Button resumeButton;
         private Button restartButton;
+        private Button mainMenuButton;
 
         private PlayerMotor motor;
         private BodyOwnership.Token bodyToken;
@@ -172,6 +173,27 @@ namespace MK.Rebuild
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
+        /// <summary>
+        /// Leaves the run and returns to the main menu through the flow. Closes the card first so
+        /// the panel cannot survive the load if activation is deferred by a frame.
+        /// </summary>
+        public void ReturnToMenu()
+        {
+            Close();
+
+            GameFlowController flow = GameFlowController.Instance;
+            if (flow != null)
+            {
+                flow.ReturnToMainMenu();
+                return;
+            }
+
+            // Fallback: same sequence as GameFlowController.ReturnToMainMenu.
+            ControlLock.Reset();
+            AudioListener.pause = false;
+            SceneManager.LoadScene("MainMenu_");
+        }
+
         private void ReleaseGameplay()
         {
             if (motor != null && bodyToken != null)
@@ -274,6 +296,9 @@ namespace MK.Rebuild
             Button restart = CreateButton(panel.transform, "Restart", "RESTART", new Vector2(0f, -120f));
             restart.onClick.AddListener(Restart);
             restartButton = restart;
+
+            mainMenuButton = CreateButton(panel.transform, "MainMenu", "MENÚ PRINCIPAL", new Vector2(0f, -240f));
+            mainMenuButton.onClick.AddListener(ReturnToMenu);
         }
 
         /// <summary>

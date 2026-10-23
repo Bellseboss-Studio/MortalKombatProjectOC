@@ -410,10 +410,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.MainMenuController
   play: {fileID: 7408765517443738457}
   quit: {fileID: 7408765517971350211}
+  options: {fileID: 7408765517058258921}
+  credits: {fileID: 7408765518533558006}
   unavailable:
-  - {fileID: 7408765517058258921}
   - {fileID: 7408765518703617595}
-  - {fileID: 7408765518533558006}
+  cinematic: {fileID: 250688796}
+  selectionIcon: {fileID: 7408765518756498911}
+  iconGap: 17.31
   focusSettleFrames: 1
   focusTimeoutSeconds: 5
 --- !u!114 &250688796
@@ -465,6 +468,7 @@ MonoBehaviour:
     target: {fileID: 438222526}
   menuMusicLoop: {fileID: 261268044}
   fallbackMusicLoopStart: 108.8
+  skipAction: {fileID: 11400000, guid: 1ce19431ba17f1c41a24a7d481ad393a, type: 2}
 --- !u!4 &250688797
 Transform:
   m_ObjectHideFlags: 0

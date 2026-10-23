@@ -172,6 +172,27 @@ namespace MK.Rebuild
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
+        /// <summary>
+        /// Returns to the main menu through the persistent scene flow. This is the only
+        /// "leave the run" path: it stops any beat, resets the lock/audio and lets the flow
+        /// controller own the load (with its missing-scene guard).
+        /// </summary>
+        public void ReturnToMainMenu()
+        {
+            if (cinematics != null) cinematics.Stop();
+
+            ControlLock.Reset();
+            AudioListener.pause = false;
+
+            if (SceneFlowController.Instance != null)
+            {
+                SceneFlowController.Instance.Load("MainMenu_");
+                return;
+            }
+
+            SceneManager.LoadScene("MainMenu_");
+        }
+
         // --- State machinery -------------------------------------------------
 
         /// <summary>
