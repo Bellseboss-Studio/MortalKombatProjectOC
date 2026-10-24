@@ -1,6 +1,7 @@
 using System;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
-using Cinemachine;
+using Unity.Cinemachine;
 
 public interface ICameraTrigger
 {

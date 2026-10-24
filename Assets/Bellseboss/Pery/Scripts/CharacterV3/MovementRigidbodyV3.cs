@@ -1,5 +1,6 @@
 using System;
-using Cinemachine;
+using _Scripts.Player;
+using Unity.Cinemachine;
 using UnityEngine;
 using Bellseboss.Pery.Scripts.Input;
 public class MovementRigidbodyV3 : MonoBehaviour
@@ -113,7 +114,7 @@ public class MovementRigidbodyV3 : MonoBehaviour
         }
 
         var resultMovement = _inputMovementCustom.CalculateMovement(result, _choiceMax ? _speedRun : _speedWalk,
-            _camera, _rigidbody.gameObject);
+            _camera, _rigidbody.gameObject, _jump);
 
         if (_jump)
         {
@@ -125,14 +126,14 @@ public class MovementRigidbodyV3 : MonoBehaviour
         }
         if (floorController.IsTouchingFloor())
         {
-            _rigidbody.velocity = new Vector3(resultMovement.x, _rigidbody.velocity.y, resultMovement.z);
+            _rigidbody.linearVelocity = new Vector3(resultMovement.x, _rigidbody.linearVelocity.y, resultMovement.z);
         }
-        if (_rigidbody.velocity.y > 0)
+        if (_rigidbody.linearVelocity.y > 0)
         {
             isUp = true;
             isFall = false;
         }
-        else if (_rigidbody.velocity.y < 0 && !floorController.IsTouchingFloor())
+        else if (_rigidbody.linearVelocity.y < 0 && !floorController.IsTouchingFloor())
         {
             isFall = true;
             isUp = false;
@@ -167,12 +168,12 @@ public class MovementRigidbodyV3 : MonoBehaviour
 
     public float GetVelocity()
     {
-        return _rigidbody.velocity.magnitude / 10;
+        return _rigidbody.linearVelocity.magnitude / 10;
     }
 
     public void AddForce(Vector3 runningDirection, float runningDistance, AttackMovementSystem.TypeOfAttack typeOfAttack)
     {
-        _rigidbody.velocity = Vector3.zero;
+        _rigidbody.linearVelocity = Vector3.zero;
         Vector3 globalDirection = transform.TransformDirection(runningDirection.normalized);
         //Debug.Log($"MovementRigidbodyV2: AddForce: {globalDirection} - {runningDistance}");
         //_rigidbody.AddForce(globalDirection * runningDistance, ForceMode.Impulse);
@@ -187,7 +188,7 @@ public class MovementRigidbodyV3 : MonoBehaviour
 
     public Vector3 GetVelocityV3()
     {
-        return _rigidbody.velocity;
+        return _rigidbody.linearVelocity;
     }
 
     public void Jump()

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 14af27324c2d2ad429fde32a1e3d3fda, type: 3}
+  m_Name: Enemy_Tirador
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.EnemyDefinition
+  id: enemy_tirador
+  maxHp: 25
+  moveSpeed: 3.5
+  aggroRadius: 16
+  turnSpeed: 720
+  attackRange: 7
+  attackDamage: 10
+  attackTell: 0.5
+  attackRecovery: 0.2
+  attackCooldown: 3
+  poiseThreshold: 1
+  staggerDuration: 0.2
+  deathDelay: 0.35
+  attackKind: 2
+  chargeStartRange: 8
+  chargeSpeed: 10
+  chargeDistance: 6
+  chargeOvershoot: 2
+  chargeHitRadius: 1
+  preferredDistance: 4
+  rangedMinDistance: 3
+  rangedMaxDistance: 6
+  projectileSpeed: 5
+  projectileLifetime: 3
+  projectileRadius: 0.25
+  maxProjectilesInFlight: 3
+  backstabCone: 60
+  stalkDistance: 2.5
+  fleeDuration: 2

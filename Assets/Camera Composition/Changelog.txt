@@ -1,0 +1,21 @@
+**************************************
+CHANGELOG
+**************************************
+1.0.2
+- fix issue where builds fail when UnityEditor namespace cannot be found
+- Add Cinemachine camera support to Target Camera field with generic "GameObject" type
+
+1.0.1
+- fix issue where Target Camera is reset to "None" when entering Play Mode
+- modify Target Camera field from "GameObject" to "Camera" type
+  for easier camera selection from the editor window
+
+1.0.0
+- initial release on the Unity Asset Store
+- includes rule of thirds, diagonal, golden ratio and golden spira
+  overlay grid images with demo scenes
+- rotation buttons to adjust golden spiral orientation
+- overlay grid color can be rendered in white or black colors
+- override grid overlays on/off state with "Turn Off All Grids" button
+- target camera selection for position/rotation changes with Edit > Undo support
+- "Align Camera With Scene View" button with "Revert" function

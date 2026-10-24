@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
 
@@ -11,6 +12,7 @@ public class EnemyFactoryMonoV2 : MonoBehaviour
     [SerializeField] private GameObject positionToCreate;
     [SerializeField] private GameObject[] pathToFollow;
     private List<EnemyV2> _enemies = new List<EnemyV2>();
+    private List<EnemyV2> _enemiesDead = new List<EnemyV2>();
     [SerializeField] private bool allEnemiesAreDead;
     public List<EnemyV2> Enemies => _enemies;
 
@@ -41,6 +43,7 @@ public class EnemyFactoryMonoV2 : MonoBehaviour
         var allDead = _enemies.TrueForAll(enemy => enemy.IsDead);
         Debug.Log($"AllEnemiesAreDead {allDead}");
         _enemies.Remove(enemy);
+        _enemiesDead.Add(enemy);
         if (allDead)
         {
             allEnemiesAreDead = true;
@@ -70,5 +73,24 @@ public class EnemyFactoryMonoV2 : MonoBehaviour
         {
             enemyV2.IntoToNearZone(b);
         }
+    }
+
+    public void Clean()
+    {
+        foreach (var enemyV2 in _enemies)
+        {
+            enemyV2.OnDead -= OnEnemyDead;
+            enemyV2.Clean();
+            Destroy(enemyV2.gameObject);
+        }
+        _enemies.Clear();
+        foreach (var enemyV2 in _enemiesDead)
+        {
+            enemyV2.OnDead -= OnEnemyDead;
+            enemyV2.Clean();
+            Destroy(enemyV2.gameObject);
+        }
+        _enemiesDead.Clear();
+        allEnemiesAreDead = false;
     }
 }

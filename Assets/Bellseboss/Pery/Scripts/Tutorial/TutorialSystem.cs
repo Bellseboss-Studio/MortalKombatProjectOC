@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using Bellseboss.Pery.Scripts.Input;
+using _Scripts.Player;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -13,6 +13,8 @@ public class TutorialSystem : MonoBehaviour
     private TeaTime _flow;
     private bool _allFinished;
     private CharacterV2 _character;
+    private bool _skip;
+    private bool _canSkip;
 
     private void Start()
     {
@@ -23,23 +25,35 @@ public class TutorialSystem : MonoBehaviour
                 activable.Activate();
             }
 
+            _skip = false;
             _character?.DisableControls();
         }).Loop(h =>
         {
+            _canSkip = true;
             _allFinished = true;
             foreach (var unused in activables.Where(actionable => !actionable.IsFinished))
             {
                 _allFinished = false;
             }
 
-            if (_allFinished)
+            if (_allFinished || _skip)
             {
                 h.Break();
             }
         }).Add(() => { _character?.EnableControls(); }).Add(() =>
         {
-            _character = null; isFinished = true;
+            if (_skip)
+            {
+                foreach (var activable in activables)
+                {
+                    activable.Deactivate();
+                }
+            }
+
+            _character = null;
+            isFinished = true;
             OnFinish?.Invoke();
+            _canSkip = false;
         });
         OnStart?.Invoke();
     }
@@ -56,5 +70,14 @@ public class TutorialSystem : MonoBehaviour
     public void StartTutorial()
     {
         _flow.Play();
+    }
+
+    public void Skip()
+    {
+        if (_canSkip)
+        {
+            // Debug.Log($"Skip tutorial from {gameObject.transform.parent.name}");
+            _skip = true;
+        }
     }
 }

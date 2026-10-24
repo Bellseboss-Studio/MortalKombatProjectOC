@@ -39,8 +39,8 @@ namespace View.Characters
             {
                 instantiate.transform.rotation = RotatingLocal(target.transform.position - transform.position);
             }*/
-            if (rb.velocity == Vector3.zero) return;
-            instantiate.transform.rotation = RotatingLocal(rb.velocity);
+            if (rb.linearVelocity == Vector3.zero) return;
+            instantiate.transform.rotation = RotatingLocal(rb.linearVelocity);
         }
 
         protected override void ConfigureExplicit()

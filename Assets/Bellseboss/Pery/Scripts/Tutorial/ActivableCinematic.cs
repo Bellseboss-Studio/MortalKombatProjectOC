@@ -17,4 +17,10 @@ public class ActivableCinematic : ActivableTutorial
         yield return new WaitForSeconds((float)playableDirector.duration);
         Finish();
     }
+
+    public override void Deactivate()
+    {
+        //change the time and play the last frame
+        playableDirector.time = (float)playableDirector.duration;
+    }
 }

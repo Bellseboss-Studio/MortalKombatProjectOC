@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11e1199f2f6dff94894117e5421a0782, type: 3}
+  m_Name: Ability_H2
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.AbilityDefinition
+  id: ABIL_H2
+  cooldown: 1.2
+  dano: 12
+  clip: {fileID: 7400000, guid: 40e5a712e2d414740ac780e198111d2e, type: 2}
+  hitNorm: {x: 0.2, y: 0.8}
+  hits: 1
+  effectRef: {fileID: 0}
+  projectileSpeed: 0
+  projectileLifetime: 0
+  projectileRadius: 0
+  muzzleOffset: {x: 0, y: 0, z: 0}
+  areaRadius: 2.2
+  clipSpeedMultiplier: 2
+  rootMovement: 0
+  cancelNorm: {x: 0.5, y: 0.9}

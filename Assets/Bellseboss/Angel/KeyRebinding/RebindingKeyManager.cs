@@ -32,7 +32,7 @@ namespace Bellseboss.Angel.KeyRebinding
         {
 
             _isOpen = !_isOpen;
-            content.SetActive(_isOpen);
+            /*content.SetActive(_isOpen);*/
             if (_isOpen)
             {
                 foreach (var reference in moveRef)

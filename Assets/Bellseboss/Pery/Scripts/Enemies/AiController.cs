@@ -1,9 +1,10 @@
 using System;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
 using View;
 
-internal class AiController : MonoBehaviour, IAiController
+internal class AiController : MonoBehaviour
 {
     [SerializeField] private float timeToWaitToChangePath;
     private IEnemyV2 _enemy;
@@ -62,7 +63,7 @@ internal class AiController : MonoBehaviour, IAiController
         _enemy.OnPlayerInNearZone += isNear =>
         {
             if (_isDeath) return;
-            Debug.Log("entro is near");
+            // Debug.Log("entro is near");
             enemy.GetPlayer().GetIntoEnemyZone(gameObject, isNear);
             if(isNear)
             {
@@ -131,7 +132,7 @@ internal class AiController : MonoBehaviour, IAiController
             }
             else
             {
-                _enemy.TriggerAnimation("watch");
+                _enemy.GetAnimatorController().PlayWatch();
                 _enemy.RotateToTargetIdle(_target, false);
             }
         }).Add(timeToWaitToChangePath).Add(() =>
@@ -192,7 +193,7 @@ internal class AiController : MonoBehaviour, IAiController
         }).Add(() =>
         {
             _enemy.CanMove(false);
-            _enemy.TriggerAnimation("dead");
+            _enemy.GetAnimatorController().PlayDeath();
         }).Add(() =>
         {
             _enemy.Died();
@@ -208,7 +209,7 @@ internal class AiController : MonoBehaviour, IAiController
 
     private void EnemyOnOnDead(EnemyV2 obj)
     {
-        Debug.Log("AiController: Enemy is dead");
+        // Debug.Log("AiController: Enemy is dead");
         _isDeath = true;
         /*_enemy.CanRotate(false);*/
         _died.Play();
@@ -224,7 +225,12 @@ internal class AiController : MonoBehaviour, IAiController
         
     }
 
-    public void Fatality()
+    public void StopAI()
+    {
+        
+    }
+
+    public void Clean()
     {
         
     }

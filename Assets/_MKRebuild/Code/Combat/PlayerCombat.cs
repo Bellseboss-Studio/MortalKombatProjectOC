@@ -1,0 +1,1458 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace MK.Rebuild
+{
+    /// <summary>
+    /// M1 slice-2 combat controller: data-driven COMBO chaining on top of the
+    /// slice-1 grey-box engine. Reads the generated <see cref="PlayerInput"/>
+    /// actions and either runs the single grey-box attack (<see cref="AttackDefinition"/>,
+    /// kept as the standalone fallback) or a <see cref="ComboDefinition"/> chain:
+    /// one combo at a time, steps advanced by input within the step's cancel window.
+    ///
+    /// Combo flow (decisions b/d/f): a 0.15 s UNSCALED input buffer (jumpBuffer
+    /// pattern) keyed by button; the controller drives the REAL attack clips via
+    /// <c>Animator.CrossFade</c> to the <c>Attack_P{n}</c> states pushed through the
+    /// dedicated <c>AttackStep</c> param (NEVER the MoveState enum — the AnyState
+    /// <c>MoveState != 0</c> would hijack new values). Hits are timed by normalized
+    /// windows (<c>hitNorm × duracion / speedMultiplier</c>), NEVER by Animation Events. The step ends
+    /// on whiff (no buffered input in whiff window) or on the finisher
+    /// (<c>siguiente.paso == -1</c>): both release <c>AttackStep = 0</c> and let the
+    /// controller's landing-mirror exits return to locomotion.
+    ///
+    /// Hit-cancel: <c>cancelHitNorm</c> (wider) applies when the step connected;
+    /// <c>cancelNorm</c> (narrower) on whiff. Hitstop (decision h): acquires and
+    /// releases a <see cref="ControlLock"/> Hitstop handle, so the scale restored on
+    /// expiry is whatever the stack says — never a stale saved value (debug F6 base).
+    /// Swing timing is SCALED (hitstop freezes the swing); the hitstop countdown,
+    /// the input buffer and the victim feedback run UNSCALED.
+    ///
+    /// Dash-cancel (slice 3septies): an attack pressed while the DASH holds the movement
+    /// lock does NOT wait for the dash to end. Past <c>PlayerDash.minCancelTime</c> it calls
+    /// <see cref="PlayerDash.TryCancelByAttack"/>, cuts the dash short and starts the attack
+    /// the SAME frame (dash-cancel into attack). Before that window the press is buffered
+    /// (held while the lock) and fires at the dash-end handoff — the 3sexies path is the fallback.
+    ///
+    /// Dash-attack opener (slice 3octies): an attack DURING a dash or within
+    /// <c>dashAttackWindow</c> after it runs the dedicated <c>dashAttack</c> combo FIRST
+    /// (its OWN clip slot + hit data + lunge); its <c>siguiente</c> then chains into the
+    /// NORMAL combo roots (GolpeDeDash -> Golpe -> Golpe...). Outside the window the attack
+    /// is normal. The opener's visual is a DORMANT slot (Attack_Dash state), entered only
+    /// once a clip is assigned to the step — with no clip it never freezes the pose.
+    /// </summary>
+    [DisallowMultipleComponent]
+    [RequireComponent(typeof(Rigidbody))]
+    public sealed class PlayerCombat : MonoBehaviour
+    {
+        [Tooltip("Light attack definition (gamepad X / mouse left). Fallback when no combo or the combo does not start on light.")]
+        [SerializeField] private AttackDefinition lightAttack;
+
+        [Tooltip("Heavy attack definition (gamepad Y / mouse right). Fallback when no combo or the combo does not start on heavy.")]
+        [SerializeField] private AttackDefinition heavyAttack;
+
+        [Tooltip("Combo chains (data-driven, multi-root). Each combo's root is its step 0 input; when several combos match a press, the LONGEST chain wins (input-prefix rule): L→Combo_1 (L→L→P), P→Combo_H, etc. Any combo can be tested alone by assigning only it.")]
+        [SerializeField] private ComboDefinition[] combos = new ComboDefinition[0];
+
+        [Tooltip("DASH-ATTACK OPENER (slice 3octies): a dedicated combo whose FIRST step is the attack that comes out of a dash (its OWN clip slot + hit data + lunge). When an attack starts during a dash or within dashAttackWindow after it, this runs FIRST; its 'siguiente' then chains into the NORMAL combo roots (GolpeDeDash -> Golpe -> Golpe...). Null = no opener (attacks always use the normal roots).")]
+        [SerializeField] private ComboDefinition dashAttack;
+
+        [Tooltip("Unscaled SECONDS after a dash during which the first attack counts as the dash-attack opener. 0 = only while the dash runs. Default 0.35 ~ the dash duration.")]
+        [SerializeField] private float dashAttackWindow = 0.35f;
+
+        [Tooltip("Soft trajectory corrector (aim-assist): at attack entry, turn the facing toward the nearest alive target inside the frontal cone + range. Drags lunge + hitbox (single point: visual.Facing). Null/disabled = forward-only (current behavior).")]
+        [SerializeField] private AimAssistDefinition aimAssist;
+
+        [Tooltip("LIVE COMBAT TUNING source (DebugWindow F1 sliders): attack speed / reach / hitstop / cancel-start scales and the victim-cap override. Null = fall back to the PlayerMotor's own params asset, so the sliders work even when this slot is empty.")]
+        [SerializeField] private PlayerParams paramsAsset;
+
+        // Active combo (the one currently running), resolved by SelectRoot at entry.
+        private ComboDefinition activeCombo;
+
+        // Dash-attack opener state (slice 3octies): true while the active combo IS the
+        // opener. PlayAttackVisual routes to the dormant Attack_Dash clip slot, and
+        // TryAdvanceOnBuffer chains into the NORMAL combo roots instead of by index.
+        private bool dashAttackActive;
+
+        [Tooltip("CrossFade duration (seconds) used to enter every attack state (decision b, ~0.1).")]
+        [SerializeField] private float crossFadeDuration = 0.1f;
+
+        [Tooltip("Input buffer in SECONDS (decision d, 0.15). UNSCALED: survives hitstop timeScale = 0.")]
+        [SerializeField] private float inputBufferSeconds = 0.15f;
+
+        private PlayerInput input;
+        private Rigidbody rb;
+        private ICharacterVisual visual;
+        private PlayerMotor motor;
+        private PlayerDash dash;
+        private Transform cameraTransform; // reference frame for the facing-relative stick
+
+        // One-shot taps submitted out-of-band (editor smoke driver / future
+        // menu or demo hooks). Consumed by the next Update as if pressed this frame.
+        private bool queuedLightTap;
+        private bool queuedHeavyTap;
+        private bool queuedDashTap;
+        // Ability input seam (m1-abilities): one-shot Skill taps queued out-of-band
+        // (editor smoke driver) + the sibling ability runner. ConsumeSkillTap is the
+        // SINGLE consumer, so PlayerAbilities stays the ability owner.
+        private bool queuedSkill1Tap;
+        private bool queuedSkill2Tap;
+        private PlayerAbilities abilities;
+
+        // Grey-box fallback swing (slice 1, one at a time).
+        private AttackDefinition current;
+        private float swingTime;                 // scaled seconds into the swing
+        private readonly HashSet<HitReceiver> hitThisSwing = new HashSet<HitReceiver>();
+
+        // Aim-assist runtime (m1-aim-assist): the XZ direction to turn toward at
+        // attack entry + the seconds left of the entry correction window. Zero
+        // direction = no active correction. SetFacing is incremental, so the
+        // corrector ITERATES over the swing opening instead of one snap.
+        private Vector3 aimDir;
+        private float aimCorrectRemaining;
+
+        // Within-step lunge COMMIT (target-switch iteration): the world XZ direction the
+        // active step's lunge was committed to at step entry (the soft-locked target, or
+        // the facing when there was none). ApplyLunge uses THIS instead of the live facing
+        // so the body can re-orient between steps without the lunge drifting mid-step.
+        private Vector3 lungeDir;
+
+        // Reused candidate buffer for the step probe (combat honesty): the probe collects
+        // the receivers that pass the vertical band + forward filter BEFORE hitting, then
+        // applies the targeting policy (up to maxTargets victims, best-aligned first).
+        // Never allocates per frame.
+        private readonly List<HitReceiver> probeCandidates = new List<HitReceiver>(8);
+
+        // Combo state (decision b: one combo at a time).
+        private bool comboActive;
+        private int stepIndex = -1;             // index into combo.steps
+        private ComboStep currentStep;          // struct copy of the active step
+        private BodyOwnership.Token attackToken; // body-ownership token for moveLock steps
+        private float stepTime;                 // scaled seconds into the step
+        private bool connectedThisStep;         // hit landed this step -> wider cancel
+        private readonly HashSet<HitReceiver> hitThisStep = new HashSet<HitReceiver>();
+
+        // Input taps (unscaled timers, jumpBuffer pattern keyed by button).
+        private float lightBuffer;
+        private float heavyBuffer;
+
+        // Direction (relative to the facing) classified at the PRESS frame and carried
+        // with the buffer, so a mid-combo branch matches the direction the player pressed
+        // even if the stick is released before the cancel window opens (follow-up slice).
+        private AttackDirection bufferedDirection;
+
+        // ROOT VARIANT "FLICK" GATE: a stick direction held longer than
+        // PlayerParams.directionFlickWindow is ordinary movement, not a deliberate
+        // variant input. Walking toward the enemy with the stick held must keep the
+        // neutral combo; only a fresh flick selects Forward/Side/Back roots.
+        private AttackDirection heldDirection = AttackDirection.Neutral;
+        private float heldDirectionTime;
+
+        // Hitstop state.
+        private float hitstopRemaining;                    // unscaled seconds left frozen
+        private ControlLock.Handle hitstopHandle;          // lock token owned by this freeze
+
+        private bool warnedMissingDefinition;
+        private AudioCueId hitCue = AudioCueId.LightHit;
+
+        /// <summary>True while a swing or a combo step is active (read-only debug seam).</summary>
+        public bool Attacking => current != null || comboActive;
+
+        /// <summary>Definition of the active grey-box swing, null when idle (read-only debug seam).</summary>
+        public AttackDefinition CurrentAttack => current;
+
+        /// <summary>Index of the active combo step, -1 when not in a combo (read-only debug seam).</summary>
+        public int CurrentStepIndex => stepIndex;
+
+        /// <summary>True while the active combo is the DASH-ATTACK opener (read-only debug seam).</summary>
+        public bool DashAttackActive => dashAttackActive;
+
+        /// <summary>
+        /// True while the hitstop freeze is active (timeScale = 0). Seam for the dash:
+        /// "dash cancela TODO salvo hitstop propio" — the dash must NOT fire during the
+        /// freeze (decision f guard).
+        /// </summary>
+        public bool IsHitstopped => hitstopRemaining > 0f;
+
+        /// <summary>
+        /// Ability cancel-window seam (change ability-cancel-window): true while a real
+        /// COMBO is active AND its current step is PAST its cancel point — the earliest
+        /// frame the player may interrupt it (on a connected hit the window opens earlier
+        /// via <c>cancelHitNorm</c>, so the ability can cancel right after the strike
+        /// lands). <see cref="PlayerAbilities"/> reads this to cancel the step and play
+        /// the STANDALONE ability, mirroring how the dash cancels a combo. False when idle
+        /// and for the grey-box single swing (which has no cancel window).
+        /// </summary>
+        public bool CanCancelIntoAbility()
+        {
+            if (!comboActive) return false;
+            CancelWindowBounds(out float cancelStart, out float _);
+            return stepTime >= cancelStart;
+        }
+
+        /// <summary>
+        /// Aim-assist tuning used by the ATTACK entry (read-only debug seam). The dash
+        /// has its OWN definition now (<c>PlayerDash.dashAimAssist</c>), so the attack and
+        /// the dash tune their range/cone independently. Null / disabled = forward-only.
+        /// </summary>
+        public AimAssistDefinition AimAssistDef => aimAssist;
+
+        /// <summary>
+        /// Style-meter seam (slice style-meter): fired ONCE per newly connected
+        /// receiver with the move-key <c>comboAssetName#stepIndex</c> (e.g.
+        /// <c>Combo_1#2</c>, opener <c>Combo_DashAttack#0</c>, grey-box fallback
+        /// <c>Attack_Light#0</c>). Additive — no behavior change; nobody listening
+        /// means nobody notices.
+        /// </summary>
+        public event Action<string> OnStepConnected;
+
+        private void Awake()
+        {
+            rb = GetComponent<Rigidbody>();
+            visual = GetComponent<ICharacterVisual>();
+            motor = GetComponent<PlayerMotor>();
+            dash = GetComponent<PlayerDash>();
+            abilities = GetComponent<PlayerAbilities>(); // sibling ability runner (m1-abilities)
+            input = new PlayerInput();
+            RefreshCamera();
+        }
+
+        private void RefreshCamera()
+        {
+            // Prefer the owned rig's basis (the authored vcam) over the tagged camera:
+            // the rig is the deterministic contract, Camera.main is only a safety net.
+            var rig = FindFirstObjectByType<CameraRig>();
+            if (rig != null && rig.Basis != null)
+            {
+                cameraTransform = rig.Basis;
+                return;
+            }
+
+            var cam = Camera.main;
+            cameraTransform = cam != null ? cam.transform : null;
+        }
+
+        private void OnEnable()
+        {
+            if (input == null) input = new PlayerInput();
+            input.Player.Enable();
+        }
+
+        private void OnDisable()
+        {
+            if (input != null) input.Player.Disable();
+            ReleaseAttackToken(); // never leave a stale attack token
+            ReleaseHitstop();     // a disabled combat component must not pin the time lock
+        }
+
+        private void OnDestroy()
+        {
+            ReleaseHitstop();     // domain/scene teardown must not leave Time.timeScale at 0
+            if (input != null) input.Dispose();
+        }
+
+        private void Update()
+        {
+            // Hitstop owns the frame: consume unscaled time, release the time lock on
+            // expiry, and ignore new input while frozen. The input buffers do NOT decay
+            // here either — they survive the freeze (decision d).
+            if (hitstopRemaining > 0f)
+            {
+                hitstopRemaining -= Time.unscaledDeltaTime;
+                if (hitstopRemaining <= 0f)
+                {
+                    hitstopRemaining = 0f;
+                    ControlLock.Release(hitstopHandle);
+                    hitstopHandle = null;
+                }
+                return;
+            }
+
+            // Unscaled buffer decay (jumpBuffer pattern): a tap survives ~0.15 s.
+            // EXCEPT while the DASH owns the body (idle + dash token + no combo):
+            // the attack pressed mid-dash is HELD (no decay) so it fires the instant the dash
+            // ends — dash -> attack -> combo. Combo steps are UNAFFECTED: their own 0.15 s
+            // step buffer keeps decaying (comboActive skips this hold).
+            bool dashHoldsInput = motor != null && motor.BodyOwner == BodyPriority.Dash && !comboActive;
+            if (!dashHoldsInput)
+            {
+                if (lightBuffer > 0f) lightBuffer = Mathf.Max(0f, lightBuffer - Time.unscaledDeltaTime);
+                if (heavyBuffer > 0f) heavyBuffer = Mathf.Max(0f, heavyBuffer - Time.unscaledDeltaTime);
+            }
+
+            UpdateAimCorrection();
+            UpdateDirectionHold();
+
+            if (comboActive) UpdateCombo();
+            else UpdateIdle();
+        }
+
+        private void FixedUpdate()
+        {
+            if (hitstopRemaining > 0f) return;
+            // BODY-OWNERSHIP GUARD (m2-hazards S2): a higher-priority system (death /
+            // knockback) owns the body — do NOT write a lunge velocity or probe hits onto
+            // the corpse. Mirrors PlayerDash's yield check. The combo itself keeps running
+            // (UpdateCombo) and ends normally, releasing ONLY its own attack token.
+            if (motor != null && motor.Body != null
+                && motor.Body.Owner != null && motor.Body.Owner != BodyPriority.Attack)
+                return;
+            if (comboActive)
+            {
+                ApplyLunge(currentStep);
+                // Ability steps deal their own damage (PlayerAbilities); the generic
+                // hitbox probe is skipped so H1/H2 never double-hits (m1-abilities).
+                if (IsInsideStepWindow() && currentStep.stepType != ComboStepType.Ability) ProbeHitboxStep();
+                return;
+            }
+            if (current == null) return;
+            if (IsInsideActiveWindow()) ProbeHitbox();
+        }
+
+        // ------------------------------------------------------------------
+        // Combo flow
+        // ------------------------------------------------------------------
+
+        private void UpdateIdle()
+        {
+            if (current != null)
+            {
+                // Scaled time: hitstop (timeScale = 0) freezes the grey-box swing.
+                swingTime += Time.deltaTime;
+                if (swingTime >= current.duration) EndSwing();
+                return;
+            }
+
+            // ACTION GATE (change action-gating): no ground combat while airborne,
+            // hanging or in a scripted state. DENY BY DEFAULT — only Free-grounded
+            // starts a NEW attack. An attack already in flight keeps playing (its own
+            // branch above); only the ENTRY is gated.
+            if (!CanStartAttack())
+            {
+                lightBuffer = 0f;
+                heavyBuffer = 0f;
+                return;
+            }
+
+            // While the DASH owns the body, combat cannot normally START an attack
+            // (its lunge would fight the dash velocity). Two paths (slice 3septies):
+            //   1. EARLY CANCEL: an attack pressed past the dash's min cancel window CUTS the
+            //      dash short (PlayerDash.TryCancelByAttack) and starts the attack this SAME
+            //      frame — no waiting for the dash to end (dash-cancel into attack).
+            //   2. FALLBACK: before that window (or with no dash) the press is BUFFERED (held,
+            //      not decayed) and fires when PlayerDash releases the token at dash end.
+            if (motor != null && motor.BodyOwner == BodyPriority.Dash)
+            {
+                bool lightPressed = LightPressedThisFrame();
+                bool heavyPressed = HeavyPressedThisFrame();
+
+                if ((lightPressed || heavyPressed) && dash != null && dash.TryCancelByAttack())
+                {
+                    if (TryStartAttack(lightPressed, heavyPressed)) return;
+                }
+
+                if (lightPressed) lightBuffer = inputBufferSeconds;
+                if (heavyPressed) heavyBuffer = inputBufferSeconds;
+                return;
+            }
+
+            // Consume either the direct press THIS frame OR a tap buffered during the dash.
+            bool light = LightPressedThisFrame() || lightBuffer > 0f;
+            bool heavy = HeavyPressedThisFrame() || heavyBuffer > 0f;
+            if (light) lightBuffer = 0f;
+            if (heavy) heavyBuffer = 0f;
+
+            TryStartAttack(light, heavy);
+        }
+
+        /// <summary>
+        /// Action gate for STARTING an attack (change action-gating): the motor's
+        /// central gate must allow the attack verb (Free-grounded only). Light and
+        /// Heavy share the same rule. Falls back to allowed when there is no motor,
+        /// so combat-only setups keep working.
+        /// </summary>
+        private bool CanStartAttack()
+        {
+            if (motor == null) return true;
+            return motor.CanPerform(PlayerAction.Light);
+        }
+
+        /// <summary>
+        /// Starts whatever the pressed input resolves to: the LONGEST matching combo root
+        /// (L→Combo_1 (L→L→P), P→Combo_H…), else the standalone grey-box swing, else the
+        /// missing-definition warning. Shared by the idle entry and the dash early-cancel
+        /// (slice 3septies) so both start the attack identically. Returns true when an
+        /// attack actually started.
+        /// </summary>
+        private bool TryStartAttack(bool light, bool heavy)
+        {
+            // BODY-OWNERSHIP ENTRY GATE (m2-hazards S2): a swing must not start while a
+            // higher-priority system (death / knockback) owns the body. Checked HERE rather
+            // than in CanStartAttack: the dash branch of UpdateIdle must stay reachable so an
+            // attack pressed during the dash can CANCEL it — this gate is re-evaluated after
+            // that cancel releases the dash token.
+            if (motor != null && motor.Body != null && !motor.Body.CanAcquire(BodyPriority.Attack))
+                return false;
+
+            // DIRECTIONAL VARIANT (slice 3nonies, decision a/f): read the RAW stick in
+            // the FRAME OF THE PRESS and classify it. Done HERE, before StartCombo ->
+            // ApplyAimAssist: the direction picks WHICH attack (root), the aim-assist
+            // then corrects WHICH WAY the body faces (different axes, no conflict).
+            AttackDirection direction = ReadRootDirection();
+
+            // Impact cue for this attack (a heavy press selects the heavy hit, even when
+            // it falls through to a light/standalone path). Set BEFORE any path starts.
+            hitCue = heavy ? AudioCueId.HeavyHit : AudioCueId.LightHit;
+
+            // DASH-ATTACK OPENER (slice 3octies): an attack during the dash or within
+            // dashAttackWindow after it uses the dedicated dashAttack FIRST. Its
+            // continuation chains into the normal combo roots (TryAdvanceOnBuffer).
+            if ((light || heavy) && TryStartDashAttack())
+            {
+                PlayAttackAudio(heavy);
+                return true;
+            }
+
+            // Combo entry (multi-root): pick the longest chain whose root matches
+            // the pressed input AND the stick direction (exact > Any wildcard); a
+            // lone press ends that chain's single step cleanly while a continuation
+            // chains. No match -> grey-box standalone swing.
+            if (light)
+            {
+                ComboDefinition c = SelectRoot(ComboInput.Ligero, direction);
+                if (c != null) { StartCombo(c); PlayAttackAudio(false); return true; }
+            }
+            if (heavy)
+            {
+                ComboDefinition c = SelectRoot(ComboInput.Pesado, direction);
+                if (c != null) { StartCombo(c); PlayAttackAudio(true); return true; }
+            }
+
+            if (light && lightAttack != null) { StartSwing(lightAttack); PlayAttackAudio(false); return true; }
+            if (heavy && heavyAttack != null) { StartSwing(heavyAttack); PlayAttackAudio(true); return true; }
+
+            if ((light || heavy) && !warnedMissingDefinition)
+            {
+                warnedMissingDefinition = true;
+                Debug.LogWarning(
+                    $"{name}: attack pressed but no AttackDefinition assigned in the inspector.", this);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Plays the swing + effort voice for an attack that has JUST started. Called
+        /// from the single point where each attack path is committed (combo root,
+        /// standalone swing, dash-attack opener) so an attack never plays it twice.
+        /// </summary>
+        private void PlayAttackAudio(bool heavy)
+        {
+            AudioDirector.Play(heavy ? AudioCueId.HeavySwing : AudioCueId.LightSwing, transform.position);
+            AudioDirector.Play(heavy ? AudioCueId.HeavyVoice : AudioCueId.LightVoice, transform.position);
+        }
+
+        /// <summary>
+        /// Starts the DASH-ATTACK OPENER when configured and the player is inside the
+        /// opener window (during the dash or within <see cref="dashAttackWindow"/> unscaled
+        /// seconds after it). Returns false when there is no opener / step 0 / dash, or the
+        /// window has passed — the caller then falls through to the normal roots.
+        /// </summary>
+        private bool TryStartDashAttack()
+        {
+            if (dashAttack == null || dash == null) return false;
+            if (dash.SecondsSinceDash > dashAttackWindow) return false;
+            if (!dashAttack.TryGetStep(0, out ComboStep _)) return false;
+            StartCombo(dashAttack, true);
+            return true;
+        }
+
+        private void UpdateCombo()
+        {
+            // Feed the buffer from this step onward (the pending input for the NEXT step).
+            // The stick direction is classified at the PRESS frame (relative to the facing,
+            // which is locked toward the target mid-combo) and carried with the buffer, so
+            // a directional branch matches even if the stick is released before the window.
+            if (LightPressedThisFrame())
+            {
+                lightBuffer = inputBufferSeconds;
+                heavyBuffer = 0f; // LAST PRESS WINS: a branching tree resolves the newest input
+                bufferedDirection = ReadAttackDirection();
+            }
+            if (HeavyPressedThisFrame())
+            {
+                heavyBuffer = inputBufferSeconds;
+                lightBuffer = 0f; // LAST PRESS WINS (see above)
+                bufferedDirection = ReadAttackDirection();
+            }
+
+            // Scaled time: hitstop (timeScale = 0) freezes the step mid-window.
+            stepTime += Time.deltaTime;
+            UpdateMidComboFacing();
+            TryAdvanceOnBuffer();
+            if (stepTime >= EffectiveDuration(currentStep)) EndCombo(); // whiff end / finisher end
+        }
+
+        // ------------------------------------------------------------------
+        // Input seam: same path for the real actions and out-of-band taps.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Public tap seam (editor smoke driver / menu / demo hooks): the next
+        /// Update treats this exactly like a LightAttack press. Real input is
+        /// untouched — the action read is OR-ed with the queued tap.
+        /// </summary>
+        public void SubmitLightAttack() => queuedLightTap = true;
+
+        /// <summary>Public tap seam for HeavyAttack (gamepad Y / mouse right).</summary>
+        public void SubmitHeavyAttack() => queuedHeavyTap = true;
+
+        /// <summary>
+        /// Public tap seam for Dash (decision e): the next <see cref="ConsumeDashTap"/>
+        /// read treats it exactly like a Dash press. <see cref="PlayerDash"/> owns the
+        /// dash logic and reads through this pipeline so editor/menu/demo taps and the
+        /// real action share one path.
+        /// </summary>
+        public void SubmitDash() => queuedDashTap = true;
+
+        /// <summary>
+        /// Dash press reader shared with <see cref="PlayerDash"/>: real Dash action OR
+        /// the queued <see cref="SubmitDash"/> tap. The queued tap is consumed exactly
+        /// once (one consumer — the dash component).
+        /// </summary>
+        public bool ConsumeDashTap()
+        {
+            bool tap = queuedDashTap;
+            queuedDashTap = false;
+            return tap || (input != null && input.Player.Dash.WasPressedThisFrame());
+        }
+
+        /// <summary>
+        /// Ability input seam (decision b/e): entry point for H1/H2/Launcher as combo
+        /// step inputs. PREPARE-only in slice 3 (abilities deferred): no projectile,
+        /// no spin, no multi-hit — the seam exists so the future AbilitySystem plugs
+        /// in without touching the input layer.
+        /// </summary>
+        public void SubmitAbility(ComboInput ability)
+        {
+            // m1-abilities: route the seam to the same pipeline the real skill reads.
+            if (ability == ComboInput.H1) queuedSkill1Tap = true;
+            else if (ability == ComboInput.H2) queuedSkill2Tap = true;
+        }
+
+        /// <summary>Public tap seam for Skill1 (H1 projectile). Mirrors <see cref="SubmitLightAttack"/>.</summary>
+        public void SubmitSkill1() => queuedSkill1Tap = true;
+
+        /// <summary>Public tap seam for Skill2 (H2 area).</summary>
+        public void SubmitSkill2() => queuedSkill2Tap = true;
+
+        /// <summary>
+        /// Skill press reader shared with <see cref="PlayerAbilities"/> (m1-abilities):
+        /// the real Skill1/Skill2 actions OR the queued SubmitSkill1/2 taps. Returns true
+        /// once per press; <paramref name="ability"/> is H1 for Skill1, H2 for Skill2.
+        /// </summary>
+        public bool ConsumeSkillTap(out ComboInput ability)
+        {
+            if (queuedSkill1Tap) { queuedSkill1Tap = false; ability = ComboInput.H1; return true; }
+            if (queuedSkill2Tap) { queuedSkill2Tap = false; ability = ComboInput.H2; return true; }
+            if (input != null && input.Player.Skill1.WasPressedThisFrame()) { ability = ComboInput.H1; return true; }
+            if (input != null && input.Player.Skill2.WasPressedThisFrame()) { ability = ComboInput.H2; return true; }
+            ability = ComboInput.H1;
+            return false;
+        }
+
+        /// <summary>
+        /// Hitstop seam for abilities (m1-abilities): <see cref="PlayerAbilities"/> owns the
+        /// ability hit but the freeze lives here (same save/restore contract as the combo probes).
+        /// </summary>
+        public void RequestHitstop(int milliseconds) => BeginHitstop(milliseconds);
+
+        /// <summary>
+        /// Aborts the active combo/swing and releases the attack lock (dash-cancel
+        /// seam, decision a: "dash cancela TODO salvo hitstop propio"). No-op when
+        /// idle. Does NOT touch hitstop state — the caller decides whether the dash
+        /// may fire (<see cref="PlayerDash"/> gates on <see cref="IsHitstopped"/>).
+        /// </summary>
+        public void CancelCombo()
+        {
+            if (comboActive) EndCombo();
+            if (current != null) EndSwing();
+            ReleaseAttackToken(); // belt-and-braces: never leave a stale attack token
+            lightBuffer = 0f;
+            heavyBuffer = 0f;
+        }
+
+        private bool LightPressedThisFrame()
+        {
+            bool tap = queuedLightTap;
+            queuedLightTap = false;
+            return tap || (input != null && input.Player.LightAttack.WasPressedThisFrame());
+        }
+
+        private bool HeavyPressedThisFrame()
+        {
+            bool tap = queuedHeavyTap;
+            queuedHeavyTap = false;
+            return tap || (input != null && input.Player.HeavyAttack.WasPressedThisFrame());
+        }
+
+        /// <summary>
+        /// If the buffered input matches a continuation (<c>siguiente</c> + <c>branches</c>)
+        /// keyed by (input, direction) and the step is inside its cancel window, advance to
+        /// the matching step. The window is WIDER when the step connected (hit-cancel).
+        /// </summary>
+        private void TryAdvanceOnBuffer()
+        {
+            if (activeCombo == null) return;
+
+            CancelWindowBounds(out float c0, out float c1);
+            if (stepTime < c0) return;
+
+            // B1 — NO STALE BUFFER: once the step is PAST its cancel window, or the
+            // buffered input does NOT match a live continuation, the press is DEAD
+            // (unmatched button). Otherwise it would survive into idle and start a
+            // fresh attack (e.g. X then Y = one jab, then a Heavy).
+            if (stepTime > c1 || !TryResolveContinuation(currentStep, out ComboLink link))
+            {
+                lightBuffer = 0f;
+                heavyBuffer = 0f;
+                return;
+            }
+
+            lightBuffer = 0f; // consume the tap (both — only one can match)
+            heavyBuffer = 0f;
+
+            // OPENER -> NORMAL COMBO (slice 3octies): the dash-attack's continuation
+            // resolves the NORMAL roots by the pressed input, so GolpeDeDash chains into
+            // the standard combo (GolpeDeDash -> Golpe -> Golpe...). The root is resolved
+            // with Neutral (input-only), which keeps the legacy Any-wildcard roots eligible.
+            if (dashAttackActive)
+            {
+                dashAttackActive = false;
+                ComboDefinition next = SelectRoot(link.input, AttackDirection.Neutral);
+                if (next != null) { StartCombo(next); return; }
+                EndCombo(); // no normal root for that input -> end the opener cleanly
+                return;
+            }
+
+            AdvanceCombo(link.paso);
+        }
+
+        /// <summary>
+        /// Resolves the continuation of <paramref name="step"/> matching a LIVE buffered
+        /// input AND the buffered (facing-relative) direction: among the scalar
+        /// <c>siguiente</c> and the extra <c>branches</c>, picks the link whose input has
+        /// a buffer and whose direction is EXACT or <see cref="AttackDirection.Any"/>
+        /// (wildcard). Exact beats wildcard; ties keep the first (siguiente, then the
+        /// branches in list order). Links with <c>paso &lt; 0</c> (finisher) are skipped,
+        /// as is a non-attack input (no press edge in this slice). False when nothing
+        /// matches.
+        /// </summary>
+        private bool TryResolveContinuation(ComboStep step, out ComboLink best)
+        {
+            ComboLink result = default;
+            bool found = false;
+            bool bestExact = false;
+
+            Consider(step.siguiente);
+            if (step.branches != null)
+            {
+                for (int i = 0; i < step.branches.Count; i++) Consider(step.branches[i]);
+            }
+
+            best = result;
+            return found;
+
+            void Consider(ComboLink link)
+            {
+                if (link.paso < 0) return; // finisher: not an in-combo continuation
+                bool live = link.input == ComboInput.Ligero ? lightBuffer > 0f
+                          : link.input == ComboInput.Pesado ? heavyBuffer > 0f
+                          : false; // H1/H2/Launcher/Dash: no press edge in this slice
+                if (!live) return;
+
+                bool exact = link.direction != AttackDirection.Any && link.direction == bufferedDirection;
+                bool wildcard = link.direction == AttackDirection.Any;
+                if (!exact && !wildcard) return;
+
+                if (!found || (exact && !bestExact)) // exact beats wildcard; else first wins
+                {
+                    result = link;
+                    found = true;
+                    bestExact = exact;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Root resolution (input-prefix + directional variant rule, multi-combo):
+        /// among <see cref="combos"/> whose first step input matches
+        /// <paramref name="pressed"/> AND whose step-0 direction is
+        /// <paramref name="direction"/> (exact) OR <see cref="AttackDirection.Any"/>
+        /// (wildcard), pick the LONGEST chain so a lone press still ends cleanly at
+        /// step 0 while a continuation chains. An EXACT direction always beats a
+        /// wildcard; ties (same exactness, same length) keep the first in the array.
+        /// Null when nothing matches.
+        /// </summary>
+        private ComboDefinition SelectRoot(ComboInput pressed, AttackDirection direction)
+        {
+            ComboDefinition best = null;
+            int bestLen = -1;
+            bool bestExact = false;
+            if (combos == null) return null;
+            for (int i = 0; i < combos.Length; i++)
+            {
+                ComboDefinition c = combos[i];
+                if (c == null || !c.TryGetStep(0, out ComboStep s0)) continue;
+                if (s0.input != pressed) continue;
+
+                bool exact = s0.direction == direction;
+                bool wildcard = s0.direction == AttackDirection.Any;
+                if (!exact && !wildcard) continue;
+
+                bool better = best == null
+                    || (exact && !bestExact)                       // exact beats wildcard
+                    || (exact == bestExact && c.Length > bestLen); // then longest chain
+                if (better) { best = c; bestLen = c.Length; bestExact = exact; }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Reads the RAW Move stick THIS frame and classifies it into an
+        /// <see cref="AttackDirection"/> RELATIVE TO THE FACING (follow-up slice): the
+        /// stick is turned into a world direction (camera-relative) and projected onto
+        /// the facing, so Back = away from the front. Zero / no input -> Neutral.
+        /// </summary>
+        private AttackDirection ReadAttackDirection()
+        {
+            return ClassifyAttackDirection();
+        }
+
+        /// <summary>
+        /// Raw stick classification at THIS frame (relative to the facing). Used for
+        /// buffered continuations, where a directional branch must still match even if
+        /// the stick is held.
+        /// </summary>
+        private AttackDirection ClassifyAttackDirection()
+        {
+            if (input == null) return AttackDirection.Neutral;
+            if (cameraTransform == null) RefreshCamera();
+            return AttackDirectionClassifier.FromStick(
+                input.Player.Move.ReadValue<Vector2>(), FacingVector(), cameraTransform);
+        }
+
+        /// <summary>
+        /// Tracks how long the current stick direction has been held. A direction that
+        /// just changed (or was just entered) has <see cref="heldDirectionTime"/> ~ 0,
+        /// which is what marks a deliberate "flick" for root selection.
+        /// </summary>
+        private void UpdateDirectionHold()
+        {
+            AttackDirection current = ClassifyAttackDirection();
+            if (current != heldDirection)
+            {
+                heldDirection = current;
+                heldDirectionTime = 0f;
+            }
+            else
+            {
+                heldDirectionTime += Time.unscaledDeltaTime;
+            }
+        }
+
+        /// <summary>
+        /// Direction used to pick a combo ROOT. Walking (stick held longer than
+        /// <see cref="PlayerParams.directionFlickWindow"/>) reads as Neutral so the
+        /// neutral combo keeps chaining; a flick selects the directional variant.
+        /// </summary>
+        private AttackDirection ReadRootDirection()
+        {
+            AttackDirection current = ClassifyAttackDirection();
+            if (current == AttackDirection.Neutral) return current;
+            float flick = Params != null ? Params.directionFlickWindow : 0.22f;
+            return heldDirectionTime <= flick ? current : AttackDirection.Neutral;
+        }
+
+        private void StartCombo(ComboDefinition definition, bool dashOpener = false)
+        {
+            if (definition == null || !definition.TryGetStep(0, out ComboStep first)) return;
+            if (abilities != null) abilities.Stop(); // leaving any standalone ability (m1-abilities)
+            activeCombo = definition;
+            current = null;
+            comboActive = true;
+            dashAttackActive = dashOpener;
+            stepIndex = 0;
+            currentStep = first;
+            stepTime = 0f;
+            connectedThisStep = false;
+            hitThisStep.Clear();
+            hitThisSwing.Clear();
+            ApplyAimAssist();
+            ApplyStepLock(first);
+            PlayAttackVisual(1, first);
+        }
+
+        private void AdvanceCombo(int index)
+        {
+            if (activeCombo == null || !activeCombo.TryGetStep(index, out ComboStep next))
+            {
+                EndCombo();
+                return;
+            }
+            if (abilities != null) abilities.Stop(); // release a previous ability step (m1-abilities)
+            stepIndex = index;
+            currentStep = next;
+            stepTime = 0f;
+            connectedThisStep = false;
+            hitThisStep.Clear();
+            ApplyAimAssist();
+            ApplyStepLock(next);
+            PlayAttackVisual(index + 1, next);
+        }
+
+        private void EndCombo()
+        {
+            comboActive = false;
+            dashAttackActive = false;
+            stepIndex = -1;
+            activeCombo = null;
+            currentStep = default;
+            stepTime = 0f;
+            connectedThisStep = false;
+            hitThisStep.Clear();
+            ClearAimAssist();
+            // B1 — a combo end must never leak a buffered press into idle (the root
+            // cause of "X then Y starts a fresh Heavy after the jab").
+            lightBuffer = 0f;
+            heavyBuffer = 0f;
+            ReleaseAttackToken(); // release the attack token -> wish control returns
+            if (visual is AnimatorVisual animatorVisual)
+            {
+                animatorVisual.ReleaseAttack();
+                animatorVisual.ReleaseDashAttack(); // dormant opener slot never stays gated
+                animatorVisual.ReleaseLauncher();   // dormant launcher slot never stays gated
+            }
+            if (abilities != null) abilities.Stop(); // release the ability slot (m1-abilities)
+        }
+
+        /// <summary>
+        /// Per-step movement lock (decision: no drift during the swing). A locked
+        /// step tells the motor to ignore the horizontal wish; the motor holds the
+        /// facing. moveLock = false leaves full control (and skips the lunge).
+        /// </summary>
+        private void ApplyStepLock(in ComboStep step)
+        {
+            if (motor == null || motor.Body == null) return;
+            if (step.moveLock)
+            {
+                // ONE token per combo. Release removes a SPECIFIC token, so acquiring a
+                // fresh token on every moveLock step would orphan the earlier ones and
+                // leave the body locked forever after EndCombo (deadlock).
+                if (attackToken == null) attackToken = motor.Body.Acquire(BodyPriority.Attack);
+            }
+            else
+            {
+                ReleaseAttackToken();
+            }
+        }
+
+        /// <summary>Releases the combo's attack token (idempotent).</summary>
+        private void ReleaseAttackToken()
+        {
+            if (motor != null && motor.Body != null) motor.Body.Release(attackToken);
+            attackToken = null;
+        }
+
+        /// <summary>
+        /// Advances the character FORWARD along the current swing facing during a
+        /// locked step, using the CURVED motion model: speed(t) decays over the
+        /// step per <c>lungeCurve</c> (normalized 1 -> 0), and the integral of the
+        /// speed over the effective window equals the total advance (≈
+        /// <c>lunge</c> meters; strong impulse at the start, decaying). An empty
+        /// curve defaults to the shared ease-out (<see cref="CurveMotion"/>). The
+        /// motor's <see cref="PlayerMotor.InputLocked"/> preserves this velocity.
+        /// A locked step with lunge = 0 is a full stop (no drift).
+        /// </summary>
+        private void ApplyLunge(in ComboStep step)
+        {
+            if (!step.moveLock) return;
+            float window = EffectiveDuration(step);
+            if (window <= 0f) return;
+
+            // Committed direction (captured at step entry): re-orienting the facing between
+            // steps must NOT drag the lunge of the step already running.
+            Vector3 dir = lungeDir.sqrMagnitude > 0.0001f ? lungeDir : FacingVector();
+            float advance = Mathf.Max(0f, step.lunge);
+            float speed = Mathf.Max(0f, CurveMotion.Speed(step.lungeCurve, advance, window, stepTime));
+            Vector3 v = rb.linearVelocity;
+            v.x = dir.x * speed;
+            v.z = dir.z * speed;
+            rb.linearVelocity = v;
+        }
+
+        /// <summary>
+        /// Code-driven entry into the attack states (decision b): CrossFade to
+        /// <c>Attack_P{n}</c> and push the dedicated param + the step's clip speed.
+        /// Presentation-only: the generic proxy visual simply does nothing here.
+        /// </summary>
+        private void PlayAttackVisual(int step, ComboStep def)
+        {
+            if (!(visual is AnimatorVisual animatorVisual)) return;
+
+            // ABILITY STEP (m1-abilities): the step delegates to PlayerAbilities (its own
+            // Attack_H1/H2 state + hitbox). No Attack_P entry — the ability owns the visual.
+            if (def.stepType == ComboStepType.Ability)
+            {
+                if (abilities != null && def.abilityRef != null) abilities.PlayFromCombo(def.abilityRef);
+                return;
+            }
+
+            // LIVE tuning: the clip retime must equal the value EffectiveDuration divides by,
+            // so the animation and the hit/cancel windows stay locked together at any scale.
+            float clipSpeed = AttackSpeed(def);
+
+            if (dashAttackActive)
+            {
+                // DASH-ATTACK opener: its OWN clip slot (Attack_Dash state). Enter it
+                // ONLY when the step has an assigned clip (ComboStep.clip) — with no clip the
+                // state would freeze the pose, so the visual is skipped and the opener
+                // renders with whatever locomotion pose is live (no pose freeze).
+                // The step's speedMultiplier rides in as the state's retime (slice 2).
+                if (def.clip != null)
+                    animatorVisual.PlayDashAttack(Mathf.Max(0f, crossFadeDuration), clipSpeed);
+                return;
+            }
+
+            // LAUNCHER variant (slice 3nonies): its OWN clip slot (Attack_Launcher),
+            // entered ONLY when the step has an assigned clip. With no clip it falls through to
+            // the grey-box Attack_P mapping below (attackStateIndex) — never enters a
+            // clip-less state (no pose freeze). speedMultiplier rides in as the retime (slice 2).
+            if (def.launch && def.clip != null)
+            {
+                animatorVisual.PlayLauncher(Mathf.Max(0f, crossFadeDuration), clipSpeed);
+                return;
+            }
+
+            // attackStateIndex > 0 overrides the auto index+1 so a 1-step
+            // combo can play a deeper clip (Combo_H -> Attack_P3).
+            int state = def.attackStateIndex > 0 ? def.attackStateIndex : step;
+            animatorVisual.PlayAttack(state, Mathf.Max(0f, crossFadeDuration));
+            animatorVisual.SetAttackSpeed(state, clipSpeed);
+        }
+
+        // ------------------------------------------------------------------
+        // Aim-assist (m1-aim-assist, decisions a/b/e): soft trajectory corrector.
+        // At attack entry, pick the nearest alive HitReceiver inside the frontal
+        // cone + range and turn visual.Facing toward it over the swing opening.
+        // Facing is the SINGLE point: ApplyLunge (reads FacingVector) and
+        // HitboxOrigin both follow -> lunge + hitbox redirect with NO motor change.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Computes the aim direction ONCE at attack entry (NOT continuous homing):
+        /// nearest alive target inside the ±coneHalfAngle frontal cone and within
+        /// [minRange, maxRange] METERS. On a hit, stores the direction and starts the
+        /// entry correction window (worst-case cone error / turnSpeed). No target or
+        /// disabled -> no-op (forward-only behavior intact). Applies in air/wall too.
+        /// </summary>
+        private void ApplyAimAssist()
+        {
+            ClearAimAssist();
+            // Default lunge commit: the facing this step starts on. Overridden below with
+            // the soft-locked target direction when one is found.
+            lungeDir = FacingVector();
+            if (visual == null) return;
+
+            // Shared selection (slice 3quinquies, Code/Combat/AimAssist.cs): the dash
+            // direction uses the EXACT same cone + range + nearest-alive-target math.
+            // CONE AXIS = the player's AIM (target-switch iteration): the cone is centered
+            // where the player POINTS (camera-relative stick), so pointing at another enemy
+            // selects it (the nearest enemy inside THAT cone). Neutral stick = the current
+            // facing, i.e. the pre-existing behavior.
+            if (!AimAssist.TryFindAimDir(transform.position, rb, AimAxis(), aimAssist, out Vector3 aim))
+                return;
+
+            aimDir = aim;
+
+            // SetFacing is incremental (~12°/frame at 720°/s): a single call cannot
+            // align. Iterate over the swing opening — window sized to the worst-case
+            // cone error at the configured turn speed.
+            aimCorrectRemaining = Mathf.Clamp(aimAssist.coneHalfAngleDeg, 0f, 180f)
+                / Mathf.Max(1f, aimAssist.turnSpeedDegPerSec);
+            // The lunge is COMMITTED to the chosen target for the whole step, so the
+            // between-steps re-orientation below never drags it mid-step.
+            lungeDir = aim;
+            visual.SetFacing(aimDir);
+        }
+
+        /// <summary>
+        /// Iterates <c>visual.SetFacing</c> toward the stored aim direction during the
+        /// swing OPENING (a smooth turn), then stops — NOT continuous homing. Scaled
+        /// time: hitstop freezes the correction with the rest of the swing.
+        /// </summary>
+        private void UpdateAimCorrection()
+        {
+            if (aimCorrectRemaining <= 0f) return;
+            aimCorrectRemaining -= Time.deltaTime;
+            if (visual != null) visual.SetFacing(aimDir);
+        }
+
+        private void ClearAimAssist()
+        {
+            aimDir = Vector3.zero;
+            aimCorrectRemaining = 0f;
+        }
+
+        /// <summary>
+        /// MID-COMBO facing re-orientation (target-switch, DMC/Bayonetta feel): while the
+        /// active step is PAST its strike (hit window closed) and inside its cancel window,
+        /// keep turning the facing toward the player's AIM + soft-lock — the nearest alive
+        /// enemy inside the cone centered on the stick. This is what lets the player swing
+        /// the body toward ANOTHER enemy mid-combo so the NEXT step's hit goes there. The
+        /// lunge stays committed (<see cref="ApplyLunge"/> uses <see cref="lungeDir"/>), so
+        /// the body pivots without drifting. It only turns when an enemy is soft-locked:
+        /// free-facing the raw stick would rotate the facing under the player's own "Back"
+        /// input and break the facing-relative launcher. SetFacing is incremental, so
+        /// calling it every frame converges over the window.
+        /// </summary>
+        private void UpdateMidComboFacing()
+        {
+            if (visual == null) return;
+            if (aimCorrectRemaining > 0f) return; // the entry correction owns the opening
+            if (IsInsideStepWindow()) return;     // committed through the strike
+            if (!IsInCancelWindow()) return;      // only between steps / in the chain tail
+
+            if (!AimAssist.TryFindAimDir(transform.position, rb, AimAxis(), aimAssist, out Vector3 lockDir))
+                return; // no enemy in the aim cone -> keep the committed facing
+
+            visual.SetFacing(lockDir);
+        }
+
+        // ------------------------------------------------------------------
+        // LIVE combat tuning (WU6): global scales that MULTIPLY the per-step data.
+        // The data stays AUTHORITATIVE (speedMultiplier, hitboxRadius/Offset,
+        // hitstopMs, cancel windows, maxTargets); scale 1 + override 0 reproduce it
+        // exactly, so this is a pure multiplier layer. The values live on
+        // PlayerParams and the DebugWindow edits them during Play Mode (no recompile).
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Tuning source: this component's own asset, else the motor's params asset.
+        /// Null (no asset anywhere) = every scale is 1 and the override is 0.
+        /// </summary>
+        private PlayerParams Params => paramsAsset != null ? paramsAsset : (motor != null ? motor.Params : null);
+
+        /// <summary>Global attack-cadence multiplier (1 = data).</summary>
+        private float SpeedScale => Params != null ? Params.attackSpeedScale : 1f;
+
+        /// <summary>Global reach multiplier on BOTH the radius and the offset (1 = data).</summary>
+        private float ReachScale => Params != null ? Params.attackReachScale : 1f;
+
+        /// <summary>Global hitstop multiplier (1 = data, 0 = no freeze).</summary>
+        private float HitstopScale => Params != null ? Params.hitstopScale : 1f;
+
+        /// <summary>Cancel-START divisor (&gt; 1 opens the cancel window EARLIER; 1 = data).</summary>
+        private float CancelStartScale => Params != null ? Params.cancelStartScale : 1f;
+
+        /// <summary>Victim-cap override; 0 = use each step's own maxTargets (data).</summary>
+        private int TargetsOverride => Params != null ? Params.maxTargetsOverride : 0;
+
+        /// <summary>
+        /// Debug readout: cancel-window START of the ACTIVE step, normalized (0..1), or
+        /// -1 when no combo step is running. Pre-scale value (the live divisor is applied
+        /// by <see cref="CancelWindowBounds"/>), so the overlay can show both.
+        /// </summary>
+        public float ActiveCancelStartNormalized =>
+            comboActive
+                ? Mathf.Clamp01((connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm).x)
+                : -1f;
+
+        /// <summary>The step's REAL clip retime: the data's speedMultiplier x the live scale.</summary>
+        private float AttackSpeed(in ComboStep step) => Mathf.Max(0.01f, step.speedMultiplier * SpeedScale);
+
+        /// <summary>
+        /// Victims this step may damage: the live override when set, else the data cap
+        /// (clamped to &gt;= 1 — an absent serialized key reads 0).
+        /// </summary>
+        private int Targets(in ComboStep step)
+        {
+            int over = TargetsOverride;
+            return over > 0 ? over : Mathf.Max(1, step.maxTargets);
+        }
+
+        /// <summary>
+        /// Scales the step hitbox ONCE, at the call site, so the probe and the gizmo
+        /// consume the SAME radius/offset (what you see is what the probe tests).
+        /// </summary>
+        private void ScaledHitbox(in ComboStep step, out float radius, out Vector3 offset)
+        {
+            float reach = ReachScale;
+            radius = step.hitboxRadius * reach;
+            offset = step.hitboxOffset * reach;
+        }
+
+        /// <summary>Same scaling for the grey-box standalone swing definition.</summary>
+        private void ScaledHitbox(AttackDefinition def, out float radius, out Vector3 offset)
+        {
+            float reach = ReachScale;
+            radius = def.hitboxRadius * reach;
+            offset = def.hitboxOffset * reach;
+        }
+
+        // ------------------------------------------------------------------
+        // Shared hitbox probe (slice-1 seam extended 1:1 to combo steps)
+        // ------------------------------------------------------------------
+
+        private bool IsInsideStepWindow()
+        {
+            float duration = EffectiveDuration(currentStep);
+            float t0 = Mathf.Clamp01(currentStep.hitNorm.x) * duration;
+            float t1 = Mathf.Clamp01(currentStep.hitNorm.y) * duration;
+            return stepTime >= t0 && stepTime <= t1;
+        }
+
+        /// <summary>
+        /// The active step's cancel window in SCALED seconds (wider when the step
+        /// connected). Shared by the buffered advance and the mid-combo facing re-orient.
+        /// </summary>
+        private void CancelWindowBounds(out float c0, out float c1)
+        {
+            Vector2 window = connectedThisStep ? currentStep.cancelHitNorm : currentStep.cancelNorm;
+            float duration = EffectiveDuration(currentStep);
+            // LIVE tuning: only the START moves (window.x / cancelStartScale), so > 1
+            // opens the cancel EARLIER; the END stays on the data. Never invert.
+            c0 = Mathf.Clamp01(Mathf.Clamp01(window.x) / Mathf.Max(0.01f, CancelStartScale)) * duration;
+            c1 = Mathf.Clamp01(window.y) * duration;
+            c0 = Mathf.Min(c0, c1);
+        }
+
+        /// <summary>True while the active step is inside its cancel window (scaled time).</summary>
+        private bool IsInCancelWindow()
+        {
+            CancelWindowBounds(out float c0, out float c1);
+            return stepTime >= c0 && stepTime <= c1;
+        }
+
+        /// <summary>
+        /// Effective step duration in SCALED seconds. The clip plays at
+        /// <c>speedMultiplier</c> (Animator state speed, decision c) x the LIVE
+        /// <c>attackSpeedScale</c>, so the hit window, the cancel windows and the
+        /// step end must be measured against
+        /// <c>duracion / (speedMultiplier x scale)</c> — NOT the raw clip length —
+        /// or the logic would outlive the accelerated clip by a full speed factor.
+        /// Instance method (not static): the duration now depends on the live tuning.
+        /// </summary>
+        private float EffectiveDuration(in ComboStep step)
+        {
+            return step.duracion / AttackSpeed(step);
+        }
+
+        private bool IsInsideActiveWindow()
+        {
+            float t0 = Mathf.Clamp01(current.hitNorm.x) * current.duration;
+            float t1 = Mathf.Clamp01(current.hitNorm.y) * current.duration;
+            return swingTime >= t0 && swingTime <= t1;
+        }
+
+        /// <summary>
+        /// Sphere probe against <see cref="HitReceiver"/> targets, excluding the
+        /// player's own Rigidbody (Face child collider shares it). Forward-only:
+        /// the origin is offset along the facing, so a target behind never counts.
+        /// Returns true when at least one target was hit.
+        /// <paramref name="moveKey"/> (style-meter seam): when non-null, every NEWLY
+        /// hit receiver fires <see cref="OnStepConnected"/> once with it.
+        /// <paramref name="halfHeight"/> (B2, combat honesty): when &gt; 0, the probe is a
+        /// CYLINDER — a victim only counts when its collider bounds overlap
+        /// <c>origin.y ± halfHeight</c>. 0 = legacy sphere (no vertical filter), so old
+        /// assets that omit the field keep their behavior.
+        /// <paramref name="maxTargets"/> (B2): the step's victim CAP. 1 = ONE victim per
+        /// step (best aim-lock / nearest in front); N &gt; 1 = cleave up to N victims.
+        /// The probe COLLECTS before hitting, so a step can never damage more victims
+        /// than its cap across frames because the first one stayed inside the sphere.
+        /// </summary>
+        private bool ProbeAt(Vector3 origin, float radius, int damage, float knockback, float launchImpulse,
+            string moveKey = null, float halfHeight = 0f, int maxTargets = 1)
+        {
+            Collider[] cols = Physics.OverlapSphere(
+                origin, radius, Physics.AllLayers, QueryTriggerInteraction.Ignore);
+
+            probeCandidates.Clear();
+
+            Vector3 forwardAxis = lungeDir.sqrMagnitude > 0.0001f ? lungeDir : FacingVector();
+            for (int i = 0; i < cols.Length; i++)
+            {
+                var col = cols[i];
+                if (col == null) continue;
+                if (col.attachedRigidbody == rb) continue; // own capsule / Face trigger
+
+                var receiver = col.GetComponentInParent<HitReceiver>();
+                if (receiver == null) continue;
+                if (hitThisStep.Contains(receiver)) continue;     // already hit this step/swing
+                if (probeCandidates.Contains(receiver)) continue; // two colliders -> one candidate
+
+                // VERTICAL BAND (cylinder): reject victims whose collider is entirely
+                // above/below the band around the sphere centre. 0 = off (legacy).
+                if (halfHeight > 0f)
+                {
+                    Bounds bounds = col.bounds;
+                    if (bounds.max.y < origin.y - halfHeight || bounds.min.y > origin.y + halfHeight)
+                        continue;
+                }
+
+                Vector3 to = receiver.transform.position - transform.position;
+                to.y = 0f;
+                if (to.sqrMagnitude < 0.0001f) to = forwardAxis;
+                to.Normalize();
+
+                // FORWARD-ONLY: the committed step axis (aim-assist result at entry) is
+                // the targeting axis, so a target behind the swing never counts.
+                if (Vector3.Dot(to, forwardAxis) < 0f) continue;
+
+                probeCandidates.Add(receiver);
+            }
+
+            // CAP (default 1): once a victim landed this step, never pick a SECOND one on a
+            // later frame (the old loop could cleave across frames).
+            if (maxTargets <= 1 && hitThisStep.Count > 0) return false;
+
+            // Budget = the step's remaining cap (victims already hit this step already
+            // consumed it). Select best-aligned first, swap-removing as we go: O(1) per
+            // pick, no Sort, no LINQ, no per-frame allocation.
+            int budget = Mathf.Max(0, Mathf.Max(1, maxTargets) - hitThisStep.Count);
+            int hits = 0;
+            while (hits < budget && probeCandidates.Count > 0)
+            {
+                int i = SelectBestIndex(forwardAxis);
+                if (i < 0) break;
+                HitReceiver pick = probeCandidates[i];
+                probeCandidates[i] = probeCandidates[probeCandidates.Count - 1];
+                probeCandidates.RemoveAt(probeCandidates.Count - 1);
+                if (HitCandidate(pick, damage, knockback, launchImpulse, moveKey)) hits++;
+            }
+            bool connected = hits > 0;
+
+            // One impact per probe call (not per receiver).
+            if (connected) AudioDirector.Play(hitCue, transform.position);
+
+            return connected;
+        }
+
+        /// <summary>
+        /// Applies the hit to ONE receiver (dedup via <see cref="hitThisStep"/>) and fires
+        /// the style seam. Returns false when the receiver was already hit this step.
+        /// </summary>
+        private bool HitCandidate(HitReceiver receiver, int damage, float knockback, float launchImpulse, string moveKey)
+        {
+            if (!hitThisStep.Add(receiver)) return false; // one hit per target per step/swing
+
+            Vector3 to = receiver.transform.position - transform.position;
+            to.y = 0f;
+            if (to.sqrMagnitude < 0.0001f) to = FacingVector();
+            to.Normalize();
+
+            // LAUNCHER (slice 3nonies): the vertical impulse is passed SEPARATELY
+            // (not baked into the XZ push) so HitReceiver can drive the juggle-lite
+            // arc (rise -> fall -> land) with its own gravity. 0 = normal hit.
+            receiver.TakeHit(damage, to * knockback, launchImpulse);
+            if (moveKey != null) OnStepConnected?.Invoke(moveKey);
+            return true;
+        }
+
+        /// <summary>
+        /// Targeting policy (B2): the best candidate is the one most aligned with the
+        /// committed step axis (aim-soft-lock first, else nearest in the swing); a tie on
+        /// the alignment breaks on the NEAREST (<c>sqrMagnitude</c>). Returns the INDEX in
+        /// <see cref="probeCandidates"/> so the caller can swap-remove it in O(1); -1 when
+        /// the buffer is empty.
+        /// </summary>
+        private int SelectBestIndex(Vector3 forwardAxis)
+        {
+            int bestIndex = -1;
+            float bestDot = float.NegativeInfinity;
+            float bestSqr = float.PositiveInfinity;
+            for (int i = 0; i < probeCandidates.Count; i++)
+            {
+                HitReceiver candidate = probeCandidates[i];
+                Vector3 to = candidate.transform.position - transform.position;
+                to.y = 0f;
+                float sqr = to.sqrMagnitude;
+                Vector3 dir = sqr > 0.0001f ? to / Mathf.Sqrt(sqr) : forwardAxis;
+                float dot = Vector3.Dot(dir, forwardAxis);
+
+                if (bestIndex < 0 || dot > bestDot || (Mathf.Approximately(dot, bestDot) && sqr < bestSqr))
+                {
+                    bestIndex = i;
+                    bestDot = dot;
+                    bestSqr = sqr;
+                }
+            }
+            return bestIndex;
+        }
+
+        private void ProbeHitboxStep()
+        {
+            float launch = currentStep.launch ? Mathf.Max(0f, currentStep.launchImpulse) : 0f;
+            string moveKey = activeCombo != null ? activeCombo.name + "#" + stepIndex : null;
+            // LIVE reach: the SAME scaled geometry feeds the probe and the gizmo.
+            ScaledHitbox(currentStep, out float radius, out Vector3 offset);
+            if (ProbeAt(HitboxOrigin(radius, offset),
+                    radius, currentStep.dano, currentStep.knockback, launch, moveKey,
+                    currentStep.hitboxHalfHeight, Targets(currentStep)))
+            {
+                connectedThisStep = true; // wider cancel window (hit-cancel)
+                BeginHitstop(currentStep.hitstopMs * HitstopScale);
+            }
+        }
+
+        private void ProbeHitbox()
+        {
+            string moveKey = current != null ? current.name + "#0" : null;
+            ScaledHitbox(current, out float radius, out Vector3 offset);
+            if (ProbeAt(HitboxOrigin(radius, offset),
+                    radius, current.damage, current.knockback, 0f, moveKey, 0f, 1))
+            {
+                BeginHitstop(current.hitstopMs * HitstopScale);
+            }
+        }
+
+        private void StartSwing(AttackDefinition def)
+        {
+            current = def;
+            swingTime = 0f;
+            hitThisSwing.Clear();
+            hitThisStep.Clear(); // standalone swings must not inherit the previous swing's victims
+            ApplyAimAssist();
+        }
+
+        private void EndSwing()
+        {
+            current = null;
+            swingTime = 0f;
+            hitThisSwing.Clear();
+            hitThisStep.Clear(); // next swing starts with a clean victim set
+            ClearAimAssist();
+        }
+
+        private void BeginHitstop(float hitstopMs)
+        {
+            if (hitstopRemaining > 0f) return; // one freeze per swing/step
+            // The lock keeps the debug base scale (F6) intact; releasing it restores
+            // that base instead of the value that happened to be live before the swing.
+            hitstopHandle = ControlLock.Acquire(ControlReason.Hitstop);
+            hitstopRemaining = Mathf.Max(0.001f, hitstopMs / 1000f);
+        }
+
+        /// <summary>
+        /// Drops the hitstop freeze and its lock token. Safe when idle; used by the
+        /// expiry path, <see cref="OnDisable"/> and <see cref="OnDestroy"/> so a
+        /// disabled/swapped combat component can never leave time at 0.
+        /// </summary>
+        private void ReleaseHitstop()
+        {
+            hitstopRemaining = 0f;
+            if (hitstopHandle == null) return;
+            ControlLock.Release(hitstopHandle);
+            hitstopHandle = null;
+        }
+
+        // ------------------------------------------------------------------
+        // Dev visualization (decision: make the grey-box hitbox legible).
+        // The origin math below is a DELIBERATE copy of the probe so what you
+        // see is exactly what the sphere query tests.
+        // ------------------------------------------------------------------
+
+        /// <summary>World-space hitbox center for radius/offset — mirrors the probe.</summary>
+        private Vector3 HitboxOrigin(float radius, Vector3 offset)
+        {
+            Vector3 facing = FacingForGizmos();
+            return transform.position
+                   + Vector3.up * offset.y
+                   + facing * offset.z;
+        }
+
+        private Vector3 FacingVector()
+        {
+            Vector3 facing = visual != null ? visual.Facing : transform.forward;
+            facing.y = 0f;
+            if (facing.sqrMagnitude < 0.0001f) facing = Vector3.forward;
+            return facing.normalized;
+        }
+
+        /// <summary>
+        /// World-space AIM direction on XZ (unit) used as the soft-lock CONE AXIS: the
+        /// camera-relative MOVE stick direction when the stick is past its deadzone (the
+        /// player is pointing somewhere), else the current facing (keep the cone where the
+        /// body already looks). Uses the SAME stick-to-world mapping the walk/dash use
+        /// (<see cref="CameraRelativeMotion"/>) and the SAME deadzone as the facing-relative
+        /// classifier (<see cref="AttackDirectionClassifier"/>), so the aim is consistent
+        /// across the combat model.
+        /// </summary>
+        private Vector3 AimAxis()
+        {
+            Vector3 facing = FacingVector();
+            if (input == null) return facing;
+            if (cameraTransform == null) RefreshCamera();
+            Vector2 stick = input.Player.Move.ReadValue<Vector2>();
+            if (stick.magnitude < AttackDirectionClassifier.DefaultDeadzone) return facing;
+            Vector3 dir = CameraRelativeMotion.WishDirection(cameraTransform, stick);
+            return dir.sqrMagnitude > 0.000001f ? dir : facing;
+        }
+
+        /// <summary>
+        /// Facing for gizmos: uses the cached visual, else resolves it lazily
+        /// (Awake does not run in edit mode), else falls back to transform.forward.
+        /// </summary>
+        private Vector3 FacingForGizmos()
+        {
+            var v = visual != null ? visual : GetComponent<ICharacterVisual>();
+            return FacingVector();
+        }
+
+        private void OnDrawGizmos()
+        {
+            // Live hitbox of the active combo step OR grey-box swing. Red while the
+            // active hit window is open, amber otherwise, so the connect frame is obvious.
+            if (comboActive)
+            {
+                Gizmos.color = IsInsideStepWindow()
+                    ? Color.red
+                    : new Color(1f, 0.6f, 0.1f, 0.6f);
+                // LIVE reach: the gizmo consumes the SAME scaled geometry as the probe.
+                ScaledHitbox(currentStep, out float stepRadius, out Vector3 stepOffset);
+                Vector3 origin = HitboxOrigin(stepRadius, stepOffset);
+                Gizmos.DrawWireSphere(origin, stepRadius);
+                // CYLINDER (B2): draw the vertical band so the gizmo stays honest about
+                // the elevated-target rejection the probe applies.
+                if (currentStep.hitboxHalfHeight > 0f)
+                {
+                    Gizmos.DrawWireCube(origin, new Vector3(
+                        stepRadius * 2f,
+                        currentStep.hitboxHalfHeight * 2f,
+                        stepRadius * 2f));
+                }
+                return;
+            }
+            if (current == null) return;
+            Gizmos.color = IsInsideActiveWindow()
+                ? Color.red
+                : new Color(1f, 0.6f, 0.1f, 0.6f);
+            ScaledHitbox(current, out float swingRadius, out Vector3 swingOffset);
+            Gizmos.DrawWireSphere(HitboxOrigin(swingRadius, swingOffset), swingRadius);
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            // Selected + idle: show BOTH reaches so light-vs-heavy is comparable.
+            DrawDefinitionGizmo(lightAttack, new Color(0.2f, 0.8f, 1f, 0.7f));
+            DrawDefinitionGizmo(heavyAttack, new Color(1f, 0.4f, 0f, 0.7f));
+        }
+
+        private void DrawDefinitionGizmo(AttackDefinition def, Color color)
+        {
+            if (def == null) return;
+            Gizmos.color = color;
+            ScaledHitbox(def, out float radius, out Vector3 offset);
+            Gizmos.DrawWireSphere(HitboxOrigin(radius, offset), radius);
+        }
+    }
+}

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8159e6b98d5540949cd1cca9697c88aa, type: 3}
+  m_Name: StyleMeter_Default
+  m_EditorClassIdentifier: 
+  pointsPerHit: 8
+  noveltyMultiplier: 2
+  noveltyWindowSeconds: 5
+  killPoints: 25
+  decayPerSecond: 15
+  decayDelaySeconds: 2
+  thresholdC: 100
+  thresholdB: 220
+  thresholdA: 360
+  thresholdS: 520
+  chargeFillRateBase: 0.05
+  chargeFillPerPoint: 0.0005
+  maxCharges: 3

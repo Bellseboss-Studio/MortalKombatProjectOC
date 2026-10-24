@@ -1,24 +1,114 @@
 name: Actions Windows Dev 😎
 
 on:
-  workflow_dispatch: {}
-  pull_request:
-    branches:
-      - develop
-      
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump for the release"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      create_release:
+        description: "Create a GitHub Release from this build (uncheck to only build)"
+        required: true
+        default: true
+        type: boolean
+      publish_itch:
+        description: "Publish the build to itch.io (release build, no -Development)"
+        required: true
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: windows-dev-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # Computes the next SemVer tag. Runs only for a manual dispatch that asked
+  # for a release, so pull-request builds never touch tags.
+  version:
+    name: Compute release version
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.create_release == 'true' || github.event.inputs.publish_itch == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.semver.outputs.tag }}
+      sha7: ${{ steps.semver.outputs.sha7 }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next SemVer tag
+        id: semver
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          SHA7="${GITHUB_SHA:0:7}"
+          LATEST="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+          if [ -z "$LATEST" ]; then
+            NEXT="v0.1.0"
+          else
+            BASE="${LATEST#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+            case "$BUMP" in
+              patch) NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+              minor) NEXT="v${MAJOR}.$((MINOR + 1)).0" ;;
+              major) NEXT="v$((MAJOR + 1)).0.0" ;;
+              *) echo "::error::Unknown bump type '${BUMP}'"; exit 1 ;;
+            esac
+          fi
+          echo "Next tag: ${NEXT} (sha7=${SHA7})"
+          echo "tag=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "sha7=${SHA7}" >> "$GITHUB_OUTPUT"
+
+      - name: Guard - tag must not exist on another commit
+        env:
+          TAG: ${{ steps.semver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} is free - proceeding."
+            exit 0
+          fi
+          TAG_COMMIT="$(git rev-list -n 1 "refs/tags/${TAG}")"
+          if [ "${TAG_COMMIT}" = "${GITHUB_SHA}" ]; then
+            echo "::warning::Tag ${TAG} already points at this commit - resuming idempotently."
+            exit 0
+          fi
+          echo "::error::Tag ${TAG} already exists on ${TAG_COMMIT} (this run targets ${GITHUB_SHA}). Pick a different bump."
+          exit 1
+
+  # NOTE: release guard intentionally omitted while the active branch is
+  # `refactor/rebuild-from-scratch`. When `main` becomes the release branch,
+  # uncomment this step to block releases from anywhere else.
+  #
+  #      - name: Guard - release only from main
+  #        if: github.ref != 'refs/heads/main'
+  #        run: |
+  #          echo "::error::Release dispatch only allowed from main (got '${GITHUB_REF}')."
+  #          exit 1
+
   build:
     name: Build Project Dev
     runs-on: ubuntu-latest
     steps:
-    
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           lfs: true
-          
+
       - name: Cache Library
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: Library
           key: Library
@@ -26,12 +116,31 @@ jobs:
       - name: Clean up
         uses: jlumbroso/free-disk-space@v1.2.0
 
+      # Cheap guard: the player must boot into the demo chain. If a scene is
+      # missing from EditorBuildSettings the build would silently start at
+      # Playground (or fail at runtime), so fail the build before compiling.
+      - name: Guard - demo scene chain in Build Settings
+        run: |
+          set -euo pipefail
+          for scene in Intro00 Intro01 MainMenu_ Playground; do
+            grep -q "Assets/_MKRebuild/Scenes/${scene}.unity" ProjectSettings/EditorBuildSettings.asset \
+              || { echo "::error::${scene} is missing from EditorBuildSettings"; exit 1; }
+          done
+          echo "Build Settings contain the full demo chain."
+
       - name: Build project
-        uses: game-ci/unity-builder@v2
+        uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: StandaloneWindows64
+          buildName: MortalKombatProjectOC
+          # Tester builds keep the Development flag so DebugWindow /
+          # PlayerDamageTestDriver activate. An itch publication is a release
+          # build, so the flag is dropped when publish_itch is requested.
+          customParameters: ${{ github.event.inputs.publish_itch == 'true' && '' || '-Development' }}
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -39,6 +148,7 @@ jobs:
         with:
           name: build-Windows
           path: build
+          retention-days: 2
 
       - name: Send Discord Notification
         run: |
@@ -49,3 +159,105 @@ jobs:
           curl -X POST -H "Content-Type: application/json" -d "$json_payload" ${{ secrets.DISCORD_WEBHOOK_URL }}
         env:
           DOWNLOAD_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/${{ steps.get_artifact_id.outputs.artifact-id }}"
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build, version]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+      SHA7: ${{ needs.version.outputs.sha7 }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-Windows
+          path: artifacts
+
+      - name: Package Windows build
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          if [ -d "artifacts/StandaloneWindows64" ]; then
+            SRC="artifacts/StandaloneWindows64"
+          else
+            SRC="artifacts"
+          fi
+          cp -r "$SRC"/. release/
+          if [ ! -f "release/MortalKombatProjectOC.exe" ]; then
+            echo "::error::Expected release/MortalKombatProjectOC.exe was not produced by the build."
+            exit 1
+          fi
+          ASSET="MortalKombat-Windows-${TAG}-${SHA7}.zip"
+          (cd release && zip -qr "../${ASSET}" .)
+          ls -lh "${ASSET}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Mortal Kombat Project ${{ needs.version.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: MortalKombat-Windows-*.zip
+
+      # Itch.io deployment lives in the `itch` job below. It is opt-in via the
+      # `publish_itch` dispatch input (default false), so PR builds and tester
+      # artifacts never touch the public page.
+
+  # ---------------------------------------------------------------------------
+  # Itch.io publication (opt-in). Uses the official butler client so the
+  # SemVer tag is the uploaded version and the package is pushed unpacked
+  # (butler does delta patching; a zip would be re-uploaded whole every time).
+  # Requires the BUTLER_CREDENTIALS secret (itch.io API key).
+  # ---------------------------------------------------------------------------
+  itch:
+    name: Publish to itch.io
+    needs: [build, version]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_itch == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-Windows
+          path: artifacts
+
+      - name: Locate package
+        id: package
+        run: |
+          set -euo pipefail
+          if [ -d "artifacts/StandaloneWindows64" ]; then
+            SRC="artifacts/StandaloneWindows64"
+          else
+            SRC="artifacts"
+          fi
+          if [ ! -f "$SRC/MortalKombatProjectOC.exe" ]; then
+            echo "::error::Expected $SRC/MortalKombatProjectOC.exe was not produced by the build."
+            exit 1
+          fi
+          echo "path=$SRC" >> "$GITHUB_OUTPUT"
+
+      - name: Install butler
+        run: |
+          set -euo pipefail
+          curl -fsSL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip
+          chmod +x butler
+          ./butler -V
+
+      - name: Push to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_CREDENTIALS }}
+          PACKAGE: ${{ steps.package.outputs.path }}
+          VERSION: ${{ needs.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ./butler push "$PACKAGE" bellseboss/mkoc-rise-of-leena:windows --userversion "$VERSION"

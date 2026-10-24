@@ -1,4 +1,5 @@
 ﻿using System;
+using _Scripts.Player;
 using Bellseboss.Angel.CombatSystem;
 using Bellseboss.Pery.Scripts.Input;
 using UnityEngine;
@@ -46,7 +47,7 @@ public class AiControllerV2 : MonoBehaviour, IAiController
         _enemy.OnDead += EnemyOnOnDead;
         _enemy.OnPlayerDetected += isDetected =>
         {
-            Debug.Log($"OnPlayerDetected {isDetected}");
+            // Debug.Log($"OnPlayerDetected {isDetected}");
 
             StopAllStartIdle();
         };
@@ -102,6 +103,7 @@ public class AiControllerV2 : MonoBehaviour, IAiController
     private void StopAllStartIdle(bool startIdle = true)
     {
         //Stop all teatime
+        Debug.Log($"name {gameObject.name}", gameObject);
         _idle.Stop();
         _findPlayer.Stop();
         _watchPlayer.Stop();
@@ -285,9 +287,14 @@ public class AiControllerV2 : MonoBehaviour, IAiController
         StopAllStartIdle(false);
     }
 
-    public void Fatality()
+    public void StopAI()
     {
         StopAllStartIdle(false);
+    }
+
+    public void Clean()
+    {
+        Destroy(_randomPosition);
     }
 
     public void StartAi()

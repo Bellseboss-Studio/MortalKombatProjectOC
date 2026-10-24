@@ -1,7 +1,8 @@
 using System;
 using System.Linq;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
-using Cinemachine;
+using Unity.Cinemachine;
 using UnityEngine;
 
 public class CameraBehaviour : MonoBehaviour, ICameraBehaviour

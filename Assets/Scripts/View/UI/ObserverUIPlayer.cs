@@ -15,6 +15,6 @@ public class ObserverUIPlayer : UiController
     public override void SetEnergyValue(float energyToAdd)
     {
         Debug.Log("Add energy");
-        sliderEnergy.fillAmount += energyToAdd/100;
+        sliderEnergy.fillAmount = energyToAdd/100;
     }
 }

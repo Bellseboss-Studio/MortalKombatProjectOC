@@ -1,6 +1,8 @@
 using System;
+using _Scripts.Interact;
+using _Scripts.Player;
 using Bellseboss.Pery.Scripts.Input;
-using Cinemachine;
+using Unity.Cinemachine;
 using UnityEngine;
 
 public class CameraTrigger : MonoBehaviour, ICameraTrigger
@@ -28,7 +30,7 @@ public class CameraTrigger : MonoBehaviour, ICameraTrigger
 
     private void OnColliderEnter(GameObject o, CameraCollider room)
     {
-        Debug.Log($"CameraTrigger:OnColliderEnter: {_index}");
+        // Debug.Log($"CameraTrigger:OnColliderEnter: {_index}");
         ChangeCamera?.Invoke(_index);
     }
 }

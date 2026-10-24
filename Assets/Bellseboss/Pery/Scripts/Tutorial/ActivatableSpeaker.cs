@@ -17,7 +17,7 @@ namespace MortalKombat.Audio
             }
             catch
             {
-                Debug.Log("error on Activatable Speaker");
+                // Debug.Log("error on Activatable Speaker");
             }
             
         }
@@ -27,12 +27,14 @@ namespace MortalKombat.Audio
             yield return new WaitForSeconds(milliseconds / 1000);
             Finish();
         }
+
+        public override void Deactivate()
+        {
+            FmodFacade.Stop();
+        }
     }
 
     public interface IFmodClient
     {
     }
 }
-
-
-

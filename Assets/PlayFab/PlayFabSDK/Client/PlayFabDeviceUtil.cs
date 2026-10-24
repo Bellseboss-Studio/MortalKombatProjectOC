@@ -29,7 +29,7 @@ namespace PlayFab.Internal
         }
         private static void OnGatherFail(PlayFabError error)
         {
-            Debug.Log("OnGatherFail: " + error.GenerateErrorReport());
+            // Debug.Log("OnGatherFail: " + error.GenerateErrorReport());
         }
         #endregion
 

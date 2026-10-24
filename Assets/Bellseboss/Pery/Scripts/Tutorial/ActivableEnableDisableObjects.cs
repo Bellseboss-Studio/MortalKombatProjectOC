@@ -23,4 +23,12 @@ public class ActivableEnableDisableObjects : ActivableTutorial
         }
         Finish();
     }
+
+    public override void Deactivate()
+    {
+        foreach (var obj in objectsToEnable)
+        {
+            obj.SetActive(!isEnable);
+        }
+    }
 }
