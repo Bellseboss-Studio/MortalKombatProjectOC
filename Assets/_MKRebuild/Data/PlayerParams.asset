@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdae459132a6ac243be8c8dcffdab5d4, type: 3}
+  m_Name: PlayerParams
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerParams
+  walkSpeed: 6
+  runSpeed: 9
+  jumpVelocity: 10
+  gravity: -25
+  walkInputThreshold: 0.2
+  runInputThreshold: 0.4
+  jumpBuffer: 0.15
+  coyoteTime: 0.12
+  jumpLockout: 0.33
+  landingClipSpeed: 4
+  jumpLockoutExtra: 0.1
+  fallGravityMultiplier: 2.2
+  jumpCutMultiplier: 0.45
+  maxFallSpeed: -25
+  jumpStartSpeed: 8.2
+  flipMidAirSpeed: 3.5
+  dashClipSpeed: 2.29
+  deathClipSpeed: 3.5
+  hitReactionClipSpeed: 1
+  attackSpeedScale: 1.5
+  attackReachScale: 1
+  hitstopScale: 1
+  cancelStartScale: 1
+  maxTargetsOverride: 0
+  directionFlickWindow: 0.22
+  accelTime: 0.08
+  decelTime: 0.1
+  airControlFactor: 0.66
+  turnSpeed: 1500
+  groundRayOffset: 0.4
+  groundNormalMinDot: 0.7
+  wallCheckDistance: 0.7
+  wallBandSize: {x: 1.2, y: 0.6, z: 1.2}
+  wallBandHeight: 0.4
+  wallNormalThreshold: 0.5
+  wallSlideSpeed: 0
+  wallJumpVelocity: 8
+  wallJumpPushOff: 6
+  wallJumpLockTime: 0.15
+  wallReGrabDelay: 0.2
+  ledgeReGrabDelay: 0.6
+  facingDotThreshold: 0.5
+  wallCoyoteTime: 0.12
+  wallReleaseHop: 3
+  wallReleaseThreshold: -0.5
+  gripDepth: 0.6
+  hangGripHeight: 0.4
+  hangBandSize: {x: 1.2, y: 0.3, z: 0.7}
+  autoMantle: 0
+  mantleDuration: 0.4
+  mantleClipSpeed: 2.78
+  mantleStepForward: 1
+  mantleArcRadius: 1.5
