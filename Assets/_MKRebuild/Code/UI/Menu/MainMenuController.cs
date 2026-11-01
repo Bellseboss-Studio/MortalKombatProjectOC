@@ -65,9 +65,12 @@ namespace MK.Rebuild
         [Tooltip("Seconds to wait for the EventSystem before giving up and logging. The menu still runs; only navigation is lost.")]
         [SerializeField, Min(0.1f)] private float focusTimeoutSeconds = 5f;
 
+        private const float PointerMoveThresholdSq = 4f;
+
         private Coroutine focusRoutine;
         private bool focusWarned;
         private bool cinematicPending;
+        private bool pointerMode;
         private bool panelOpen;
         private MenuPanel optionsPanel;
         private MenuPanel creditsPanel;
@@ -97,7 +100,7 @@ namespace MK.Rebuild
 
         private void OnEnable()
         {
-            HideCursor();
+            ApplyCursorMode();
 
             if (cinematic != null && cinematic.IsPlaying)
             {
@@ -118,6 +121,12 @@ namespace MK.Rebuild
 
         private void OnDisable()
         {
+            // Gameplay inherits whatever cursor state the menu leaves behind, and PauseMenu saves
+            // and restores that state. A pointer-mode menu would therefore leak a visible cursor
+            // into the next scene, so the menu always leaves in controller mode.
+            pointerMode = false;
+            ApplyCursorMode();
+
             if (cinematic != null) cinematic.Finished -= OnCinematicFinished;
 
             if (focusRoutine != null)
@@ -129,10 +138,12 @@ namespace MK.Rebuild
 
         private void Update()
         {
-            // Re-asserted every frame on purpose: a mouse click, an editor focus change or the
-            // OS unlocking the cursor would otherwise bring the pointer back mid-menu, and the
-            // menu must never show it.
-            HideCursor();
+            // Re-asserted every frame on purpose: a mouse click, an editor focus change or the OS
+            // unlocking the cursor would otherwise override the current mode. The menu stays
+            // controller-first, but a player holding a mouse must be able to use it.
+            PollMouseMovement();
+            PollControllerButtons();
+            ApplyCursorMode();
 
             if (panelOpen)
             {
@@ -166,6 +177,11 @@ namespace MK.Rebuild
         /// </summary>
         public void Play()
         {
+            // Leave the menu in controller mode so the next scene starts with the cursor locked,
+            // exactly as it did before pointer support existed.
+            pointerMode = false;
+            ApplyCursorMode();
+
             if (SceneFlowController.Instance != null)
             {
                 SceneFlowController.Instance.LoadNext();
@@ -414,10 +430,66 @@ namespace MK.Rebuild
             module.cancel.action.Enable();
         }
 
-        private static void HideCursor()
+        /// <summary>
+        /// The menu is controller-first: the cursor starts hidden and locked. A pointer device,
+        /// however, must be able to drive the menu — a PC player holding only a mouse has no other
+        /// way in. So the cursor is not forced off; it follows the last device that moved.
+        /// </summary>
+        private void ApplyCursorMode()
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            Cursor.lockState = pointerMode ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = pointerMode;
+        }
+
+        /// <summary>
+        /// Any gamepad, joystick or keyboard button hands control back to the controller path.
+        /// Polled instead of subscribed because <c>InputSystem.onAnyButtonPress</c> is an
+        /// <c>IObservable</c>, not an event, and this needs no extra dependency. Checking the
+        /// <c>Joystick</c> device explicitly is what keeps generic/Android pads working: they do
+        /// not enumerate as <c>Gamepad</c>.
+        /// </summary>
+        private void PollControllerButtons()
+        {
+            if (pointerMode == false) return;
+            if (AnyPressedOn(UnityEngine.InputSystem.Gamepad.current)) { pointerMode = false; return; }
+            if (AnyPressedOn(UnityEngine.InputSystem.Joystick.current)) { pointerMode = false; return; }
+
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard != null && keyboard.anyKey.wasPressedThisFrame) pointerMode = false;
+        }
+
+        private static bool AnyPressedOn(UnityEngine.InputSystem.InputDevice device)
+        {
+            if (device == null) return false;
+
+            var controls = device.allControls;
+            for (int i = 0; i < controls.Count; i++)
+            {
+                if (controls[i] is UnityEngine.InputSystem.Controls.ButtonControl button &&
+                    button.wasPressedThisFrame)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Mouse movement is not a button press, so it needs its own poll. Ignored while the
+        /// cinematic runs: a pointer floating over the intro would break the shot.
+        /// </summary>
+        private void PollMouseMovement()
+        {
+            if (pointerMode) return;
+            if (cinematic != null && cinematic.IsPlaying) return;
+
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            if (mouse == null) return;
+            if (mouse.delta.ReadValue().sqrMagnitude <= PointerMoveThresholdSq) return;
+
+            pointerMode = true;
+            ApplyCursorMode();
         }
     }
 }

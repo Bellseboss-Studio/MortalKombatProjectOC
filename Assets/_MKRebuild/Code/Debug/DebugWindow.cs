@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.Utilities;
 
 namespace MK.Rebuild.Debugging
@@ -107,6 +108,7 @@ namespace MK.Rebuild.Debugging
 
         private string lastInputPath = "<none>";
         private string lastInputDevice = "<none>";
+        private string lastInput = "<none>";
         private IDisposable anyButtonSubscription;
 
         private Texture2D background;
@@ -188,6 +190,11 @@ namespace MK.Rebuild.Debugging
 
         private void Update()
         {
+            // Always (every tab, and even with no tab open): map what the pad actually
+            // reports. Polled because some generic <Joystick> devices never raise
+            // onAnyButtonPress — R3 on the tester's pad is exactly that case.
+            PollPressedControl();
+
             // Header clicks are queued so the change lands between IMGUI passes.
             if (pendingTab != DebugTab.None)
             {
@@ -218,6 +225,32 @@ namespace MK.Rebuild.Debugging
             if (keyboard.f10Key.wasPressedThisFrame) { ExecuteSlot(10); return; }
             if (keyboard.f11Key.wasPressedThisFrame) { ExecuteSlot(11); return; }
             // F12 is reserved: intentionally no-op.
+        }
+
+        /// <summary>
+        /// Observe-only input probe: scans every device's button controls and remembers the
+        /// last press as <c>device · controlPath</c>. Polled instead of subscribed because
+        /// generic <c>&lt;Joystick&gt;</c> devices do not always raise
+        /// <c>onAnyButtonPress</c>. The string is built ONLY on a press (no per-frame garbage).
+        /// </summary>
+        private void PollPressedControl()
+        {
+            var devices = InputSystem.devices;
+            for (int d = 0; d < devices.Count; d++)
+            {
+                InputDevice device = devices[d];
+                if (device == null) continue;
+
+                var controls = device.allControls;
+                for (int c = 0; c < controls.Count; c++)
+                {
+                    if (controls[c] is ButtonControl button && button.wasPressedThisFrame)
+                    {
+                        lastInput = $"{device.displayName} · {button.path}";
+                        return; // one line: the first press of the frame wins
+                    }
+                }
+            }
         }
 
         private void ToggleTab(DebugTab tab)
@@ -622,6 +655,13 @@ namespace MK.Rebuild.Debugging
                 case DebugTab.Player: DrawPlayerTab(); break;
                 case DebugTab.Etc: DrawEtcTab(); break;
             }
+
+            // INPUT PROBE footer: ONE line at the bottom of EVERY tab, so a pad button can
+            // be identified without opening the Player tab. Visual only.
+            GUILayout.FlexibleSpace();
+            GUILayout.Label(
+                InputSystem.devices.Count == 0 ? "last input: <none>" : $"last input: {lastInput}",
+                labelStyle);
 
             GUILayout.EndArea();
         }
