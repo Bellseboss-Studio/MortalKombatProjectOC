@@ -34,6 +34,7 @@ namespace MK.Rebuild
         private ICharacterVisual visual;
         private PlayerInput input;
         private PlayerDash dash;
+        private PlayerStance stance;
 
         private Vector2 moveInput;
         private Vector3 wishDir; // cached camera-relative input direction (XZ unit, zero = no input)
@@ -274,6 +275,7 @@ namespace MK.Rebuild
             body = GetComponent<CapsuleCollider>();
             visual = GetComponent<ICharacterVisual>();
             dash = GetComponent<PlayerDash>();
+            stance = GetComponent<PlayerStance>();
             // One-time params seam for the concrete driver (turnSpeed stays data-driven).
             if (visual is AnimatorVisual animatorVisual) animatorVisual.Bind(paramsAsset);
 
@@ -637,6 +639,15 @@ namespace MK.Rebuild
                 targetSpeed = paramsAsset.runSpeed; // run zone (fixed)
                 running = true;
             }
+
+            // Stance seam: blocking is a slow strafe by design (PlayerStance owns the number).
+            // `running` is cleared so the visual plays the walk, not a 35%-speed run cycle.
+            if (stance != null && stance.IsBlocking)
+            {
+                targetSpeed *= stance.SpeedMultiplier;
+                running = false;
+            }
+
             bool moving = targetSpeed > 0.0001f;
 
             if (grounded && moving && !InputLocked)

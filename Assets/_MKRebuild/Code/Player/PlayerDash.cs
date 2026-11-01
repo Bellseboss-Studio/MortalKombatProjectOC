@@ -84,12 +84,23 @@ namespace MK.Rebuild
         [Tooltip("Aim-assist config for the DASH direction — its OWN definition, tunable independently from PlayerCombat's attack corrector (cone / range / turn). E.g. a more generous range so the dash gap-closes farther than an attack. Null / disabled = the dash stays straight.")]
         [SerializeField] private AimAssistDefinition dashAimAssist;
 
+        [Header("Lunge (Tarkatana)")]
+        [Tooltip("Maximum distance the lunge will travel to reach a target inside the cone. The lunge stretches to the target's distance; this caps it so a charge cannot cross the whole level.")]
+        [SerializeField] private float maxLungeDistance = 10f;
+
+        [Tooltip("Travel speed of the lunge in m/s. The dash DURATION stretches with the distance at this speed, so a long lunge stays readable instead of becoming a teleport.")]
+        [SerializeField] private float lungeSpeed = 14f;
+
+        [Tooltip("How far short of the target the lunge stops, in meters. Keeps the player adjacent to the enemy instead of inside it.")]
+        [SerializeField] private float lungeStopOffset = 1.0f;
+
         private Rigidbody rb;
         private PlayerMotor motor;
         private PlayerCombat combat;
         private PlayerAbilities abilities;
         private ICharacterVisual visual;
         private AnimatorVisual animatorVisual;
+        private PlayerStance stance;
 
         private bool isDashing;
         private BodyOwnership.Token dashToken; // body-ownership token (released by EndDash / OnDisable)
@@ -99,9 +110,13 @@ namespace MK.Rebuild
         private float cooldownTimer;  // unscaled seconds left until the dash is ready
         private Vector3 dashDir;      // locked facing/direction of the impulse
         private Vector3 baseVelocity; // horizontal velocity captured at dash start (additive mode, direction locked)
+        private float activeDistance; // dashDistance after the stance multiplier (set at dash start)
+        private float activeDuration; // dashDuration for THIS dash (the lunge stretches it)
+        private bool cancelable = true; // false on the Tarkatana lunge: it is a commitment
         private float sinceDash = RecencyCap; // unscaled seconds since the dash started (0 while dashing; large until the first dash)
 
         private const float RecencyCap = 1000f; // "never dashed" sentinel for sinceDash
+        private const float MinLungeReach = 0.5f; // shortest lunge, so a point-blank target still pounces
 
         /// <summary>True while the dash impulse is running (read-only seam).</summary>
         public bool IsDashing => isDashing;
@@ -135,6 +150,7 @@ namespace MK.Rebuild
             // state now has a clip (anim_dash2_north). Cache the concrete driver
             // so PlayDash/ReleaseDash can drive it — null on the proxy fallback.
             animatorVisual = GetComponent<AnimatorVisual>();
+            stance = GetComponent<PlayerStance>();
         }
 
         private void Update()
@@ -219,8 +235,8 @@ namespace MK.Rebuild
                 return;
             }
 
-            float window = Mathf.Max(0.001f, dashDuration);
-            float speed = Mathf.Max(0f, CurveMotion.Speed(dashCurve, dashDistance, window, dashElapsed));
+            float window = Mathf.Max(0.001f, activeDuration);
+            float speed = Mathf.Max(0f, CurveMotion.Speed(dashCurve, activeDistance, window, dashElapsed));
             Vector3 v = rb.linearVelocity;
             if (additive)
             {
@@ -243,7 +259,37 @@ namespace MK.Rebuild
             dashElapsed = 0f;
             sinceDash = 0f;
             if (!CurveMotion.IsUsable(dashCurve)) dashCurve = CurveMotion.DefaultEaseOut();
-            invulnTimer = Mathf.Max(0f, invulnDuration);
+
+            // STANCE SEAM (the duality): the SAME button means opposite things per stance.
+            //   Mantis    = PARRY. The player PLANTS — no displacement at all — for exactly the
+            //               parry window. A hit inside the window is consumed; a late press eats
+            //               the hit. The monk waits.
+            //   Tarkatana = LUNGE. Longer dash, ZERO defensive frames. It initiates. The beast
+            //               charges.
+            // Without a PlayerStance component (the v1 player) everything stays as authored.
+            bool parryMode = stance != null && stance.AllowsDashParry;
+            activeDistance = dashDistance;
+            activeDuration = dashDuration;
+            float activeInvuln = invulnDuration;
+
+            // The LUNGE is a COMMITMENT: it cannot be cut by an attack or a jump. A cancellable
+            // lunge reads as a hesitant, weak dash — exactly what the stance is not.
+            cancelable = stance == null || !stance.IsTarkatana;
+
+            if (parryMode)
+            {
+                activeDistance = 0f;
+                activeDuration = stance.ParryWindow;
+                activeInvuln = stance.ParryWindow;
+                dashTimer = Mathf.Max(0.01f, stance.ParryWindow);
+            }
+            else if (stance != null)
+            {
+                activeDistance *= stance.DashDistanceMultiplier;
+                activeInvuln = 0f;
+            }
+
+            invulnTimer = Mathf.Max(0f, activeInvuln);
             cooldownTimer = Mathf.Max(0f, cooldown);
 
             // Dash direction follows the INPUT (slice 3octies): the camera-relative wish
@@ -260,11 +306,32 @@ namespace MK.Rebuild
             }
 
             // Aim-assist ON TOP of the intended direction (slice 3sexies): the dash's OWN
-            // definition. If a target sits inside the frontal cone + range, SNAP the dash
-            // direction toward it (OFFENSIVE gap-close). Dashing AWAY — target behind or
-            // outside the cone — finds nothing, so dashDir stays as intended (DEFENSIVE).
-            if (AimAssist.TryFindAimDir(transform.position, rb, dashDir, dashAimAssist, out Vector3 aim))
+            // definition. If a target sits inside the frontal cone, SNAP the dash direction
+            // toward it (OFFENSIVE gap-close). Dashing AWAY — target behind or outside the
+            // cone — finds nothing, so dashDir stays as intended (DEFENSIVE).
+            //
+            // LUNGE (Tarkatana): the search IGNORES the definition's range. An enemy inside the
+            // cone is reached no matter how far away it is, and the dash then STRETCHES to cover
+            // the measured distance. A lunge that falls short reads as a tired beast; this one
+            // always commits.
+            bool lungeMode = stance != null && stance.IsTarkatana;
+            Vector3 aim;
+            float aimDistance;
+
+            if (lungeMode)
+            {
+                if (AimAssist.TryFindAimTarget(
+                        transform.position, rb, dashDir, dashAimAssist,
+                        maxLungeDistance, out aim, out aimDistance))
+                {
+                    dashDir = aim;
+                    ApplyLungeReach(aimDistance);
+                }
+            }
+            else if (AimAssist.TryFindAimDir(transform.position, rb, dashDir, dashAimAssist, out aim))
+            {
                 dashDir = aim;
+            }
 
             if (visual != null) visual.SetFacing(dashDir);
 
@@ -272,12 +339,27 @@ namespace MK.Rebuild
             // full vector (direction locked too — it is NOT re-aimed at the facing).
             // Run + dash keeps this base through the whole dash and hands back control
             // at ~base speed at dash end; stand + dash captures ~0 (burst from zero).
+            // The parry is a PLANT: no motion at all, so a captured run velocity is dropped and
+            // the body's horizontal velocity is zeroed for the window. Tarkatana keeps its lunge
+            // base (the additive burst rides on top of a run).
             if (rb != null)
-                baseVelocity = zeroBase
+            {
+                baseVelocity = zeroBase || parryMode
                     ? Vector3.zero
                     : new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+
+                if (parryMode)
+                {
+                    Vector3 planted = rb.linearVelocity;
+                    planted.x = 0f;
+                    planted.z = 0f;
+                    rb.linearVelocity = planted;
+                }
+            }
             else
+            {
                 baseVelocity = Vector3.zero;
+            }
 
             if (motor != null && motor.Body != null)
                 dashToken = motor.Body.Acquire(BodyPriority.Dash);
@@ -285,6 +367,24 @@ namespace MK.Rebuild
             // Real dash clip (slice 1): CrossFade into the Dash state + raise
             // DashState so the mirror exits stay gated until EndDash releases it.
             if (animatorVisual != null) animatorVisual.PlayDash(0.05f);
+        }
+
+        /// <summary>
+        /// Stretches the lunge so it actually reaches the target: distance first, then duration at
+        /// a CONSTANT speed. Constant duration with a growing distance would turn a long lunge into
+        /// a teleport, and a discrete Rigidbody at that speed would tunnel through walls.
+        ///
+        /// The distance is set to the target's — NOT max'd with the base — so a close enemy is a
+        /// short pounce instead of being flown past. No target = the authored lunge distance.
+        /// </summary>
+        private void ApplyLungeReach(float targetDistance)
+        {
+            float reach = Mathf.Clamp(
+                targetDistance - lungeStopOffset, MinLungeReach, maxLungeDistance);
+
+            activeDistance = reach;
+            activeDuration = Mathf.Max(dashDuration, reach / Mathf.Max(1f, lungeSpeed));
+            dashTimer = activeDuration;
         }
 
         /// <summary>
@@ -299,7 +399,7 @@ namespace MK.Rebuild
         /// </summary>
         public bool TryCancelByAttack()
         {
-            if (!isDashing) return false;
+            if (!isDashing || !cancelable) return false;
             if (dashElapsed < minCancelTime) return false;
             EndDash();
             return true;
@@ -313,7 +413,7 @@ namespace MK.Rebuild
         /// </summary>
         public bool TryCancelByJump()
         {
-            if (!isDashing) return false;
+            if (!isDashing || !cancelable) return false;
             if (dashElapsed < minCancelTime) return false;
             EndDash();
             return true;

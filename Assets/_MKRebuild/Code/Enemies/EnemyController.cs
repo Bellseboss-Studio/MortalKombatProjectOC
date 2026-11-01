@@ -62,6 +62,8 @@ namespace MK.Rebuild
         private float cooldownTimer;
         private float attackTimer;
         private float staggerTimer;
+        private bool staggerLocked;
+        private float staggerLockUntil;
         private bool attackHitApplied;
         private bool hasToken;
         private bool hasRangedToken;
@@ -77,6 +79,13 @@ namespace MK.Rebuild
         /// debug overlay only; false in normal play.
         /// </summary>
         public bool Frozen { get; set; }
+
+        /// <summary>
+        /// True while a thrown body owns this enemy's horizontal motion (Tarkatana grab
+        /// throw). The debug AI freeze and the dead branch must not brake it, or the
+        /// projectile would stall in the air. Set/cleared by <see cref="ThrownBody"/>.
+        /// </summary>
+        public bool Thrown { get; set; }
 
         // Backstab archetype (EnemyAttackKind.Backstab).
         private float fleeTimer;
@@ -161,7 +170,7 @@ namespace MK.Rebuild
             {
                 ReleaseToken();
                 ReleaseRangedToken();
-                StopHorizontal();
+                if (!Thrown) StopHorizontal(); // a thrown body owns its horizontal motion
                 return;
             }
 
@@ -217,7 +226,8 @@ namespace MK.Rebuild
                     break;
 
                 case State.Dead:
-                    if (!rb.isKinematic) StopHorizontal();
+                    // A corpse that is still flying (thrown body) keeps its momentum.
+                    if (!Thrown && !rb.isKinematic) StopHorizontal();
                     break;
             }
         }
@@ -721,8 +731,17 @@ namespace MK.Rebuild
             // Deliberately does NOT write horizontal velocity: knockback/steering
             // momentum plays out while staggering.
             if (characterVisual != null) characterVisual.SetMoving(false, 0f);
+
+            // The explicit-duration lock (disarm) expires with its own timer even if the
+            // state was left early; leaving State.Stagger also releases it below.
+            if (staggerLocked && Time.time >= staggerLockUntil) staggerLocked = false;
+
             staggerTimer -= dt;
-            if (staggerTimer <= 0f) state = State.Chase;
+            if (staggerTimer <= 0f)
+            {
+                staggerLocked = false;
+                state = State.Chase;
+            }
         }
 
         // --- HitReceiver seams ----------------------------------------------
@@ -731,10 +750,50 @@ namespace MK.Rebuild
         {
             if (dead || definition == null) return;
             if (characterVisual != null) characterVisual.PlayHit();
+
+            // EXPLICIT-DURATION STAGGER (Mantis disarm) is protected: a hit during the open
+            // window must not re-stagger it back to the archetype's shorter duration, or the
+            // "precise hit" window would destroy itself with the first hit. Damage and the
+            // PlayHit feedback above still happen normally.
+            if (staggerLocked && Time.time < staggerLockUntil) return;
+
             if (damage >= definition.poiseThreshold) EnterStagger();
         }
 
+        /// <summary>
+        /// Public stagger seam: a successful parry leaves the attacker exposed. Reuses the exact
+        /// poise-break path, so the recovery, the token release and the visual are identical.
+        /// </summary>
+        public void Stagger()
+        {
+            if (dead || definition == null) return;
+            EnterStagger();
+        }
+
+        /// <summary>
+        /// Public stagger with an EXPLICIT duration (Mantis disarm): same poise-break path, but
+        /// the enemy stays open for the caller's window instead of the archetype's. The caller
+        /// owns the tuning; this only guarantees the minimum readable stagger.
+        /// </summary>
+        /// <param name="duration">Seconds the enemy stays in <c>State.Stagger</c> (clamped to 0.05).</param>
+        public void Stagger(float duration)
+        {
+            if (dead || definition == null) return;
+
+            // Lock out poise re-staggers for the whole explicit window: this is what keeps
+            // the disarm's long opening alive after the player lands the precise hit.
+            staggerLocked = true;
+            staggerLockUntil = Time.time + Mathf.Max(0.05f, duration);
+
+            EnterStagger(duration);
+        }
+
         private void EnterStagger()
+        {
+            EnterStagger(definition.staggerDuration);
+        }
+
+        private void EnterStagger(float duration)
         {
             // Interrupts Attack/Charge/Recovery/RangedAttack/Backstab/Flee; the
             // ring slot is kept so the crowd does not reshuffle every time
@@ -748,13 +807,14 @@ namespace MK.Rebuild
                 characterVisual.PlayHit();
             }
             state = State.Stagger;
-            staggerTimer = definition.staggerDuration;
+            staggerTimer = Mathf.Max(0.05f, duration);
         }
 
         private void OnDied()
         {
             if (dead) return;
             dead = true;
+            staggerLocked = false;
             ReleaseToken();
             ReleaseRangedToken();
             ReleaseRingSlot();

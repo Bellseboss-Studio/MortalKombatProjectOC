@@ -37,6 +37,16 @@ namespace MK.Rebuild
         [Tooltip("Get-up lock duration (seconds) after landing from an air hit. Match the GetUp clip length.")]
         [SerializeField] private float getUpDuration = 2f;
 
+        [Header("Parry (Mantis dash)")]
+        [Tooltip("How far toward the ATTACKER the parry looks for the enemy to stagger, in meters. The push direction points away from the source, so the probe goes the opposite way.")]
+        [SerializeField] private float parryStaggerProbe = 1.2f;
+
+        [Tooltip("Radius of the parry stagger search around the probe point, in meters. Raise it if a parry sometimes fails to expose the attacker.")]
+        [SerializeField] private float parryStaggerRadius = 1.8f;
+
+        [Tooltip("How long the parried attacker stays open. Must be clearly longer than the normal poise stagger, or the parry has no payoff.")]
+        [SerializeField] private float parryStaggerDuration = 1.0f;
+
         private enum HitPhase { None, AirHit, GetUp }
 
         private int hp;
@@ -47,6 +57,8 @@ namespace MK.Rebuild
         private PlayerKnockback knockback;
         private PlayerAbilities abilities;
         private PlayerMotor motor;
+        private PlayerStance stance;
+        private PlayerDash dash;
 
         private HitPhase hitPhase;
         private BodyOwnership.Token recoveryToken;
@@ -86,6 +98,8 @@ namespace MK.Rebuild
             knockback = GetComponent<PlayerKnockback>();
             abilities = GetComponent<PlayerAbilities>();
             motor = GetComponent<PlayerMotor>();
+            stance = GetComponent<PlayerStance>();
+            dash = GetComponent<PlayerDash>();
         }
 
         private void Update()
@@ -131,6 +145,27 @@ namespace MK.Rebuild
         public void TakeHit(int damage, Vector3 direction, float knockbackDistance, float knockbackDuration)
         {
             if (!IsAlive || IsInvulnerable) return;
+
+            // Dash seam: a Mantis dash consumes the hit as a PARRY — no damage, no reaction, no
+            // knockback. Tarkatana's dash has no defensive frames, and the gate requires the
+            // PlayerStance component so the v1 player keeps its old behaviour exactly.
+            if (dash != null && stance != null && stance.AllowsDashParry && dash.IsInvulnerable)
+            {
+                stance.NotifyParry();
+                StaggerParrySource(direction);
+                return;
+            }
+
+            // Stance seam: a raised guard (Mantis only) cuts the hit and cancels the shove. The
+            // guard meter is spent FIRST, so the hit that empties it is still blocked; after the
+            // break IsBlocking is false and every hit lands in full.
+            if (stance != null && stance.IsBlocking)
+            {
+                stance.ConsumeGuard(damage);
+                damage = Mathf.Max(1, Mathf.RoundToInt(damage * stance.DamageMultiplier));
+                knockbackDistance = 0f;
+            }
+
             CancelRecovery();
             hp = Mathf.Max(0, hp - Mathf.Max(0, damage));
 
@@ -230,6 +265,48 @@ namespace MK.Rebuild
         {
             if (motor == null) motor = GetComponent<PlayerMotor>();
             if (motor != null) motor.CancelVerticalMomentum();
+        }
+
+        /// <summary>
+        /// A successful parry leaves the attacker exposed: the enemy enters the SAME stagger a
+        /// poise break produces, so the player gets a real counter window instead of a dodge.
+        ///
+        /// WHY a probe instead of a reference: the hurt path only carries the PUSH direction
+        /// (away from the source), not the attacker, and adding a source parameter would touch
+        /// every enemy call site. The probe walks back along the push and takes the nearest live
+        /// <see cref="EnemyController"/> — exact in a 1v1, approximate in a crowd. Replace it with
+        /// an explicit source parameter when the hurt path is next refactored.
+        /// </summary>
+        private void StaggerParrySource(Vector3 pushDirection)
+        {
+            Vector3 dir = pushDirection;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) dir = -transform.forward;
+            dir.Normalize();
+
+            Vector3 probe = transform.position - dir * parryStaggerProbe;
+            Collider[] hits = Physics.OverlapSphere(
+                probe, parryStaggerRadius, ~0, QueryTriggerInteraction.Ignore);
+
+            EnemyController nearest = null;
+            float best = float.MaxValue;
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                Collider hit = hits[i];
+                if (hit == null) continue;
+
+                EnemyController enemy = hit.GetComponentInParent<EnemyController>();
+                if (enemy == null) continue;
+
+                float distance = (enemy.transform.position - probe).sqrMagnitude;
+                if (distance >= best) continue;
+
+                best = distance;
+                nearest = enemy;
+            }
+
+            if (nearest != null) nearest.Stagger(parryStaggerDuration);
         }
 
         private void Die()

@@ -156,6 +156,33 @@ namespace MK.Rebuild
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Block"",
+                    ""type"": ""Button"",
+                    ""id"": ""a1b2c3d4-0009-4a00-9009-000000000009"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Grab"",
+                    ""type"": ""Button"",
+                    ""id"": ""a1b2c3d4-000a-4a00-900a-00000000000a"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""StanceSwitch"",
+                    ""type"": ""Button"",
+                    ""id"": ""a1b2c3d4-000b-4a00-900b-00000000000b"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -499,6 +526,138 @@ namespace MK.Rebuild
                     ""action"": ""Skill2"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0060-4a00-9060-000000000060"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Block"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0061-4a00-9061-000000000061"",
+                    ""path"": ""<Gamepad>/leftShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Block"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0062-4a00-9062-000000000062"",
+                    ""path"": ""<Joystick>/button11"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Block"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0063-4a00-9063-000000000063"",
+                    ""path"": ""<Keyboard>/f"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Grab"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0064-4a00-9064-000000000064"",
+                    ""path"": ""<Gamepad>/rightShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Grab"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0065-4a00-9065-000000000065"",
+                    ""path"": ""<Joystick>/button12"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Grab"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0066-4a00-9066-000000000066"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""StanceSwitch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0067-4a00-9067-000000000067"",
+                    ""path"": ""<Gamepad>/rightStickButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""StanceSwitch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0068-4a00-9068-000000000068"",
+                    ""path"": ""<Joystick>/button13"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""StanceSwitch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-0069-4a00-9069-000000000069"",
+                    ""path"": ""<Gamepad>/select"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""StanceSwitch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-006a-4a00-906a-00000000006a"",
+                    ""path"": ""<Joystick>/button14"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""StanceSwitch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""e921c7b8-a7c9-49e2-8368-661eac2dc9f8"",
+                    ""path"": ""<Gamepad>/rightStickPress"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""StanceSwitch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -514,6 +673,9 @@ namespace MK.Rebuild
             m_Player_Dash = m_Player.FindAction("Dash", throwIfNotFound: true);
             m_Player_Skill1 = m_Player.FindAction("Skill1", throwIfNotFound: true);
             m_Player_Skill2 = m_Player.FindAction("Skill2", throwIfNotFound: true);
+            m_Player_Block = m_Player.FindAction("Block", throwIfNotFound: true);
+            m_Player_Grab = m_Player.FindAction("Grab", throwIfNotFound: true);
+            m_Player_StanceSwitch = m_Player.FindAction("StanceSwitch", throwIfNotFound: true);
         }
 
         ~@PlayerInput()
@@ -601,6 +763,9 @@ namespace MK.Rebuild
         private readonly InputAction m_Player_Dash;
         private readonly InputAction m_Player_Skill1;
         private readonly InputAction m_Player_Skill2;
+        private readonly InputAction m_Player_Block;
+        private readonly InputAction m_Player_Grab;
+        private readonly InputAction m_Player_StanceSwitch;
         /// <summary>
         /// Provides access to input actions defined in input action map "Player".
         /// </summary>
@@ -640,6 +805,18 @@ namespace MK.Rebuild
             /// Provides access to the underlying input action "Player/Skill2".
             /// </summary>
             public InputAction @Skill2 => m_Wrapper.m_Player_Skill2;
+            /// <summary>
+            /// Provides access to the underlying input action "Player/Block".
+            /// </summary>
+            public InputAction @Block => m_Wrapper.m_Player_Block;
+            /// <summary>
+            /// Provides access to the underlying input action "Player/Grab".
+            /// </summary>
+            public InputAction @Grab => m_Wrapper.m_Player_Grab;
+            /// <summary>
+            /// Provides access to the underlying input action "Player/StanceSwitch".
+            /// </summary>
+            public InputAction @StanceSwitch => m_Wrapper.m_Player_StanceSwitch;
             /// <summary>
             /// Provides access to the underlying input action map instance.
             /// </summary>
@@ -687,6 +864,15 @@ namespace MK.Rebuild
                 @Skill2.started += instance.OnSkill2;
                 @Skill2.performed += instance.OnSkill2;
                 @Skill2.canceled += instance.OnSkill2;
+                @Block.started += instance.OnBlock;
+                @Block.performed += instance.OnBlock;
+                @Block.canceled += instance.OnBlock;
+                @Grab.started += instance.OnGrab;
+                @Grab.performed += instance.OnGrab;
+                @Grab.canceled += instance.OnGrab;
+                @StanceSwitch.started += instance.OnStanceSwitch;
+                @StanceSwitch.performed += instance.OnStanceSwitch;
+                @StanceSwitch.canceled += instance.OnStanceSwitch;
             }
 
             /// <summary>
@@ -719,6 +905,15 @@ namespace MK.Rebuild
                 @Skill2.started -= instance.OnSkill2;
                 @Skill2.performed -= instance.OnSkill2;
                 @Skill2.canceled -= instance.OnSkill2;
+                @Block.started -= instance.OnBlock;
+                @Block.performed -= instance.OnBlock;
+                @Block.canceled -= instance.OnBlock;
+                @Grab.started -= instance.OnGrab;
+                @Grab.performed -= instance.OnGrab;
+                @Grab.canceled -= instance.OnGrab;
+                @StanceSwitch.started -= instance.OnStanceSwitch;
+                @StanceSwitch.performed -= instance.OnStanceSwitch;
+                @StanceSwitch.canceled -= instance.OnStanceSwitch;
             }
 
             /// <summary>
@@ -808,6 +1003,27 @@ namespace MK.Rebuild
             /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
             /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
             void OnSkill2(InputAction.CallbackContext context);
+            /// <summary>
+            /// Method invoked when associated input action "Block" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+            /// </summary>
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+            void OnBlock(InputAction.CallbackContext context);
+            /// <summary>
+            /// Method invoked when associated input action "Grab" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+            /// </summary>
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+            void OnGrab(InputAction.CallbackContext context);
+            /// <summary>
+            /// Method invoked when associated input action "StanceSwitch" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+            /// </summary>
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+            void OnStanceSwitch(InputAction.CallbackContext context);
         }
     }
 }

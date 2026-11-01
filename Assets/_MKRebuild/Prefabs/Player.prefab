@@ -23,6 +23,9 @@ GameObject:
   - component: {fileID: 7278438221546404397}
   - component: {fileID: 4324381211253474142}
   - component: {fileID: 6204770575668994066}
+  - component: {fileID: 74958031236481241}
+  - component: {fileID: 6277405534685220957}
+  - component: {fileID: 9148919412895865521}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -208,6 +211,7 @@ MonoBehaviour:
   dashAttack: {fileID: 11400000, guid: 7b3f9c2a1d4e48f0a6b8c5d7e9f01234, type: 2}
   dashAttackWindow: 0.35
   aimAssist: {fileID: 11400000, guid: 9791715ece54f894d9f7b0d76508fd97, type: 2}
+  paramsAsset: {fileID: 0}
   crossFadeDuration: 0.05
   inputBufferSeconds: 0.15
 --- !u!114 &8723977993880935580
@@ -262,6 +266,9 @@ MonoBehaviour:
     m_RotationOrder: 4
   additive: 1
   dashAimAssist: {fileID: 11400000, guid: 3f7c1a9e5b2d406e8a1c7f9d0b3e5a21, type: 2}
+  maxLungeDistance: 10
+  lungeSpeed: 14
+  lungeStopOffset: 1
 --- !u!114 &2080388334703850012
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -291,6 +298,9 @@ MonoBehaviour:
   maxHp: 100
   crossFadeDuration: 0.1
   getUpDuration: 2
+  parryStaggerProbe: 1.2
+  parryStaggerRadius: 1.8
+  parryStaggerDuration: 1
 --- !u!114 &6227659845601279009
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -368,6 +378,89 @@ MonoBehaviour:
   baseAlpha: 0.55
   minAlpha: 0.12
   rayStartOffset: 0.3
+--- !u!114 &74958031236481241
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555956608794397432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39ff4e0efc8a44a4bb45c10f9ebcfd5c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerStance
+  initialStance: 0
+  blockSpeedMultiplier: 0.35
+  blockDamageMultiplier: 0.2
+  guardMax: 100
+  guardRegenPerSecond: 35
+  guardRegenDelay: 0.8
+  guardDamageRatio: 2
+  guardBreakDuration: 0.9
+  guardBrokenRefill: 30
+  guardWarnTint: {r: 1, g: 0.12, b: 0.08, a: 1}
+  mantisTint: {r: 0.62, g: 0.84, b: 1, a: 1}
+  tarkatanaTint: {r: 1, g: 0.55, b: 0.38, a: 1}
+  blockTint: {r: 0.85, g: 0.98, b: 1, a: 1}
+  allowStanceSwitch: 1
+  allowBlock: 1
+  tarkatanaDashDistanceMultiplier: 1.35
+  allowDashParry: 1
+  parryWindowSeconds: 0.15
+  parryTint: {r: 1, g: 1, b: 1, a: 1}
+  parryFlashSeconds: 0.18
+--- !u!114 &6277405534685220957
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555956608794397432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de9cd3cf7c3390847a7fa2c441583d21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerGrab
+  grabRange: 1.8
+  grabDuration: 0.45
+  missRecovery: 0.5
+  cooldown: 1.2
+  throwSpeed: 12
+  throwLift: 14
+  throwDamage: 8
+  throwRadius: 0.9
+  flightDuration: 0.5
+  grabAimAssist: {fileID: 11400000, guid: 6daf1006a746a8d47b27cd23d4030c43, type: 2}
+  throwAimAssist: {fileID: 0}
+  throwAimRange: 12
+  throwAngleDeg: 45
+  maxThrowSpeed: 25
+  aimThrow: 1
+  grabAnchor: {fileID: 0}
+  grabAnchorLocalOffset: {x: 0, y: 0, z: 0}
+  throwAlongAnchor: 0
+  disarmStaggerDuration: 1.2
+  disarmCooldown: 0.8
+  disarmRecovery: 0.25
+--- !u!114 &9148919412895865521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555956608794397432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79fc70ccf3a68c54fb28e14495d84c21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.PlayerRoar
+  roarRadius: 4.5
+  chargeSeconds: 0.6
+  staggerDuration: 1.2
+  cooldown: 3
+  ringSeconds: 0.45
+  burstScale: 1.5
 --- !u!1 &6055354495051249728
 GameObject:
   m_ObjectHideFlags: 0
