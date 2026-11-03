@@ -22,6 +22,11 @@ on:
         required: true
         default: false
         type: boolean
+      release_tag:
+        description: "Exact SemVer tag to publish (e.g. v0.2.0). Leave empty to auto-bump from the latest tag."
+        required: false
+        default: ""
+        type: string
 
 permissions: {}
 
@@ -51,9 +56,20 @@ jobs:
         id: semver
         env:
           BUMP: ${{ inputs.bump }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           SHA7="${GITHUB_SHA:0:7}"
+          if [ -n "${RELEASE_TAG}" ]; then
+            if ! printf '%s' "${RELEASE_TAG}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::release_tag '${RELEASE_TAG}' is not a valid SemVer tag (expected vX.Y.Z)"
+              exit 1
+            fi
+            echo "Using explicit release tag: ${RELEASE_TAG} (sha7=${SHA7})"
+            echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+            echo "sha7=${SHA7}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           LATEST="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
           if [ -z "$LATEST" ]; then
             NEXT="v0.1.0"
@@ -74,8 +90,13 @@ jobs:
       - name: Guard - tag must not exist on another commit
         env:
           TAG: ${{ steps.semver.outputs.tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
+          if [ -n "${RELEASE_TAG}" ]; then
+            echo "::warning::Explicit release_tag ${TAG} requested - skipping the tag-collision guard."
+            exit 0
+          fi
           if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "Tag ${TAG} is free - proceeding."
             exit 0
@@ -248,7 +269,9 @@ jobs:
       - name: Install butler
         run: |
           set -euo pipefail
-          curl -fsSL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          # broth.itch.ovh is dead (NXDOMAIN). The CI host is broth.itch.zone.
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+            -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
           unzip -q butler.zip
           chmod +x butler
           ./butler -V
