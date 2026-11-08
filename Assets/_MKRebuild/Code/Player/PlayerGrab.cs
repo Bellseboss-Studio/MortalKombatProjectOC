@@ -421,14 +421,6 @@ namespace MK.Rebuild
 
                 body.isKinematic = false;
                 body.linearVelocity = velocity;
-
-                // DIAGNOSTIC (temporary): what was written vs what the physics step keeps.
-                // Remove once the throw is verified.
-                Debug.Log(
-                    $"[{nameof(PlayerGrab)}] THROW VELOCITY {velocity} | dir {dir} | " +
-                    $"kinematic {body.isKinematic} | body {body.name}",
-                    this);
-                StartCoroutine(LogVelocityAfterStep(body));
             }
 
             Debug.Log(
@@ -774,26 +766,6 @@ namespace MK.Rebuild
         /// from its center of mass finds ground. The probe skips the body's own collider
         /// because a raycast starting inside a collider does not report it.
         /// </summary>
-        /// <summary>
-        /// DIAGNOSTIC (temporary): logs the body velocity after one physics step, to tell apart
-        /// "the launch velocity was never written" from "something overwrote it".
-        /// </summary>
-        private System.Collections.IEnumerator LogVelocityAfterStep(Rigidbody body)
-        {
-            yield return new WaitForFixedUpdate();
-
-            if (body == null)
-            {
-                Debug.Log($"[{nameof(PlayerGrab)}] VELOCITY AFTER STEP: body destroyed", this);
-                yield break;
-            }
-
-            Debug.Log(
-                $"[{nameof(PlayerGrab)}] VELOCITY AFTER STEP {body.linearVelocity} | " +
-                $"kinematic {body.isKinematic} | pos {body.position}",
-                this);
-        }
-
         private static bool HasLanded(Rigidbody body)
         {
             if (body.IsSleeping()) return true;

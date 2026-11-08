@@ -162,17 +162,32 @@ namespace MK.Rebuild
         }
 
         /// <summary>
-        /// Applies <paramref name="damage"/> and shows the grey-box feedback.
+        /// Guard seam (future enemy block): while TRUE a hit is reported as
+        /// <see cref="HitOutcome.Blocked"/> and lands NO damage. No component sets it today
+        /// (enemies have no guard), so every existing receiver keeps its exact behavior; the
+        /// combo grammar already treats Blocked like a whiff (short cancel window).
+        /// </summary>
+        public bool Blocking { get; set; }
+
+        /// <summary>
+        /// Applies <paramref name="damage"/> and shows the grey-box feedback, REPORTING what
+        /// happened (combo-grammar T2.2): <see cref="HitOutcome.Hit"/> when the hit landed
+        /// (including a killing blow), <see cref="HitOutcome.Blocked"/> when <see cref="Blocking"/>
+        /// consumed it, <see cref="HitOutcome.Ignored"/> when the receiver was invulnerable, already
+        /// dead or not alive. Existing call sites ignore the return, so every caller keeps its
+        /// exact old behavior.
         /// <paramref name="dir"/> is the FULL horizontal push vector (direction already
         /// scaled by the attack's knockback distance) — see <see cref="PlayerCombat"/>.
         /// <paramref name="launchImpulse"/> (m/s) drives the juggle-lite arc when the
         /// hit is a LAUNCHER: the victim rises, falls under manual gravity and lands
         /// back on the ground plane. 0 = normal hit (feedback only).
         /// </summary>
-        public void TakeHit(int damage, Vector3 dir, float launchImpulse = 0f)
+        public HitOutcome TakeHit(int damage, Vector3 dir, float launchImpulse = 0f)
         {
-            if (Invulnerable) return; // boss phase transition: no damage, no feedback
-            if (!IsAlive) return;
+            if (Invulnerable) return HitOutcome.Ignored; // boss phase transition: no damage, no feedback
+            if (!IsAlive) return HitOutcome.Ignored;
+            if (Blocking) return HitOutcome.Blocked;     // future guard seam: no damage, no feedback
+
             hp = Mathf.Max(0, hp - damage);
 
             // Grey-box death: at 0 HP the dummy disappears immediately. Applies to
@@ -186,9 +201,9 @@ namespace MK.Rebuild
             if (hp <= 0)
             {
                 LethalHit?.Invoke(this);
-                if (hp > 0) return; // listener restored phase HP
+                if (hp > 0) return HitOutcome.Hit; // listener restored phase HP
                 Die();
-                return; // no feedback on the killing blow — the object is gone
+                return HitOutcome.Hit; // no feedback on the killing blow — the object is gone
             }
 
             // Enemy seam: let the controller react (stagger) BEFORE the feedback
@@ -208,6 +223,8 @@ namespace MK.Rebuild
                 if (arcRoutine != null) StopCoroutine(arcRoutine);
                 arcRoutine = StartCoroutine(LaunchArc(launchImpulse));
             }
+
+            return HitOutcome.Hit;
         }
 
         /// <summary>

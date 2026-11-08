@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace MK.Rebuild
@@ -86,6 +87,9 @@ namespace MK.Rebuild
         [Tooltip("When off, StanceSwitch is ignored and the player keeps the initial stance. This is the explicit gate that keeps the v1 player behaviour intact.")]
         [SerializeField] private bool allowStanceSwitch = true;
 
+        [Tooltip("When off, the combo grammar is DISABLED for this player: the chain uses the legacy V1 rules (single continuation, old windows, no style cadence), i.e. indistinguishable from v0.2.0. Gate of the combo-grammar change; ON by default.")]
+        [SerializeField] private bool allowComboGrammar = true;
+
         [Tooltip("When off, the Block action is ignored entirely (no slow strafe, no damage reduction).")]
         [SerializeField] private bool allowBlock = true;
 
@@ -169,6 +173,30 @@ namespace MK.Rebuild
             ApplyTint();
         }
 
+        /// <summary>
+        /// True when the combo grammar owns the chain for this player (combo-grammar gate).
+        /// The matrix is NOT the gate (design decision 5): a stance with the grammar ON but
+        /// no matrix assigned is ROOT-ONLY instead of falling back to the legacy chaining.
+        /// </summary>
+        public bool AllowsComboGrammar => allowComboGrammar;
+
+        /// <summary>
+        /// Predicate the combo controller INSTALLS (combo-grammar) so a stance switch can be
+        /// forbidden mid-combo WITHOUT this component knowing what a chain is. True = the switch
+        /// may happen now; NULL = always allowed (the v1 player and every grammar-less setup).
+        /// <see cref="PlayerCombat"/> installs <c>() =&gt; !comboActive || IsInCancelWindow()</c>
+        /// in OnEnable and clears it in OnDisable, so a disabled combat component can never pin
+        /// the stance shut.
+        /// </summary>
+        public Func<bool> CanSwitchStanceNow;
+
+        /// <summary>
+        /// Fired ONCE after a stance switch actually happened, with the new stance (combo-grammar
+        /// reset signal). Never fired when <see cref="CanSwitchStanceNow"/> denied the switch, and
+        /// never fired for the initial stance set in Awake. No listener = nothing changes.
+        /// </summary>
+        public event Action<Stance> OnStanceChanged;
+
         /// <summary>Move speed multiplier the motor must apply (1 when not blocking).</summary>
         public float SpeedMultiplier => blocking ? blockSpeedMultiplier : 1f;
 
@@ -237,6 +265,10 @@ namespace MK.Rebuild
         {
             if (input != null) input.Player.Disable();
             blocking = false;
+            // The predicate belongs to the combo controller: dropping it here guarantees a
+            // DISABLED stance component can never leave a stale (already-disabled) closure
+            // installed, which would silently lock stance switching forever.
+            CanSwitchStanceNow = null;
         }
 
         private void Update()
@@ -306,9 +338,15 @@ namespace MK.Rebuild
 
         private void ToggleStance()
         {
+            // WINDOW GATE (combo-grammar): the controller decides WHEN a switch is legal —
+            // mid-combo only inside the cancel window. NULL = always legal (v1 player and any
+            // grammar-less setup), so this is a no-op for them.
+            if (CanSwitchStanceNow != null && !CanSwitchStanceNow()) return;
+
             stance = stance == Stance.Mantis ? Stance.Tarkatana : Stance.Mantis;
             blocking = false;
             ApplyTint();
+            OnStanceChanged?.Invoke(stance); // exactly ONCE per successful switch
             Debug.Log($"[{nameof(PlayerStance)}] Stance -> {stance}", this);
         }
 

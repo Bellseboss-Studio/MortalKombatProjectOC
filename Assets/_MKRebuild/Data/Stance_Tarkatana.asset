@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 72b0ecd04682532438253f666557b005, type: 3}
+  m_Name: Stance_Tarkatana
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.StanceComboMatrix
+  stance: 1
+  connectWindowSeconds: 0.2
+  whiffWindowSeconds: 0.1
+  bufferGraceSeconds: 0.1
+  chainResetSeconds: 0.45
+  chainSlots: 6
+  styleSpeedScale: 0.8
+  damageScaleByHit:
+  - 1
+  - 0.9
+  - 0.8
+  - 0.7
+  damageFloorPct: 0.5
+  enderBonusPct: 0.15
+  rows:
+  - current:
+      combo: {fileID: 11400000, guid: f1e2d3c4b5a69788796a5b4c3d2e1f01, type: 2}
+      stepIndex: 0
+    role: 0
+    entries:
+    - input: 0
+      variant: 1
+      next:
+        combo: {fileID: 11400000, guid: 2adea1b23fae815459426f877712c708, type: 2}
+        stepIndex: 0
+  - current:
+      combo: {fileID: 11400000, guid: 2adea1b23fae815459426f877712c708, type: 2}
+      stepIndex: 0
+    role: 1
+    entries:
+    - input: 0
+      variant: 1
+      next:
+        combo: {fileID: 11400000, guid: bb22cc33dd44ee55ff6600112233aa44, type: 2}
+        stepIndex: 0
+    - input: 0
+      variant: 3
+      next:
+        combo: {fileID: 11400000, guid: bb22cc33dd44ee55ff6600112233aa44, type: 2}
+        stepIndex: 0
+    - input: 1
+      variant: 1
+      next:
+        combo: {fileID: 11400000, guid: f1e2d3c4b5a69788796a5b4c3d2e1f01, type: 2}
+        stepIndex: 0
+  - current:
+      combo: {fileID: 11400000, guid: bb22cc33dd44ee55ff6600112233aa44, type: 2}
+      stepIndex: 0
+    role: 2
+    entries: []
