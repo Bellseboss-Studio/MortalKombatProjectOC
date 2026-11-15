@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fb2204dbb26ce343b27a3fd66df023c, type: 3}
+  m_Name: Boss_Orochi
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.BossDefinition
+  id: boss_orochi
+  phaseHp: 500
+  moveSpeed: 2.2
+  aggroRadius: 30
+  turnSpeed: 140
+  leashRadius: 12
+  slamTell: 0.8
+  slamRecovery: 2
+  slamRadius: 3.6
+  slamDamage: 30
+  chargeTell: 0.8
+  chargeRecovery: 1.8
+  chargeSpeed: 9
+  chargeDistance: 10
+  chargeOvershoot: 3
+  chargeHitRadius: 1.5
+  chargeDamage: 20
+  chargeStartRange: 10
+  attackCooldown: 2.2
+  phase2SpeedMultiplier: 1.3
+  roarDuration: 1.5
+  deathDelay: 2.2
+  minionsToSummon: 2
+  shockwaveDamage: 25
+  shockwaveRadius: 5
+  shockwaveDuration: 0.7
+  shockwaveHitRadius: 0.7
