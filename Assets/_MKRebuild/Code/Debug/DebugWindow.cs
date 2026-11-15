@@ -722,6 +722,17 @@ namespace MK.Rebuild.Debugging
                 boss != null ? $"boss: {boss.Phase} {boss.HP}/{boss.MaxHp}" : "boss: none",
                 labelStyle);
             GUILayout.Label($"AI freeze: {(aiFrozen ? "ON" : "OFF")}   [F8]", labelStyle);
+
+            GUILayout.Space(6f);
+            var overlay = EnemyStatusOverlay.Instance;
+            if (overlay == null)
+            {
+                GUILayout.Label("overlay: sin instancia en la escena", labelStyle);
+            }
+            else
+            {
+                overlay.Visible = GUILayout.Toggle(overlay.Visible, " overlay: estado + tell sobre cada enemigo");
+            }
         }
 
         private void DrawPlayerTab()
@@ -735,6 +746,15 @@ namespace MK.Rebuild.Debugging
             GUILayout.Label(
                 $"invulnerable: {playerInvulnerable || (damage != null && damage.IsInvulnerable)}   [F8]",
                 labelStyle);
+
+            var stance = FindFirstObjectByType<PlayerStance>();
+            if (stance != null)
+            {
+                GUILayout.Space(4f);
+                GUILayout.Label($"parry window: {stance.ParryWindow:0.00}s  (Mantis)", labelStyle);
+                var window = GUILayout.HorizontalSlider(stance.ParryWindow, 0.05f, 0.60f);
+                if (!UnityEngine.Mathf.Approximately(window, stance.ParryWindow)) stance.SetParryWindow(window);
+            }
 
             if (showStates)
             {

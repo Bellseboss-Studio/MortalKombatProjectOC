@@ -184,8 +184,11 @@ namespace MK.Rebuild
             }
 
             // Fire gate (decision f): off-cooldown + NOT during the hitstop freeze.
-            bool pressed = combat != null && combat.ConsumeDashTap();
-            if (!pressed || cooldownTimer > 0f || (combat != null && combat.IsHitstopped)) return;
+            // ORDER MATTERS: cooldown and hitstop are checked BEFORE the tap is consumed, so a
+            // parry pressed during hitstop (i.e. right after landing a hit) is not eaten — it
+            // survives to the next frame and fires as soon as the freeze ends.
+            if (cooldownTimer > 0f || (combat != null && combat.IsHitstopped)) return;
+            if (combat == null || !combat.ConsumeDashTap()) return;
 
             // ACTION GATE (change action-gating): the dash is a ground mobility verb —
             // denied in the air, while hanging, or in a scripted state (deny by default).

@@ -81,6 +81,32 @@ namespace MK.Rebuild
         public bool Frozen { get; set; }
 
         /// <summary>
+        /// Debug seam: current AI state name, for the enemy status overlay. Read-only.
+        /// </summary>
+        public string DebugState => state.ToString();
+
+        /// <summary>
+        /// Debug seam: seconds elapsed inside the current attack window (tell + recovery).
+        /// </summary>
+        public float DebugAttackTimer => attackTimer;
+
+        /// <summary>
+        /// Debug seam: tell length in seconds for the current archetype.
+        /// </summary>
+        public float DebugTell => definition != null ? definition.attackTell : 0f;
+
+        /// <summary>
+        /// Debug seam: recovery length in seconds for the current archetype.
+        /// </summary>
+        public float DebugRecovery => definition != null ? definition.attackRecovery : 0f;
+
+        /// <summary>
+        /// Debug seam: stable archetype id (e.g. enemy_esbirro).
+        /// </summary>
+        public string DebugArchetype => definition != null ? definition.id : "?";
+
+
+        /// <summary>
         /// True while a thrown body owns this enemy's horizontal motion (Tarkatana grab
         /// throw). The debug AI freeze and the dead branch must not brake it, or the
         /// projectile would stall in the air. Set/cleared by <see cref="ThrownBody"/>.

@@ -217,6 +217,14 @@ namespace MK.Rebuild
         public float ParryWindow => parryWindowSeconds;
 
         /// <summary>
+        /// Debug seam: live retune of the Mantis parry window from the debug panel.
+        /// </summary>
+        public void SetParryWindow(float seconds)
+        {
+            parryWindowSeconds = Mathf.Max(0.02f, seconds);
+        }
+
+        /// <summary>
         /// Called by the hurt path when a dash consumed a hit. Feedback only: the damage was
         /// already negated by the caller. The counter-attack reward is not implemented yet.
         /// </summary>
