@@ -23,6 +23,8 @@ namespace MK.Rebuild
         private const string MoveState = "Move";
         private const string MeleeState = "Melee";
         private const string ChargeState = "Charge";
+        private const string ChargeRunState = "ChargeRun";
+        private const string ChargeRecoverState = "ChargeRecover";
         private const string AimState = "Aim";
         private const string ShootState = "Shoot";
         private const string StabState = "Stab";
@@ -103,10 +105,28 @@ namespace MK.Rebuild
             PlayOneShot(MeleeState);
         }
 
-        /// <summary>Charge state. Placeholder clip until a real shoulder-charge is imported.</summary>
+        /// <summary>
+        /// Charge WIND-UP state. On a multi-beat charge this is only the telegraphed hold;
+        /// the travel and the punish window have their own seams below.
+        /// </summary>
         public void PlayCharge()
         {
             PlayOneShot(ChargeState);
+        }
+
+        /// <summary>
+        /// Charge TRAVEL state. Loops on purpose: the controller ends the travel either on
+        /// distance or on solid geometry, so its real length is never constant.
+        /// </summary>
+        public void PlayChargeRun()
+        {
+            PlayOneShot(ChargeRunState);
+        }
+
+        /// <summary>Charge PUNISH window, after the travel stops.</summary>
+        public void PlayChargeRecover()
+        {
+            PlayOneShot(ChargeRecoverState);
         }
 
         /// <summary>Ranged aim hold (loop state).</summary>

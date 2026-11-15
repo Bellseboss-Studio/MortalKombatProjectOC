@@ -438,6 +438,9 @@ namespace MK.Rebuild
                     if (chargeDir.sqrMagnitude < 0.000001f) chargeDir = transform.forward;
                     chargeStart = transform.position;
                     chargeLaunched = true;
+
+                    // The wind-up clip ends here; the travel is its own looping beat.
+                    if (characterVisual != null) characterVisual.PlayChargeRun();
                 }
 
                 return;
@@ -461,7 +464,8 @@ namespace MK.Rebuild
                 ChargeBlocked())
             {
                 StopHorizontal();
-                if (characterVisual != null) characterVisual.SetMoving(false, 0f);
+                // Travel is over (distance covered or blocked): the punish beat owns the pose.
+                if (characterVisual != null) characterVisual.PlayChargeRecover();
                 cooldownTimer = definition.attackCooldown / mult;
                 recoveryTimer = definition.chargeRecovery / mult;
                 state = State.Recovery;
@@ -526,7 +530,9 @@ namespace MK.Rebuild
             if (characterVisual != null)
             {
                 characterVisual.SetMoving(false, 0f);
-                characterVisual.SetPlaybackSpeed(definition.phase2SpeedMultiplier);
+                // The roar is measured on UNSCALED time (RoarRoutine), so the clip MUST play
+                // at speed 1. Phase-2 speed is restored when the roar ends, not before.
+                characterVisual.SetPlaybackSpeed(1f);
                 characterVisual.PlayRoar();
             }
 
@@ -582,6 +588,12 @@ namespace MK.Rebuild
 
             if (IsDead) yield break;
 
+            // The unscaled roar is over: phase 2 may speed the animator up from here on.
+            if (characterVisual != null && definition != null)
+            {
+                characterVisual.SetPlaybackSpeed(definition.phase2SpeedMultiplier);
+            }
+
             receiver.Invulnerable = false;
             cooldownTimer = 0f;
             state = State.Approach;
@@ -606,7 +618,13 @@ namespace MK.Rebuild
             BossArena.Instance?.UnlockExit();
             ClearMinions();
 
-            if (characterVisual != null) characterVisual.PlayDeath();
+            if (characterVisual != null)
+            {
+                // DeathRoutine waits on UNSCALED time, so the clip runs at speed 1 even when
+                // the boss dies during phase 2. Otherwise the pose freezes before the wait ends.
+                characterVisual.SetPlaybackSpeed(1f);
+                characterVisual.PlayDeath();
+            }
 
             StopHorizontal();
             if (bodyCollider != null) bodyCollider.enabled = false;
@@ -722,8 +740,8 @@ namespace MK.Rebuild
 
             if (characterVisual != null)
             {
-                characterVisual.SetPlaybackSpeed(
-                    phase == 2 && definition != null ? definition.phase2SpeedMultiplier : 1f);
+                // Respawn always restarts at phase 1, so the animator goes back to speed 1.
+                characterVisual.SetPlaybackSpeed(1f);
                 characterVisual.PlaySpawn();
             }
 
