@@ -601,9 +601,10 @@ namespace MK.Rebuild.EditorTools
         /// Una vcam y una zona por sala. Cada vcam lleva un <see cref="CinemachineDeoccluder"/>:
         /// eso es lo que evita que la cámara quede detrás de la pared, la trae hacia el jugador.
         ///
-        /// Entre salas sólo cambia el offset (alto y distancia). El yaw se deja alineado con la
-        /// vcam base a propósito: el basis de input vive ahí, y <see cref="CameraZone"/> avisa si
-        /// una sala se sale de la banda de ±25°.
+        /// Cada sala tiene su PROPIO yaw, apuntando hacia donde el jugador camina en esa ala.
+        /// Eso es lo que evita que en la sala sur la cámara te mire la cara. Funciona porque
+        /// <see cref="CameraRig.Basis"/> sigue a <see cref="CameraDirector.ActiveCamera"/>: al
+        /// rotar la vista, los controles rotan con ella.
         /// </summary>
         private static void BuildCameras()
         {
@@ -619,30 +620,38 @@ namespace MK.Rebuild.EditorTools
                 baseDeoccluder.IgnoreTag = PlayerTag;
             }
 
-            BuildCameraZone("Atrio", new Vector3(0f, 0f, 0f), new Vector3(28f, 8f, 28f), new Vector3(0f, 5.5f, -11f));
-            BuildCameraZone("Lanzas", new Vector3(-30f, 0f, 0f), new Vector3(14f, 7f, 14f), new Vector3(0f, 4.5f, -9f));
-            BuildCameraZone("Pozo", new Vector3(-55f, 0f, 0f), new Vector3(16f, 8f, 16f), new Vector3(0f, 6f, -12f));
-            BuildCameraZone("Guardia", new Vector3(30f, 0f, 0f), new Vector3(16f, 7f, 16f), new Vector3(0f, 5f, -10f));
-            BuildCameraZone("Galeria", new Vector3(56f, 0f, 0f), new Vector3(18f, 8f, 18f), new Vector3(0f, 6f, -12f));
-            BuildCameraZone("Pesos", new Vector3(0f, 0f, -30f), new Vector3(16f, 7f, 16f), new Vector3(0f, 5f, -10f));
-            BuildCameraZone("CamaraPeso", new Vector3(0f, 0f, -58f), new Vector3(18f, 8f, 20f), new Vector3(0f, 6f, -12f));
-            BuildCameraZone("Guardian", new Vector3(0f, 0f, 36f), new Vector3(26f, 8f, 26f), new Vector3(0f, 7f, -14f));
-            BuildCameraZone("Orochi", new Vector3(0f, 0f, 80f), new Vector3(34f, 8f, 34f), new Vector3(0f, 8f, -16f));
+            BuildCameraZone("Atrio", new Vector3(0f, 0f, 0f), new Vector3(28f, 8f, 28f), new Vector3(0f, 5.5f, -11f), 0f);
+            BuildCameraZone("Lanzas", new Vector3(-30f, 0f, 0f), new Vector3(14f, 7f, 14f), new Vector3(0f, 4.5f, -9f), -90f);
+            BuildCameraZone("Pozo", new Vector3(-55f, 0f, 0f), new Vector3(16f, 8f, 16f), new Vector3(0f, 6f, -12f), -90f);
+            BuildCameraZone("Guardia", new Vector3(30f, 0f, 0f), new Vector3(16f, 7f, 16f), new Vector3(0f, 5f, -10f), 90f);
+            BuildCameraZone("Galeria", new Vector3(56f, 0f, 0f), new Vector3(18f, 8f, 18f), new Vector3(0f, 6f, -12f), 90f);
+            BuildCameraZone("Pesos", new Vector3(0f, 0f, -30f), new Vector3(16f, 7f, 16f), new Vector3(0f, 5f, -10f), 180f);
+            BuildCameraZone("CamaraPeso", new Vector3(0f, 0f, -58f), new Vector3(18f, 8f, 20f), new Vector3(0f, 6f, -12f), 180f);
+            BuildCameraZone("Guardian", new Vector3(0f, 0f, 36f), new Vector3(26f, 8f, 26f), new Vector3(0f, 7f, -14f), 0f);
+            BuildCameraZone("Orochi", new Vector3(0f, 0f, 80f), new Vector3(34f, 8f, 34f), new Vector3(0f, 8f, -16f), 0f);
         }
 
-        private static void BuildCameraZone(string roomName, Vector3 centre, Vector3 volumeSize, Vector3 followOffset)
+        private static void BuildCameraZone(string roomName, Vector3 centre, Vector3 volumeSize, Vector3 followOffset, float yaw)
         {
             var vcamHost = new GameObject("Cam_" + roomName);
             vcamHost.transform.SetParent(root, false);
             vcamHost.transform.position = centre + followOffset;
-            vcamHost.transform.rotation = Quaternion.Euler(26.6f, 0f, 0f);
+            vcamHost.transform.rotation = Quaternion.Euler(26.6f, yaw, 0f);
 
             var vcam = vcamHost.AddComponent<CinemachineCamera>();
             vcam.Priority.Value = 0;
             vcam.Priority.Enabled = true;
 
-            var follow = vcamHost.AddComponent<CinemachineFollow>();
-            follow.FollowOffset = followOffset;
+            // OrbitalFollow y no Follow: es el que deja fijar el ángulo horizontal (yaw) con el
+            // que la cámara orbita al jugador. Con Follow el composer re-apunta la vcam al
+            // target y el yaw autorado se pierde.
+            float distance = followOffset.magnitude;
+            float pitch = Mathf.Atan2(followOffset.y, Mathf.Abs(followOffset.z)) * Mathf.Rad2Deg;
+
+            var orbital = vcamHost.AddComponent<CinemachineOrbitalFollow>();
+            orbital.Radius = distance;
+            orbital.HorizontalAxis.Value = yaw;
+            orbital.VerticalAxis.Value = pitch;
 
             vcamHost.AddComponent<CinemachineRotationComposer>();
             var deoccluder = vcamHost.AddComponent<CinemachineDeoccluder>();
@@ -661,6 +670,7 @@ namespace MK.Rebuild.EditorTools
             var zone = zoneHost.AddComponent<CameraZone>();
             Wire(zone, "vcam", vcam);
             WireInt(zone, "priority", 20);
+            WireFloat(zone, "maxYawDeviation", 180f);
         }
 
         private static void WireInt(Object target, string field, int value)
@@ -669,6 +679,15 @@ namespace MK.Rebuild.EditorTools
             SerializedProperty property = serialized.FindProperty(field);
             if (property == null) return;
             property.intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void WireFloat(Object target, string field, float value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(field);
+            if (property == null) return;
+            property.floatValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

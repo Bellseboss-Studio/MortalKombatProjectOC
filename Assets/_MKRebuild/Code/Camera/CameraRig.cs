@@ -30,7 +30,20 @@ namespace MK.Rebuild
         /// transform (not <c>Camera.main</c>) so movement/combat stay in sync with the
         /// authored rig, including while the Brain blends.
         /// </summary>
-        public Transform Basis => vcam != null ? vcam.transform : transform;
+        public Transform Basis
+        {
+            get
+            {
+                CameraDirector director = CameraDirector.Instance;
+                if (director != null)
+                {
+                    CinemachineCamera active = director.ActiveCamera;
+                    if (active != null) return active.transform;
+                }
+
+                return vcam != null ? vcam.transform : transform;
+            }
+        }
 
         private void Awake()
         {

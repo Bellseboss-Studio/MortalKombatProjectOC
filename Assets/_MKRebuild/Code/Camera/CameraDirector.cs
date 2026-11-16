@@ -76,12 +76,19 @@ namespace MK.Rebuild
         private Transform bossMember;
         private BossController bossController;
         private bool bossModeActive;
+        private CinemachineCamera activeCamera;
 
         /// <summary>Scene singleton; null in scenes without a director (WU1b wires it).</summary>
         public static CameraDirector Instance { get; private set; }
 
         /// <summary>Base gameplay vcam (the input basis owner).</summary>
         public CinemachineCamera BaseCamera => baseCamera;
+
+        /// <summary>
+        /// Camera that currently owns the view: boss > winning zone > base. The input basis
+        /// follows this, so rotating a room's camera also rotates the controls with it.
+        /// </summary>
+        public CinemachineCamera ActiveCamera => activeCamera;
 
         /// <summary>Scene brain the director writes blends into.</summary>
         public CinemachineBrain Brain => brain;
@@ -310,6 +317,10 @@ namespace MK.Rebuild
             }
 
             if (winner != null) ApplyPriority(winner.Vcam, winner.Priority);
+
+            activeCamera = bossModeActive && bossCamera != null
+                ? bossCamera
+                : winner != null ? winner.Vcam : baseCamera;
         }
 
         /// <summary>
