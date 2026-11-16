@@ -389,7 +389,7 @@ namespace MK.Rebuild
         {
             Vector3 facing = FacingVector();
             if (input == null) return facing;
-            if (cameraTransform == null) RefreshCamera();
+            RefreshCamera(); // el basis cambia por sala: releerlo siempre
             Vector2 stick = input.Player.Move.ReadValue<Vector2>();
             if (stick.magnitude < AttackDirectionClassifier.DefaultDeadzone) return facing;
             Vector3 dir = CameraRelativeMotion.WishDirection(cameraTransform, stick);

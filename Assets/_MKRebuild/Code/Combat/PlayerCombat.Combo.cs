@@ -473,7 +473,7 @@ namespace MK.Rebuild
         private AttackDirection ClassifyAttackDirection()
         {
             if (input == null) return AttackDirection.Neutral;
-            if (cameraTransform == null) RefreshCamera();
+            RefreshCamera(); // el basis cambia por sala: releerlo siempre
             return AttackDirectionClassifier.FromStick(
                 input.Player.Move.ReadValue<Vector2>(), FacingVector(), cameraTransform);
         }

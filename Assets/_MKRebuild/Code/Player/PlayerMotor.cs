@@ -45,6 +45,7 @@ namespace MK.Rebuild
         private float jumpLockoutTimer; // landing recovery: blocks a buffered re-fire on touchdown
         private float footstepTimer;    // counts down to the next footstep while grounded + moving
         private Transform cameraTransform;
+        private CameraRig cameraRig;
 
         // Wall motion (M0): minimal contact state, no state machine.
         private bool wallContact;
@@ -313,12 +314,14 @@ namespace MK.Rebuild
 
         private void RefreshCamera()
         {
-            // Prefer the owned rig's basis (the authored vcam) over the tagged camera:
-            // the rig is the deterministic contract, Camera.main is only a safety net.
-            var rig = FindFirstObjectByType<CameraRig>();
-            if (rig != null && rig.Basis != null)
+            // Prefer the owned rig's basis (the ACTIVE vcam) over the tagged camera: the rig is
+            // the deterministic contract, Camera.main is only a safety net. The rig is cached
+            // because Basis changes per room (each zone vcam has its own yaw); only the lookup
+            // is cached, never the resulting transform.
+            if (cameraRig == null) cameraRig = FindFirstObjectByType<CameraRig>();
+            if (cameraRig != null && cameraRig.Basis != null)
             {
-                cameraTransform = rig.Basis;
+                cameraTransform = cameraRig.Basis;
                 return;
             }
 
@@ -330,6 +333,7 @@ namespace MK.Rebuild
         {
             if (paramsAsset == null || input == null) return;
             moveInput = input.Player.Move.ReadValue<Vector2>();
+            RefreshCamera(); // el basis cambia por sala: hay que releerlo, no cachearlo
             if (input.Player.Jump.WasPressedThisFrame())
             {
                 // DASH -> JUMP: only a jump inside the dash's cancel window may cancel

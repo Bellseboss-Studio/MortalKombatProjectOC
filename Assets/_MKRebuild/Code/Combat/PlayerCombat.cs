@@ -99,6 +99,7 @@ namespace MK.Rebuild
         private PlayerStance stance;       // combo-grammar gate + style cadence source
         private PlayerDamage playerDamage; // hurt signals: a hit taken resets the chain memory
         private Transform cameraTransform; // reference frame for the facing-relative stick
+        private CameraRig cameraRig;
 
         // One-shot taps submitted out-of-band (editor smoke driver / future
         // menu or demo hooks). Consumed by the next Update as if pressed this frame.
@@ -162,12 +163,12 @@ namespace MK.Rebuild
 
         private void RefreshCamera()
         {
-            // Prefer the owned rig's basis (the authored vcam) over the tagged camera:
-            // the rig is the deterministic contract, Camera.main is only a safety net.
-            var rig = FindFirstObjectByType<CameraRig>();
-            if (rig != null && rig.Basis != null)
+            // The basis follows the ACTIVE vcam (each room has its own yaw), so only the rig
+            // lookup is cached — never the resulting transform.
+            if (cameraRig == null) cameraRig = FindFirstObjectByType<CameraRig>();
+            if (cameraRig != null && cameraRig.Basis != null)
             {
-                cameraTransform = rig.Basis;
+                cameraTransform = cameraRig.Basis;
                 return;
             }
 
