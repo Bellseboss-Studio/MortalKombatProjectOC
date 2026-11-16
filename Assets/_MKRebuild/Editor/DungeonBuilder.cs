@@ -76,6 +76,7 @@ namespace MK.Rebuild.EditorTools
             BuildOrochiArena();
             BuildCameras();
             BuildSafetyNet();
+            Organize();
 
             PlacePlayer();
             Physics.SyncTransforms();
@@ -717,6 +718,65 @@ namespace MK.Rebuild.EditorTools
             WireInt(checkpoint, "sectionId", sectionId);
         }
 
+        // ------------------------------------------------------------------ organización
+
+        /// <summary>
+        /// Agrupa lo que se edita a mano. Sin esto las nueve cámaras, las nueve zonas y los
+        /// diez checkpoints quedan mezclados entre doscientas piezas de geometría y no hay
+        /// forma de encontrarlos en la jerarquía.
+        /// </summary>
+        private static void Organize()
+        {
+            Transform cameras = Group("Cameras");
+            Transform zones = Group("CameraZones");
+            Transform checkpoints = Group("Checkpoints");
+            Transform levers = Group("Levers");
+            Transform encounters = Group("Encounters");
+            Transform systems = Group("Systems");
+
+            var moves = new List<(Transform child, Transform parent)>();
+            foreach (Transform child in root)
+            {
+                if (child == cameras || child == zones || child == checkpoints) continue;
+                if (child == levers || child == encounters || child == systems) continue;
+
+                if (child.name.StartsWith("Cam_")) moves.Add((child, cameras));
+                else if (child.name.StartsWith("Zone_")) moves.Add((child, zones));
+                else if (child.name.StartsWith("Checkpoint_")) moves.Add((child, checkpoints));
+                else if (child.name.StartsWith("Lever_")) moves.Add((child, levers));
+                else if (child.name.EndsWith("Encounter") ||
+                         child.name.StartsWith("GuardianEncounter") ||
+                         child.name.StartsWith("OrochiEncounter"))
+                    moves.Add((child, encounters));
+                else if (child.name == "DungeonObjective" || child.name == "VoidReset" || child.name == "GreatDoor")
+                    moves.Add((child, systems));
+            }
+
+            // SetParent AFTER collecting: moving while enumerating invalidates the iterator.
+            foreach ((Transform child, Transform parent) in moves) child.SetParent(parent, true);
+        }
+
+        private static Transform Group(string name)
+        {
+            Transform existing = root.Find(name);
+            if (existing != null) return existing;
+
+            var group = new GameObject(name);
+            group.transform.SetParent(root, false);
+            return group.transform;
+        }
+
+        /// <summary>Busca en toda la jerarquía: los objetos viven agrupados, no en la raíz.</summary>
+        private static Transform FindDeep(string name)
+        {
+            foreach (Transform candidate in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (candidate.name == name) return candidate;
+            }
+
+            return null;
+        }
+
         // ------------------------------------------------------------------ auditoría
 
         /// <summary>
@@ -804,7 +864,7 @@ namespace MK.Rebuild.EditorTools
 
             foreach (string leverName in new[] { "Lever_West", "Lever_East", "Lever_South" })
             {
-                if (root.Find(leverName) == null)
+                if (FindDeep(leverName) == null)
                 {
                     failures++;
                     Debug.LogError("[Dungeon] Falta la palanca " + leverName);
@@ -813,7 +873,7 @@ namespace MK.Rebuild.EditorTools
 
             foreach (string encounterName in new[] { "GuardianEncounter", "OrochiEncounter" })
             {
-                Transform encounter = root.Find(encounterName);
+                Transform encounter = FindDeep(encounterName);
                 if (encounter == null || encounter.GetComponent<BossSpawner>() == null)
                 {
                     failures++;
@@ -821,7 +881,7 @@ namespace MK.Rebuild.EditorTools
                 }
             }
 
-            if (root.Find("VoidReset") == null)
+            if (FindDeep("VoidReset") == null)
             {
                 failures++;
                 Debug.LogError("[Dungeon] Falta la red de seguridad (VoidReset): caer sería infinito.");
@@ -836,7 +896,7 @@ namespace MK.Rebuild.EditorTools
 
             foreach (string checkpointName in checkpointNames)
             {
-                Transform pad = root.Find(checkpointName);
+                Transform pad = FindDeep(checkpointName);
                 if (pad == null)
                 {
                     failures++;

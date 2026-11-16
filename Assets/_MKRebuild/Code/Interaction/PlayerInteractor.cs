@@ -56,8 +56,17 @@ namespace MK.Rebuild
             candidate = FindBest();
             if (candidate == null) return;
 
+            if (ConfirmPressed()) Begin(candidate);
+        }
+
+        /// <summary>Keyboard E or gamepad south face button.</summary>
+        private bool ConfirmPressed()
+        {
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && keyboard[interactKey].wasPressedThisFrame) Begin(candidate);
+            if (keyboard != null && keyboard[interactKey].wasPressedThisFrame) return true;
+
+            Gamepad pad = Gamepad.current;
+            return pad != null && pad.buttonSouth.wasPressedThisFrame;
         }
 
         private void OnDisable()
@@ -135,11 +144,19 @@ namespace MK.Rebuild
             timer = 0f;
         }
 
+        /// <summary>Debug seam: how many times the prompt was drawn (proves OnGUI reaches it).</summary>
+        public static int PromptDraws { get; private set; }
+
         private void OnGUI()
         {
             if (busy != null || candidate == null) return;
 
-            string label = "[" + interactKey + "] " + candidate.Prompt;
+            PromptDraws++;
+
+            bool hasPad = Gamepad.current != null;
+            string label = hasPad
+                ? "[" + interactKey + "] / [A] " + candidate.Prompt
+                : "[" + interactKey + "] " + candidate.Prompt;
             var style = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
