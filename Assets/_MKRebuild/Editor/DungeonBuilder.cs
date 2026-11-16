@@ -80,6 +80,7 @@ namespace MK.Rebuild.EditorTools
             BuildCinematics();
             BuildSafetyNet();
             BuildPauseMenu();
+            BuildCombatCoordinator();
             Organize();
 
             PlacePlayer();
@@ -1013,6 +1014,20 @@ namespace MK.Rebuild.EditorTools
             WireInt(cue, "trigger", (int)trigger);
             WireFloat(cue, "delay", delay);
             if (spawner != null) Wire(cue, "spawner", spawner);
+        }
+
+        // ------------------------------------------------------------------ combate
+
+        /// <summary>
+        /// Coordinador de combate. Sin él, <see cref="EnemyController"/> no consigue tokens de
+        /// ataque ni anillos y TODOS los enemigos van encima del jugador a la vez. Se perdió al
+        /// armar la escena, igual que la pausa.
+        /// </summary>
+        private static void BuildCombatCoordinator()
+        {
+            var host = new GameObject("CombatCoordinator");
+            host.transform.SetParent(root, false);
+            host.AddComponent<CombatCoordinator>();
         }
 
         // ------------------------------------------------------------------ organización

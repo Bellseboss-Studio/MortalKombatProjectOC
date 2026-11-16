@@ -629,6 +629,12 @@ namespace MK.Rebuild
         private void OnDamaged(int damage, Vector3 dir, float launchImpulse)
         {
             if (IsDead || definition == null) return;
+
+            // Hiperarmadura en los ataques: el boss NO flinchea mientras ejecuta Slam o
+            // Charge. Sin esto, el clip de golpe cortaba la animación de ataque y el boss
+            // quedaba en Idle mientras la acción seguía corriendo (embestida invisible).
+            if (state == State.Slam || state == State.Charge || state == State.Roar) return;
+
             if (characterVisual != null) characterVisual.PlayHit();
         }
 
