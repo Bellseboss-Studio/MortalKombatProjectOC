@@ -76,6 +76,7 @@ namespace MK.Rebuild.EditorTools
             BuildOrochiArena();
             BuildCameras();
             BuildSafetyNet();
+            BuildPauseMenu();
             Organize();
 
             PlacePlayer();
@@ -661,6 +662,10 @@ namespace MK.Rebuild.EditorTools
             var deoccluder = host.AddComponent<CinemachineDeoccluder>();
             deoccluder.IgnoreTag = PlayerTag;
 
+            // Sólo geometría de nivel (capa 0): los bosses viven en la capa 2 para que no
+            // empujen la cámara en cuerpo a cuerpo.
+            deoccluder.CollideAgainst = 1;
+
             Wire(director, "bossCamera", vcam);
             Wire(director, "bossGroup", group);
         }
@@ -769,6 +774,25 @@ namespace MK.Rebuild.EditorTools
 
             var checkpoint = pad.AddComponent<Checkpoint>();
             WireInt(checkpoint, "sectionId", sectionId);
+        }
+
+        // ------------------------------------------------------------------ pausa
+
+        /// <summary>
+        /// Menú de pausa. Se perdió al armar la escena porque vive en Playground, y sin él la
+        /// mazmorra no se puede pausar (Esc/Start no hacen nada).
+        /// </summary>
+        private static void BuildPauseMenu()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_MKRebuild/Prefabs/UI/PauseMenu.prefab");
+            if (prefab == null)
+            {
+                Debug.LogError("[Dungeon] Falta el prefab de PauseMenu: la escena no se podrá pausar.");
+                return;
+            }
+
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root);
+            instance.name = "PauseMenu";
         }
 
         // ------------------------------------------------------------------ organización
