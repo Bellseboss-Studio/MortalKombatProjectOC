@@ -75,6 +75,7 @@ namespace MK.Rebuild.EditorTools
             BuildDescent();
             BuildOrochiArena();
             BuildCameras();
+            BuildSafetyNet();
 
             PlacePlayer();
             Physics.SyncTransforms();
@@ -670,6 +671,52 @@ namespace MK.Rebuild.EditorTools
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        // ------------------------------------------------------------------ red de seguridad
+
+        /// <summary>
+        /// Red de seguridad: un volumen de vacío que cubre toda la mazmorra y devuelve al
+        /// jugador a su último checkpoint, más un checkpoint por sala importante.
+        ///
+        /// Sin esto, caer en un foso es caer al infinito: los fosos del nivel tienen piso bajo,
+        /// pero cualquier hueco no previsto (o un salto fallido contra una pared) no.
+        /// </summary>
+        private static void BuildSafetyNet()
+        {
+            var voidHost = new GameObject("VoidReset");
+            voidHost.layer = IgnoreRaycastLayer;
+            voidHost.transform.SetParent(root, false);
+            voidHost.transform.localPosition = new Vector3(0f, -22f, 15f);
+
+            var voidVolume = voidHost.AddComponent<BoxCollider>();
+            voidVolume.isTrigger = true;
+            voidVolume.center = Vector3.zero;
+            voidVolume.size = new Vector3(200f, 24f, 240f);
+            voidHost.AddComponent<VoidReset>();
+
+            BuildCheckpoint("Checkpoint_Atrio", new Vector3(0f, 0.15f, -6f), 0);
+            BuildCheckpoint("Checkpoint_Lanzas", new Vector3(-27f, 0.15f, 0f), 1);
+            BuildCheckpoint("Checkpoint_Pozo", new Vector3(-61f, 0.15f, 0f), 2);
+            BuildCheckpoint("Checkpoint_Guardia", new Vector3(28f, 0.15f, 0f), 3);
+            BuildCheckpoint("Checkpoint_Galeria", new Vector3(54f, 0.15f, 0f), 4);
+            BuildCheckpoint("Checkpoint_Pesos", new Vector3(0f, 0.15f, -28f), 5);
+            BuildCheckpoint("Checkpoint_CamaraPeso", new Vector3(0f, 0.15f, -60f), 6);
+            BuildCheckpoint("Checkpoint_Guardian", new Vector3(0f, 0.15f, 27f), 7);
+            BuildCheckpoint("Checkpoint_Descenso", new Vector3(0f, 0.15f, 52f), 8);
+            BuildCheckpoint("Checkpoint_Orochi", new Vector3(0f, 0.15f, 66f), 9);
+        }
+
+        private static void BuildCheckpoint(string name, Vector3 position, int sectionId)
+        {
+            GameObject pad = Box(name, position, new Vector3(2.4f, 0.3f, 2.4f), floorMat);
+            pad.layer = IgnoreRaycastLayer;
+
+            var volume = pad.GetComponent<BoxCollider>();
+            volume.isTrigger = true;
+
+            var checkpoint = pad.AddComponent<Checkpoint>();
+            WireInt(checkpoint, "sectionId", sectionId);
+        }
+
         // ------------------------------------------------------------------ auditoría
 
         /// <summary>
@@ -771,6 +818,40 @@ namespace MK.Rebuild.EditorTools
                 {
                     failures++;
                     Debug.LogError("[Dungeon] Falta el encuentro " + encounterName);
+                }
+            }
+
+            if (root.Find("VoidReset") == null)
+            {
+                failures++;
+                Debug.LogError("[Dungeon] Falta la red de seguridad (VoidReset): caer sería infinito.");
+            }
+
+            string[] checkpointNames =
+            {
+                "Checkpoint_Atrio", "Checkpoint_Lanzas", "Checkpoint_Pozo", "Checkpoint_Guardia",
+                "Checkpoint_Galeria", "Checkpoint_Pesos", "Checkpoint_CamaraPeso",
+                "Checkpoint_Guardian", "Checkpoint_Descenso", "Checkpoint_Orochi",
+            };
+
+            foreach (string checkpointName in checkpointNames)
+            {
+                Transform pad = root.Find(checkpointName);
+                if (pad == null)
+                {
+                    failures++;
+                    Debug.LogError("[Dungeon] Falta el checkpoint " + checkpointName);
+                    continue;
+                }
+
+                // Un checkpoint sobre un foso es peor que no tenerlo: al volver, el jugador cae.
+                bool grounded = Physics.Raycast(pad.position + Vector3.up * 0.5f, Vector3.down,
+                    out RaycastHit ground, 3f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+
+                if (!grounded || ground.point.y < -0.5f)
+                {
+                    failures++;
+                    Debug.LogError("[Dungeon] Checkpoint sin piso firme: " + checkpointName);
                 }
             }
 
