@@ -549,7 +549,8 @@ namespace MK.Rebuild.EditorTools
             WallZ("Guardian_Wall_W", -13f, 23f, 49f, 8f);
             WallZ("Guardian_Wall_E", 13f, 23f, 49f, 8f);
 
-            Box("Guardian_Dais", new Vector3(0f, 0.2f, 36f), new Vector3(9f, 0.4f, 9f), floorMat);
+            // Sin dais: un resalte de 40 cm en medio de la arena dejaba al boss del lado de
+            // afuera (no puede subir el escalón) y el deoccluder chocaba con el borde.
 
             Pillar("Guardian_Pillar_1", -10f, 28f, 1.5f, 8f);
             Pillar("Guardian_Pillar_2", 10f, 28f, 1.5f, 8f);
@@ -581,7 +582,7 @@ namespace MK.Rebuild.EditorTools
             WallZ("Orochi_Wall_W", -17f, 63f, 97f, 8f);
             WallZ("Orochi_Wall_E", 17f, 63f, 97f, 8f);
 
-            Box("Orochi_Dais", new Vector3(0f, 0.25f, 86f), new Vector3(12f, 0.5f, 10f), floorMat);
+            // Sin dais por el mismo motivo que la arena del Guardián.
 
             for (int i = 0; i < 8; i++)
             {
