@@ -56,6 +56,7 @@ namespace MK.Rebuild.EditorTools
             BuildEastWing();
             BuildSouthWing();
             BuildObjective();
+            BuildEncounters();
             BuildGuardianArena();
             BuildDescent();
             BuildOrochiArena();
@@ -435,8 +436,76 @@ namespace MK.Rebuild.EditorTools
             Lamp(name + "_Lamp", basePosition.x - facing.x * 0.6f, basePosition.z - facing.z * 0.6f, 4.2f);
         }
 
-        private static void Wire(Object target, string field, Object value)
+        // ------------------------------------------------------------------ encuentros
+
+        /// <summary>
+        /// Dos encuentros de boss. Cada uno: spawner, volumen de entrada y (el del Guardián)
+        /// una reja física en la salida norte que se cierra durante la pelea.
+        ///
+        /// No se usa <see cref="BossArena"/> porque es singleton de escena y acá conviven dos
+        /// arenas: el Guardián pisaría la instancia del Orochi.
+        /// </summary>
+        private static void BuildEncounters()
         {
+            BuildEncounter(
+                "GuardianEncounter",
+                new Vector3(0f, 0f, 36f),
+                new Vector3(0f, 2f, 25f),
+                "Assets/_MKRebuild/Prefabs/Enemies/Guardia_EB.prefab",
+                new Vector3(0f, 3f, 49f));
+
+            BuildEncounter(
+                "OrochiEncounter",
+                new Vector3(0f, 0f, 80f),
+                new Vector3(0f, 2f, 65.5f),
+                "Assets/_MKRebuild/Prefabs/Enemies/Orochi_EB.prefab",
+                Vector3.zero);
+        }
+
+        private static void BuildEncounter(string name, Vector3 spawnPosition, Vector3 triggerPosition,
+            string bossPrefabPath, Vector3 gatePosition)
+        {
+            var host = new GameObject(name);
+            host.transform.SetParent(root, false);
+            host.transform.localPosition = spawnPosition;
+
+            var spawner = host.AddComponent<BossSpawner>();
+            BossController boss = LoadBossPrefab(bossPrefabPath);
+            if (boss == null) Debug.LogError("[Dungeon] No se pudo cargar el prefab del boss: " + bossPrefabPath);
+            Wire(spawner, "prefab", boss);
+
+            var entry = new GameObject(name + "_Entry");
+            entry.transform.SetParent(host.transform, false);
+            entry.transform.localPosition = triggerPosition - spawnPosition;
+
+            var volume = entry.AddComponent<BoxCollider>();
+            volume.isTrigger = true;
+            volume.size = new Vector3(8f, 4f, 3f);
+            volume.center = Vector3.zero;
+
+            var trigger = entry.AddComponent<BossEncounterTrigger>();
+            Wire(trigger, "spawner", spawner);
+
+            var starter = host.AddComponent<BossEncounterStarter>();
+            Wire(starter, "spawner", spawner);
+
+            if (gatePosition == Vector3.zero) return;
+
+            GameObject slab = Box(name + "_GateSlab", gatePosition, new Vector3(4.2f, 6f, 0.4f), wallMat);
+            slab.SetActive(false);
+
+            var gate = host.AddComponent<ArenaGate>();
+            Wire(gate, "spawner", spawner);
+            Wire(gate, "slab", slab);
+        }
+
+        private static BossController LoadBossPrefab(string path)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            return prefab != null ? prefab.GetComponent<BossController>() : null;
+        }
+
+        private static void Wire(Object target, string field, Object value)        {
             var serialized = new SerializedObject(target);
             SerializedProperty property = serialized.FindProperty(field);
             if (property == null)
@@ -576,7 +645,7 @@ namespace MK.Rebuild.EditorTools
                 for (int side = -1; side <= 1; side += 2)
                 {
                     var probe = new Vector3(x + dx * 2.5f * side, 1.6f, z + dz * 2.5f * side);
-                    if (Physics.CheckSphere(probe, 0.9f))
+                    if (Physics.CheckSphere(probe, 0.9f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                     {
                         failures++;
                         Debug.LogError("[Dungeon] PASO bloqueado en " + label + " lado " + side +
@@ -586,7 +655,7 @@ namespace MK.Rebuild.EditorTools
             }
 
             // La gran puerta arranca cerrada y las tres palancas deben existir.
-            if (!Physics.CheckSphere(new Vector3(0f, 1.6f, 14f), 0.8f))
+            if (!Physics.CheckSphere(new Vector3(0f, 1.6f, 14f), 0.8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 failures++;
                 Debug.LogError("[Dungeon] La gran puerta no bloquea el vano norte.");
@@ -598,6 +667,16 @@ namespace MK.Rebuild.EditorTools
                 {
                     failures++;
                     Debug.LogError("[Dungeon] Falta la palanca " + leverName);
+                }
+            }
+
+            foreach (string encounterName in new[] { "GuardianEncounter", "OrochiEncounter" })
+            {
+                Transform encounter = root.Find(encounterName);
+                if (encounter == null || encounter.GetComponent<BossSpawner>() == null)
+                {
+                    failures++;
+                    Debug.LogError("[Dungeon] Falta el encuentro " + encounterName);
                 }
             }
 
