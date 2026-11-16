@@ -32,6 +32,11 @@ namespace MK.Rebuild
 
         private void HandleSpawned(BossController boss)
         {
+            // El director tiene un solo bossSpawner: hay que apuntarlo al de esta arena o el
+            // segundo boss nunca recibe la cámara de pelea.
+            CameraDirector director = CameraDirector.Instance;
+            if (director != null) director.BindBossSpawner(spawner);
+
             StartCoroutine(Wake(boss));
         }
 

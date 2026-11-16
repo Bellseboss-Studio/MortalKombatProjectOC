@@ -149,6 +149,35 @@ namespace MK.Rebuild
             DetachBoss();
         }
 
+        /// <summary>
+        /// Points boss mode at a different spawner. The dungeon has one spawner per arena, so
+        /// the director must follow whichever boss is live: without this it would stay bound
+        /// to the first spawner and the second boss would never get the boss camera.
+        ///
+        /// Only attaches; entering boss mode stays arena/distance driven by Update, so a spawn
+        /// that happens while the player is far away cannot snap the camera.
+        /// </summary>
+        public void BindBossSpawner(BossSpawner spawner)
+        {
+            if (spawner == null) return;
+
+            if (bossSpawner != spawner)
+            {
+                if (bossSpawner != null) bossSpawner.Spawned -= HandleBossSpawned;
+
+                // Leave boss mode BEFORE swapping: entering is a no-op while it is already
+                // active, so without this the previous arena's boss would stay in the target
+                // group and the new one would never be framed.
+                if (bossModeActive) ExitBossMode();
+
+                DetachBoss();
+                bossSpawner = spawner;
+                bossSpawner.Spawned += HandleBossSpawned;
+            }
+
+            if (spawner.Current != null) AttachBoss(spawner.Current);
+        }
+
         private void OnDestroy()
         {
             if (bossSpawner != null) bossSpawner.Spawned -= HandleBossSpawned;

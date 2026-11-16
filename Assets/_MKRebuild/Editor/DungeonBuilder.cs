@@ -610,7 +610,7 @@ namespace MK.Rebuild.EditorTools
         {
             var directorHost = new GameObject("CameraDirector");
             directorHost.transform.SetParent(root, false);
-            directorHost.AddComponent<CameraDirector>();
+            CameraDirector director = directorHost.AddComponent<CameraDirector>();
 
             GameObject baseCamera = GameObject.Find("CinemachineCamera");
             if (baseCamera != null)
@@ -619,6 +619,8 @@ namespace MK.Rebuild.EditorTools
                 if (baseDeoccluder == null) baseDeoccluder = baseCamera.AddComponent<CinemachineDeoccluder>();
                 baseDeoccluder.IgnoreTag = PlayerTag;
             }
+
+            BuildBossCamera(director);
 
             BuildCameraZone("Atrio", new Vector3(0f, 0f, 0f), new Vector3(28f, 8f, 28f), new Vector3(0f, 5.5f, -11f), 0f);
             BuildCameraZone("Lanzas", new Vector3(-30f, 0f, 0f), new Vector3(14f, 7f, 14f), new Vector3(0f, 4.5f, -9f), -90f);
@@ -629,6 +631,37 @@ namespace MK.Rebuild.EditorTools
             BuildCameraZone("CamaraPeso", new Vector3(0f, 0f, -58f), new Vector3(18f, 8f, 20f), new Vector3(0f, 6f, -12f), 180f);
             BuildCameraZone("Guardian", new Vector3(0f, 0f, 36f), new Vector3(26f, 8f, 26f), new Vector3(0f, 7f, -14f), 0f);
             BuildCameraZone("Orochi", new Vector3(0f, 0f, 80f), new Vector3(34f, 8f, 34f), new Vector3(0f, 8f, -16f), 0f);
+        }
+
+        /// <summary>
+        /// Cámara de pelea: encuadra al jugador y al boss JUNTOS vía un CinemachineTargetGroup.
+        /// El director agrega los dos miembros y sube esta vcam a prioridad 30 mientras el
+        /// jugador esté dentro del alcance del boss; al morir el boss la baja.
+        /// </summary>
+        private static void BuildBossCamera(CameraDirector director)
+        {
+            var groupHost = new GameObject("BossTargetGroup");
+            groupHost.transform.SetParent(root, false);
+            var group = groupHost.AddComponent<CinemachineTargetGroup>();
+
+            var host = new GameObject("Cam_Boss");
+            host.transform.SetParent(root, false);
+
+            var vcam = host.AddComponent<CinemachineCamera>();
+            vcam.Priority.Value = 0;
+            vcam.Priority.Enabled = true;
+            vcam.Follow = groupHost.transform;
+            vcam.LookAt = groupHost.transform;
+
+            var follow = host.AddComponent<CinemachineFollow>();
+            follow.FollowOffset = new Vector3(0f, 9f, -16f);
+
+            host.AddComponent<CinemachineRotationComposer>();
+            var deoccluder = host.AddComponent<CinemachineDeoccluder>();
+            deoccluder.IgnoreTag = PlayerTag;
+
+            Wire(director, "bossCamera", vcam);
+            Wire(director, "bossGroup", group);
         }
 
         private static void BuildCameraZone(string roomName, Vector3 centre, Vector3 volumeSize, Vector3 followOffset, float yaw)
@@ -760,6 +793,7 @@ namespace MK.Rebuild.EditorTools
                 if (child == levers || child == encounters || child == systems) continue;
 
                 if (child.name.StartsWith("Cam_")) moves.Add((child, cameras));
+                else if (child.name == "BossTargetGroup") moves.Add((child, cameras));
                 else if (child.name.StartsWith("Zone_")) moves.Add((child, zones));
                 else if (child.name.StartsWith("Checkpoint_")) moves.Add((child, checkpoints));
                 else if (child.name.StartsWith("Lever_")) moves.Add((child, levers));
