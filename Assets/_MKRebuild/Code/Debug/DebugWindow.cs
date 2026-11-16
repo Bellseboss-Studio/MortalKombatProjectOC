@@ -63,8 +63,8 @@ namespace MK.Rebuild.Debugging
         private const float SpawnAhead = 3f;       // units in front of the player
         private const float CapsuleHalfHeight = 1f;
 
-        [Tooltip("Tab shown when the overlay boots. F1-F4 switch tabs at runtime.")]
-        [SerializeField] private DebugTab initialTab = DebugTab.Music;
+        [Tooltip("Tab shown when the overlay boots. F1-F4 switch tabs at runtime. None = hidden until a key.")]
+        [SerializeField] private DebugTab initialTab = DebugTab.None;
 
         [Tooltip("States readout body (MoveState / grounded / facing / speed). F7 on the Player tab toggles.")]
         [SerializeField] private bool showStates = true;
@@ -732,6 +732,30 @@ namespace MK.Rebuild.Debugging
             else
             {
                 overlay.Visible = GUILayout.Toggle(overlay.Visible, " overlay: estado + tell sobre cada enemigo");
+            }
+
+            // Atajo de prueba: saltarse las tres alas y llegar directo a los bosses.
+            GUILayout.Space(8f);
+            var objective = FindFirstObjectByType<DungeonObjective>();
+            if (objective == null)
+            {
+                GUILayout.Label("objetivo: sin DungeonObjective en la escena", labelStyle);
+                return;
+            }
+
+            var door = FindFirstObjectByType<GreatDoor>();
+            GUILayout.Label(
+                $"objetivo: {objective.Activated}/{objective.Required}   puerta: " +
+                (door == null ? "?" : door.IsOpen ? "ABIERTA" : door.IsOpening ? "abriendo" : "cerrada"),
+                labelStyle);
+
+            if (GUILayout.Button(" activar palancas faltantes "))
+            {
+                var levers = FindObjectsByType<LeverInteractable>(FindObjectsSortMode.None);
+                for (int i = 0; i < levers.Length; i++)
+                {
+                    if (levers[i] != null && levers[i].CanInteract) levers[i].Interact();
+                }
             }
         }
 
