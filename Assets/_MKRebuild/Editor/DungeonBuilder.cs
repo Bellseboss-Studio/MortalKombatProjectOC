@@ -40,6 +40,7 @@ namespace MK.Rebuild.EditorTools
         private static Material wallMat;
         private static Material floorMat;
         private static Transform root;
+        private static DungeonObjective objective;
 
         [MenuItem("MK/Level/Build Dungeon")]
         public static void Build()
@@ -54,6 +55,7 @@ namespace MK.Rebuild.EditorTools
             BuildWestWing();
             BuildEastWing();
             BuildSouthWing();
+            BuildObjective();
             BuildGuardianArena();
             BuildDescent();
             BuildOrochiArena();
@@ -367,6 +369,86 @@ namespace MK.Rebuild.EditorTools
             Lamp("South_Chamber_Lamp", 0f, -58f, 6.5f);
         }
 
+        // ------------------------------------------------------------------ objetivo
+
+        /// <summary>
+        /// Objetivo de la mazmorra: tres palancas, una al fondo de cada ala, abren la gran
+        /// puerta del atrio. La puerta es un colisionador móvil: mientras está cerrada tapa
+        /// el vano norte de verdad, así que el objetivo no se puede saltear caminando.
+        /// </summary>
+        private static void BuildObjective()
+        {
+            var host = new GameObject("DungeonObjective");
+            host.transform.SetParent(root, false);
+            objective = host.AddComponent<DungeonObjective>();
+
+            BuildLever("Lever_West", new Vector3(-62f, 0f, 0f), Vector3.right);
+            BuildLever("Lever_East", new Vector3(64f, 0f, 0f), Vector3.left);
+            BuildLever("Lever_South", new Vector3(0f, 0f, -67f), Vector3.forward);
+
+            // Gran puerta: tapa el vano norte del atrio (4 m de ancho, 3.2 de alto).
+            var doorRoot = new GameObject("GreatDoor");
+            doorRoot.transform.SetParent(root, false);
+            doorRoot.transform.localPosition = new Vector3(0f, 0f, 14f);
+
+            GameObject slab = Box("GreatDoor_Slab", new Vector3(0f, 3f, 14f), new Vector3(4.2f, 6f, 0.4f), wallMat);
+            slab.transform.SetParent(doorRoot.transform, true);
+
+            GameObject stone = Box("GreatDoor_Stone", new Vector3(2.8f, 0.6f, 12.2f), new Vector3(1.2f, 1.2f, 1.2f), floorMat);
+
+            var door = doorRoot.AddComponent<GreatDoor>();
+            Wire(door, "door", slab.transform);
+            Wire(door, "objective", objective);
+            Wire(door, "stone", stone.transform);
+        }
+
+        /// <summary>Palanca: base fija, mango que se inclina hacia el jugador y ancla de pose.</summary>
+        private static void BuildLever(string name, Vector3 basePosition, Vector3 facing)
+        {
+            var leverRoot = new GameObject(name);
+            leverRoot.transform.SetParent(root, false);
+            leverRoot.transform.localPosition = basePosition;
+
+            Box(name + "_Base", basePosition + Vector3.up * 0.55f, new Vector3(0.9f, 1.1f, 0.9f), wallMat);
+
+            var handle = new GameObject(name + "_Handle");
+            handle.transform.SetParent(leverRoot.transform, false);
+            handle.transform.localPosition = new Vector3(0f, 1.1f, 0f);
+            handle.transform.localRotation = Quaternion.LookRotation(facing);
+
+            GameObject arm = Box(name + "_Arm", Vector3.zero, new Vector3(0.16f, 1.1f, 0.16f), wallMat);
+            arm.transform.SetParent(handle.transform, false);
+            arm.transform.localPosition = new Vector3(0f, 0.55f, 0f);
+            arm.transform.localRotation = Quaternion.identity;
+
+            var anchor = new GameObject(name + "_Anchor");
+            anchor.transform.SetParent(leverRoot.transform, false);
+            anchor.transform.localPosition = facing * 1.15f;
+            // El ancla mira DE VUELTA a la palanca: el jugador se planta mirándola.
+            anchor.transform.localRotation = Quaternion.LookRotation(-facing);
+
+            var lever = leverRoot.AddComponent<LeverInteractable>();
+            Wire(lever, "handle", handle.transform);
+            Wire(lever, "anchor", anchor.transform);
+            Wire(lever, "objective", objective);
+
+            Lamp(name + "_Lamp", basePosition.x - facing.x * 0.6f, basePosition.z - facing.z * 0.6f, 4.2f);
+        }
+
+        private static void Wire(Object target, string field, Object value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(field);
+            if (property == null)
+            {
+                Debug.LogError("[Dungeon] Campo inexistente al cablear: " + field + " en " + target.name);
+                return;
+            }
+
+            property.objectReferenceValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         // ------------------------------------------------------------------ final
 
         /// <summary>Cámara del Guardián: arena de 26x26, puertas al sur y al norte.</summary>
@@ -479,7 +561,7 @@ namespace MK.Rebuild.EditorTools
             (string label, float x, float z, float dx, float dz)[] doors =
             {
                 ("Hub oeste", -14f, 0f, 1f, 0f), ("Hub este", 14f, 0f, 1f, 0f),
-                ("Hub sur", 0f, -14f, 0f, 1f), ("Hub norte", 0f, 14f, 0f, 1f),
+                ("Hub sur", 0f, -14f, 0f, 1f),
                 ("Lanzas oeste", -37f, 0f, 1f, 0f), ("Pozo este", -47f, 0f, 1f, 0f),
                 ("Guardia oeste", 22f, 0f, 1f, 0f), ("Guardia este", 38f, 0f, 1f, 0f),
                 ("Galería oeste", 47f, 0f, 1f, 0f),
@@ -503,11 +585,26 @@ namespace MK.Rebuild.EditorTools
                 }
             }
 
+            // La gran puerta arranca cerrada y las tres palancas deben existir.
+            if (!Physics.CheckSphere(new Vector3(0f, 1.6f, 14f), 0.8f))
+            {
+                failures++;
+                Debug.LogError("[Dungeon] La gran puerta no bloquea el vano norte.");
+            }
+
+            foreach (string leverName in new[] { "Lever_West", "Lever_East", "Lever_South" })
+            {
+                if (root.Find(leverName) == null)
+                {
+                    failures++;
+                    Debug.LogError("[Dungeon] Falta la palanca " + leverName);
+                }
+            }
+
             if (failures == 0)
             {
                 Debug.Log("[Dungeon] AUDITORÍA OK: " + floors.Length + " pisos y " + doors.Length + " puertas.");
-            }
-            else
+            }            else
             {
                 Debug.LogError("[Dungeon] AUDITORÍA: " + failures + " problema(s).");
             }

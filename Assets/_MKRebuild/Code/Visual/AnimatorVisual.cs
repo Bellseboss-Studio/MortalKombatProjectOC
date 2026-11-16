@@ -59,6 +59,12 @@ namespace MK.Rebuild
         private const float HitReactionFallbackSeconds = 0.4f;
 
         /// <summary>
+        /// State used for the interaction gesture. Interim: borrows the ledge grab, which is a
+        /// two-handed reach with a pull. Replace with the bespoke lever clip when it lands.
+        /// </summary>
+        private const string InteractState = "LedgeGrab";
+
+        /// <summary>
         /// Fallback only: used when the trimmed Death clip cannot be resolved. The LIVE respawn
         /// delay is always derived from the clip (2.5 s collapse / 3.5 ≈ 0.714 s).
         /// </summary>
@@ -479,6 +485,18 @@ namespace MK.Rebuild
             if (animator == null) return;
             animator.SetFloat(DeathSpeedHash, DeathClipSpeed);
             animator.CrossFade("Death", Mathf.Max(0f, crossFadeDuration), 0, 0f);
+        }
+
+        /// <summary>
+        /// INTERACTION gesture seam (change dungeon-levers-cinematics): reaches out and pulls.
+        /// There is no bespoke lever clip yet, so it borrows the ledge-grab state, which is
+        /// already a two-handed reach with a pull. Swap the state name here once the real clip
+        /// lands — callers never change.
+        /// </summary>
+        public void PlayInteract(float crossFadeDuration)
+        {
+            if (animator == null) return;
+            animator.CrossFade(InteractState, Mathf.Max(0f, crossFadeDuration), 0, 0f);
         }
 
         /// <summary>
