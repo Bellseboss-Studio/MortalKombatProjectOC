@@ -77,6 +77,12 @@ namespace MK.Rebuild
         [Tooltip("Phase-2 speed multiplier applied to tells, recovery, cooldown, move and charge speed.")]
         public float phase2SpeedMultiplier = 1.25f;
 
+        [Tooltip("How many phases the fight has. The killing blow of every phase but the last restores a full phase of HP and plays the roar.")]
+        public int phases = 2;
+
+        [Tooltip("Phase-3 speed multiplier. Only used when phases >= 3.")]
+        public float phase3SpeedMultiplier = 1.45f;
+
         [Tooltip("Roar/pause duration at the phase transition, in UNSCALED seconds.")]
         public float roarDuration = 1.2f;
 

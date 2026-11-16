@@ -23,8 +23,11 @@ namespace MK.Rebuild
         [Tooltip("Phase-1 fill (left half).")]
         [SerializeField] private Image phase1Fill;
 
-        [Tooltip("Phase-2 fill (right half).")]
+        [Tooltip("Phase-2 fill (middle / right half).")]
         [SerializeField] private Image phase2Fill;
+
+        [Tooltip("Phase-3 fill (third segment). Hidden on two-phase fights.")]
+        [SerializeField] private Image phase3Fill;
 
         public static BossHealthBar Instance { get; private set; }
 
@@ -86,8 +89,34 @@ namespace MK.Rebuild
         private void Refresh()
         {
             if (boss == null) return;
+            ApplySegmentLayout(boss.PhaseCount);
             if (phase1Fill != null) phase1Fill.fillAmount = boss.Phase1Normalized;
             if (phase2Fill != null) phase2Fill.fillAmount = boss.Phase2Normalized;
+            if (phase3Fill != null) phase3Fill.fillAmount = boss.Phase3Normalized;
+        }
+
+        /// <summary>
+        /// Splits the bar into as many segments as the fight has phases. Two phases keep the
+        /// authored halves; three phases split it into thirds and show the extra fill.
+        /// </summary>
+        private void ApplySegmentLayout(int phaseCount)
+        {
+            bool three = phaseCount >= 3;
+
+            SetSegment(phase1Fill, 0f, three ? 1f / 3f : 0.5f);
+            SetSegment(phase2Fill, three ? 1f / 3f : 0.5f, three ? 2f / 3f : 1f);
+
+            if (phase3Fill == null) return;
+            if (phase3Fill.gameObject.activeSelf != three) phase3Fill.gameObject.SetActive(three);
+            if (three) SetSegment(phase3Fill, 2f / 3f, 1f);
+        }
+
+        private static void SetSegment(Image fill, float min, float max)
+        {
+            if (fill == null) return;
+            var rect = fill.rectTransform;
+            rect.anchorMin = new Vector2(min, rect.anchorMin.y);
+            rect.anchorMax = new Vector2(max, rect.anchorMax.y);
         }
 
         /// <summary>

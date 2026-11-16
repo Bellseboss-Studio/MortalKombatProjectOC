@@ -71,6 +71,22 @@ namespace MK.Rebuild
         /// <summary>Current fight phase: 1 until the first lethal hit, then 2.</summary>
         public int Phase => phase;
 
+        /// <summary>How many phases this fight has (data-driven; 2 by default, 3 for the Orochi).</summary>
+        public int PhaseCount => definition != null ? Mathf.Max(1, definition.phases) : 1;
+
+        /// <summary>
+        /// Speed multiplier for the CURRENT phase: 1 in phase 1, phase-2 multiplier after that,
+        /// phase-3 multiplier on the last one. One place so tells, recovery and cooldowns can
+        /// never disagree with the animator speed.
+        /// </summary>
+        private float PhaseSpeedMultiplier()
+        {
+            if (definition == null || phase <= 1) return 1f;
+            return phase == 2
+                ? definition.phase2SpeedMultiplier
+                : Mathf.Max(1f, definition.phase3SpeedMultiplier);
+        }
+
         /// <summary>Current phase HP (read-only debug seam).</summary>
         public int HP => receiver != null ? receiver.HP : 0;
 
@@ -93,7 +109,15 @@ namespace MK.Rebuild
                         : 0f)
                 : 0f;
 
-        /// <summary>True after the final (phase-2) death blow.</summary>
+        /// <summary>Phase-3 bar fill [0..1]; only meaningful on a three-phase fight.</summary>
+        public float Phase3Normalized =>
+            definition != null
+                ? (phase < 3
+                    ? 1f
+                    : Mathf.Clamp01((float)HP / Mathf.Max(1, definition.phaseHp)))
+                : 0f;
+
+        /// <summary>True after the final death blow.</summary>
         public bool IsDead { get; private set; }
 
         /// <summary>
@@ -218,7 +242,7 @@ namespace MK.Rebuild
                 return;
             }
 
-            float mult = phase == 2 ? definition.phase2SpeedMultiplier : 1f;
+            float mult = PhaseSpeedMultiplier();
 
             // Leash: the brute refuses to leave its arena. Roar/Dead are exempt so
             // the transition and the death visual are never interrupted.
@@ -330,7 +354,7 @@ namespace MK.Rebuild
                 }
 
                 // M3.5a: phase-2 slams also release a jumpable shockwave.
-                if (phase == 2 && !shockwaveSpawned)
+                if (phase >= 2 && !shockwaveSpawned)
                 {
                     shockwaveSpawned = true;
                     StartCoroutine(ShockwaveRoutine());
@@ -364,7 +388,7 @@ namespace MK.Rebuild
                 yield break;
             }
 
-            float mult = phase == 2 ? definition.phase2SpeedMultiplier : 1f;
+            float mult = PhaseSpeedMultiplier();
             float duration = Mathf.Max(0.0001f, definition.shockwaveDuration / mult);
             float radius = definition.shockwaveRadius;
             float hitBand = definition.shockwaveHitRadius;
@@ -520,9 +544,9 @@ namespace MK.Rebuild
         private void OnLethalHit(HitReceiver hitReceiver)
         {
             if (IsDead || definition == null) return;
-            if (phase != 1) return;
+            if (phase >= PhaseCount) return;
 
-            phase = 2;
+            phase++;
             receiver.Configure(definition.phaseHp);
             receiver.Invulnerable = true;
             StopHorizontal();
@@ -591,7 +615,7 @@ namespace MK.Rebuild
             // The unscaled roar is over: phase 2 may speed the animator up from here on.
             if (characterVisual != null && definition != null)
             {
-                characterVisual.SetPlaybackSpeed(definition.phase2SpeedMultiplier);
+                characterVisual.SetPlaybackSpeed(PhaseSpeedMultiplier());
             }
 
             receiver.Invulnerable = false;
