@@ -240,6 +240,16 @@ namespace MK.Rebuild
 
             float window = Mathf.Max(0.001f, activeDuration);
             float speed = Mathf.Max(0f, CurveMotion.Speed(dashCurve, activeDistance, window, dashElapsed));
+
+            // El dash NO atraviesa cuerpos: si hay un enemigo o un boss justo delante, termina
+            // ahí. Sin esto el jugador empujaba al enemigo y seguía de largo (el Rigidbody
+            // reaplica la velocidad cada frame y gana el empuje).
+            if (BlockedByBody(speed))
+            {
+                EndDash();
+                return;
+            }
+
             Vector3 v = rb.linearVelocity;
             if (additive)
             {
@@ -254,8 +264,27 @@ namespace MK.Rebuild
             rb.linearVelocity = v;
         }
 
-        private void StartDash(bool zeroBase = false)
+        /// <summary>
+        /// True cuando hay un cuerpo hostil justo delante, en la dirección del dash.
+        /// El SphereCast arranca dentro de la cápsula del jugador, así que su propio collider
+        /// se ignora y sólo cuentan los enemigos y los bosses.
+        /// </summary>
+        private bool BlockedByBody(float speed)
         {
+            float probe = Mathf.Max(0.5f, speed * Time.fixedDeltaTime * 2.5f);
+            Vector3 origin = rb.position + Vector3.up * 0.9f;
+
+            if (!Physics.SphereCast(origin, 0.35f, dashDir, out RaycastHit hit, probe,
+                    Physics.AllLayers, QueryTriggerInteraction.Ignore))
+            {
+                return false;
+            }
+
+            return hit.collider.GetComponentInParent<EnemyController>() != null
+                || hit.collider.GetComponentInParent<BossController>() != null;
+        }
+
+        private void StartDash(bool zeroBase = false)        {
             isDashing = true;
             AudioDirector.Play(AudioCueId.Dash, transform.position);
             dashTimer = Mathf.Max(0.001f, dashDuration);
