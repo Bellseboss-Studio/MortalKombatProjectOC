@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Playables;
+using UnityEngine.Timeline;
 
 namespace MK.Rebuild.EditorTools
 {
@@ -75,6 +77,7 @@ namespace MK.Rebuild.EditorTools
             BuildDescent();
             BuildOrochiArena();
             BuildCameras();
+            BuildCinematics();
             BuildSafetyNet();
             BuildPauseMenu();
             Organize();
@@ -793,6 +796,223 @@ namespace MK.Rebuild.EditorTools
 
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root);
             instance.name = "PauseMenu";
+        }
+
+        // ------------------------------------------------------------------ cinemáticas
+
+        private sealed class Beat
+        {
+            public string name;
+            public Vector3 shotA;
+            public Vector3 lookA;
+            public Vector3 shotB;
+            public Vector3 lookB;
+            public float seconds;
+        }
+
+        /// <summary>
+        /// Seis beats con dos planos cada uno (un corte), para que se lean como cinemática y no
+        /// como escena fija. El contenido es reemplazable: cada beat es un CinematicDefinition
+        /// con su Timeline, y el director de fotografía sólo edita ese Timeline.
+        ///
+        /// No hay lógica de juego acá: los cues deciden CUÁNDO, el director hace el resto.
+        /// </summary>
+        private static void BuildCinematics()
+        {
+            var host = new GameObject("Cinematics");
+            host.transform.SetParent(root, false);
+            var director = host.AddComponent<CinematicDirector>();
+
+            CinemachineBrain brain = Camera.main != null ? Camera.main.GetComponent<CinemachineBrain>() : null;
+            if (brain == null) brain = Object.FindFirstObjectByType<CinemachineBrain>();
+
+            Beat[] beats =
+            {
+                new Beat { name = "DungeonArrival", seconds = 4f,
+                    shotA = new Vector3(0f, 2.5f, -12f), lookA = new Vector3(0f, 2f, 2f),
+                    shotB = new Vector3(6f, 6f, -9f), lookB = new Vector3(0f, 1.5f, 3f) },
+                new Beat { name = "GreatDoorLocked", seconds = 4.5f,
+                    shotA = new Vector3(0f, 2.5f, 5f), lookA = new Vector3(0f, 4f, 14f),
+                    shotB = new Vector3(6f, 5.5f, 8f), lookB = new Vector3(0f, 3f, 14f) },
+                new Beat { name = "GreatDoorOpen", seconds = 5f,
+                    shotA = new Vector3(7f, 1.6f, 14f), lookA = new Vector3(0f, 3f, 14f),
+                    shotB = new Vector3(0f, 1.2f, 6f), lookB = new Vector3(0f, 6f, 14f) },
+                new Beat { name = "MinibossDefeated", seconds = 4f,
+                    shotA = new Vector3(0f, 8f, 26f), lookA = new Vector3(0f, 1f, 36f),
+                    shotB = new Vector3(9f, 3f, 32f), lookB = new Vector3(0f, 1f, 36f) },
+                new Beat { name = "FinalBossIntro", seconds = 5f,
+                    shotA = new Vector3(0f, 4f, 66f), lookA = new Vector3(0f, 3f, 80f),
+                    shotB = new Vector3(10f, 7f, 72f), lookB = new Vector3(0f, 2f, 80f) },
+                new Beat { name = "DungeonExit", seconds = 5f,
+                    shotA = new Vector3(0f, 2f, 70f), lookA = new Vector3(0f, 2f, 92f),
+                    shotB = new Vector3(0f, 8f, 90f), lookB = new Vector3(0f, 1f, 68f) },
+            };
+
+            var bindings = new List<CinematicDefinition>();
+            var directors = new List<PlayableDirector>();
+
+            foreach (Beat beat in beats)
+            {
+                CinemachineCamera camA = BuildShotCamera(beat.name + "_A", beat.shotA, beat.lookA);
+                CinemachineCamera camB = BuildShotCamera(beat.name + "_B", beat.shotB, beat.lookB);
+
+                // Regenerable: CreateAsset falla si el archivo ya existe, y un asset viejo
+                // dejaría referencias rotas entre definición y timeline.
+                string timelinePath = "Assets/_MKRebuild/Timelines/TL_" + beat.name + ".playable";
+                string definitionPath = "Assets/_MKRebuild/Data/Cinematic_" + beat.name + ".asset";
+                DeleteAssetIfExists(timelinePath);
+                DeleteAssetIfExists(definitionPath);
+
+                var timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+                timeline.name = "TL_" + beat.name;
+                AssetDatabase.CreateAsset(timeline, timelinePath);
+
+                var track = timeline.CreateTrack<CinemachineTrack>(null, "Cinemachine");
+
+                var clipA = track.CreateClip<CinemachineShot>();
+                clipA.start = 0d;
+                clipA.duration = beat.seconds * 0.6d;
+                CinemachineShot shotA = (CinemachineShot)clipA.asset;
+                shotA.VirtualCamera = new ExposedReference<CinemachineVirtualCameraBase>
+                {
+                    exposedName = new PropertyName(beat.name + "_A"),
+                    defaultValue = camA,
+                };
+
+                var clipB = track.CreateClip<CinemachineShot>();
+                clipB.start = beat.seconds * 0.6d;
+                clipB.duration = beat.seconds * 0.4d;
+                CinemachineShot shotB = (CinemachineShot)clipB.asset;
+                shotB.VirtualCamera = new ExposedReference<CinemachineVirtualCameraBase>
+                {
+                    exposedName = new PropertyName(beat.name + "_B"),
+                    defaultValue = camB,
+                };
+
+                var directorHost = new GameObject("TL_" + beat.name);
+                directorHost.transform.SetParent(host.transform, false);
+                var playable = directorHost.AddComponent<PlayableDirector>();
+                playable.playableAsset = timeline;
+                playable.playOnAwake = false;
+                playable.extrapolationMode = DirectorWrapMode.None;
+                if (brain != null) playable.SetGenericBinding(track, brain);
+
+                // El ExposedReference del shot no se serializa por defaultValue: hay que
+                // registrar el vcam en el director por su nombre expuesto.
+                CinemachineCamera[] shotCams = { camA, camB };
+                int shotIndex = 0;
+                foreach (var clip in track.GetClips())
+                {
+                    var shot = clip.asset as CinemachineShot;
+                    if (shot != null && shotIndex < shotCams.Length)
+                    {
+                        playable.SetReferenceValue(shot.VirtualCamera.exposedName, shotCams[shotIndex]);
+                    }
+
+                    shotIndex++;
+                }
+
+                var definition = ScriptableObject.CreateInstance<CinematicDefinition>();
+                definition.name = "Cinematic_" + beat.name;
+                AssetDatabase.CreateAsset(definition, definitionPath);
+
+                var so = new SerializedObject(definition);
+                so.FindProperty("timeline").objectReferenceValue = timeline;
+                so.FindProperty("debugLabel").stringValue = beat.name;
+                so.FindProperty("onComplete").enumValueIndex = (int)CinematicOnComplete.ReturnToPrevious;
+                so.ApplyModifiedPropertiesWithoutUndo();
+
+                // Guardar acá: el CreateAsset del próximo beat dispara un reimport que
+                // descarta los cambios pendientes de las definiciones anteriores.
+                AssetDatabase.SaveAssets();
+
+                bindings.Add(definition);
+                directors.Add(playable);
+            }
+
+            var directorSo = new SerializedObject(director);
+            var array = directorSo.FindProperty("bindings");
+            array.arraySize = bindings.Count;
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                SerializedProperty entry = array.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("definition").objectReferenceValue = bindings[i];
+                entry.FindPropertyRelative("director").objectReferenceValue = directors[i];
+            }
+
+            directorSo.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.SaveAssets();
+
+            BuildCinematicCues(bindings);
+        }
+
+        private static void DeleteAssetIfExists(string path)
+        {
+            if (AssetDatabase.LoadAssetAtPath<Object>(path) != null) AssetDatabase.DeleteAsset(path);
+        }
+
+        private static CinemachineCamera BuildShotCamera(string name, Vector3 position, Vector3 lookAt)
+        {
+            var host = new GameObject("Shot_" + name);
+            host.transform.SetParent(root, false);
+            host.transform.position = position;
+            host.transform.rotation = Quaternion.LookRotation((lookAt - position).normalized);
+
+            var vcam = host.AddComponent<CinemachineCamera>();
+            vcam.Priority.Value = 0;
+            vcam.Priority.Enabled = true;
+            return vcam;
+        }
+
+        /// <summary>Coloca cada beat en el momento del recorrido que le corresponde.</summary>
+        private static void BuildCinematicCues(List<CinematicDefinition> definitions)
+        {
+            if (definitions == null || definitions.Count < 6) return;
+
+            BuildCue("Cue_Arrival", definitions[0], CinematicCue.Trigger.OnStart,
+                new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f), 1.2f);
+
+            BuildCue("Cue_DoorLocked", definitions[1], CinematicCue.Trigger.OnVolume,
+                new Vector3(0f, 2f, 8f), new Vector3(14f, 4f, 3f), 0f);
+
+            BuildCue("Cue_DoorOpen", definitions[2], CinematicCue.Trigger.OnObjective,
+                new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f), 0.6f);
+
+            Transform guardianHost = FindDeep("GuardianEncounter");
+            Transform orochiHost = FindDeep("OrochiEncounter");
+            BossSpawner guardian = guardianHost != null ? guardianHost.GetComponent<BossSpawner>() : null;
+            BossSpawner orochi = orochiHost != null ? orochiHost.GetComponent<BossSpawner>() : null;
+
+            // Cada cue escucha SU spawner: el miniboss es el Guardián, el final es el Orochi.
+            BuildCue("Cue_MinibossDown", definitions[3], CinematicCue.Trigger.OnBossDeath,
+                new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f), 1.2f, guardian);
+
+            BuildCue("Cue_FinalBossIntro", definitions[4], CinematicCue.Trigger.OnBossSpawn,
+                new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f), 0.4f, orochi);
+
+            BuildCue("Cue_Exit", definitions[5], CinematicCue.Trigger.OnVolume,
+                new Vector3(0f, 2f, 94f), new Vector3(16f, 4f, 3f), 0f);
+        }
+
+        private static void BuildCue(string name, CinematicDefinition definition,
+            CinematicCue.Trigger trigger, Vector3 centre, Vector3 size, float delay,
+            BossSpawner spawner = null)
+        {
+            var host = new GameObject(name);
+            host.layer = IgnoreRaycastLayer;
+            host.transform.SetParent(root, false);
+            host.transform.position = centre;
+
+            var volume = host.AddComponent<BoxCollider>();
+            volume.isTrigger = true;
+            volume.center = Vector3.zero;
+            volume.size = size;
+
+            var cue = host.AddComponent<CinematicCue>();
+            Wire(cue, "definition", definition);
+            WireInt(cue, "trigger", (int)trigger);
+            WireFloat(cue, "delay", delay);
+            if (spawner != null) Wire(cue, "spawner", spawner);
         }
 
         // ------------------------------------------------------------------ organización
