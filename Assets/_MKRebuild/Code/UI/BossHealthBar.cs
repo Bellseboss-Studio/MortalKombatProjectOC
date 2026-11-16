@@ -127,6 +127,7 @@ namespace MK.Rebuild
         {
             if (phase1Fill != null) EnsureFillSprite(phase1Fill);
             if (phase2Fill != null) EnsureFillSprite(phase2Fill);
+            if (phase3Fill != null) EnsureFillSprite(phase3Fill);
         }
 
         private static void EnsureFillSprite(Image fill)
