@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Cinemachine;
 using UnityEditor;
 using UnityEngine;
 
@@ -37,6 +38,19 @@ namespace MK.Rebuild.EditorTools
         private const float T = 0.5f;
         private const float PitDepth = 2.5f;
 
+        /// <summary>
+        /// Los volúmenes de trigger viven acá: si quedan en Default, el CinemachineDeoccluder
+        /// los trata como pared y mete la cámara dentro del jugador (el volumen de la sala
+        /// envuelve a la propia cámara).
+        /// </summary>
+        private const int IgnoreRaycastLayer = 2;
+
+        /// <summary>
+        /// Tag del jugador. El deoccluder la usa para no chocar con su propio capsule: sin esto
+        /// el rayo cámara→jugador termina dentro del capsule y la cámara se mete en la cabeza.
+        /// </summary>
+        private const string PlayerTag = "Player";
+
         private static Material wallMat;
         private static Material floorMat;
         private static Transform root;
@@ -60,6 +74,7 @@ namespace MK.Rebuild.EditorTools
             BuildGuardianArena();
             BuildDescent();
             BuildOrochiArena();
+            BuildCameras();
 
             PlacePlayer();
             Physics.SyncTransforms();
@@ -475,6 +490,7 @@ namespace MK.Rebuild.EditorTools
             Wire(spawner, "prefab", boss);
 
             var entry = new GameObject(name + "_Entry");
+            entry.layer = IgnoreRaycastLayer;
             entry.transform.SetParent(host.transform, false);
             entry.transform.localPosition = triggerPosition - spawnPosition;
 
@@ -577,6 +593,83 @@ namespace MK.Rebuild.EditorTools
             Lamp("Orochi_Lamp_2", 8f, 80f, 6.5f);
         }
 
+        // ------------------------------------------------------------------ cámaras
+
+        /// <summary>
+        /// Una vcam y una zona por sala. Cada vcam lleva un <see cref="CinemachineDeoccluder"/>:
+        /// eso es lo que evita que la cámara quede detrás de la pared, la trae hacia el jugador.
+        ///
+        /// Entre salas sólo cambia el offset (alto y distancia). El yaw se deja alineado con la
+        /// vcam base a propósito: el basis de input vive ahí, y <see cref="CameraZone"/> avisa si
+        /// una sala se sale de la banda de ±25°.
+        /// </summary>
+        private static void BuildCameras()
+        {
+            var directorHost = new GameObject("CameraDirector");
+            directorHost.transform.SetParent(root, false);
+            directorHost.AddComponent<CameraDirector>();
+
+            GameObject baseCamera = GameObject.Find("CinemachineCamera");
+            if (baseCamera != null)
+            {
+                CinemachineDeoccluder baseDeoccluder = baseCamera.GetComponent<CinemachineDeoccluder>();
+                if (baseDeoccluder == null) baseDeoccluder = baseCamera.AddComponent<CinemachineDeoccluder>();
+                baseDeoccluder.IgnoreTag = PlayerTag;
+            }
+
+            BuildCameraZone("Atrio", new Vector3(0f, 0f, 0f), new Vector3(28f, 8f, 28f), new Vector3(0f, 5.5f, -11f));
+            BuildCameraZone("Lanzas", new Vector3(-30f, 0f, 0f), new Vector3(14f, 7f, 14f), new Vector3(0f, 4.5f, -9f));
+            BuildCameraZone("Pozo", new Vector3(-55f, 0f, 0f), new Vector3(16f, 8f, 16f), new Vector3(0f, 6f, -12f));
+            BuildCameraZone("Guardia", new Vector3(30f, 0f, 0f), new Vector3(16f, 7f, 16f), new Vector3(0f, 5f, -10f));
+            BuildCameraZone("Galeria", new Vector3(56f, 0f, 0f), new Vector3(18f, 8f, 18f), new Vector3(0f, 6f, -12f));
+            BuildCameraZone("Pesos", new Vector3(0f, 0f, -30f), new Vector3(16f, 7f, 16f), new Vector3(0f, 5f, -10f));
+            BuildCameraZone("CamaraPeso", new Vector3(0f, 0f, -58f), new Vector3(18f, 8f, 20f), new Vector3(0f, 6f, -12f));
+            BuildCameraZone("Guardian", new Vector3(0f, 0f, 36f), new Vector3(26f, 8f, 26f), new Vector3(0f, 7f, -14f));
+            BuildCameraZone("Orochi", new Vector3(0f, 0f, 80f), new Vector3(34f, 8f, 34f), new Vector3(0f, 8f, -16f));
+        }
+
+        private static void BuildCameraZone(string roomName, Vector3 centre, Vector3 volumeSize, Vector3 followOffset)
+        {
+            var vcamHost = new GameObject("Cam_" + roomName);
+            vcamHost.transform.SetParent(root, false);
+            vcamHost.transform.position = centre + followOffset;
+            vcamHost.transform.rotation = Quaternion.Euler(26.6f, 0f, 0f);
+
+            var vcam = vcamHost.AddComponent<CinemachineCamera>();
+            vcam.Priority.Value = 0;
+            vcam.Priority.Enabled = true;
+
+            var follow = vcamHost.AddComponent<CinemachineFollow>();
+            follow.FollowOffset = followOffset;
+
+            vcamHost.AddComponent<CinemachineRotationComposer>();
+            var deoccluder = vcamHost.AddComponent<CinemachineDeoccluder>();
+            deoccluder.IgnoreTag = PlayerTag;
+
+            var zoneHost = new GameObject("Zone_" + roomName);
+            zoneHost.layer = IgnoreRaycastLayer;
+            zoneHost.transform.SetParent(root, false);
+            zoneHost.transform.position = centre;
+
+            var volume = zoneHost.AddComponent<BoxCollider>();
+            volume.isTrigger = true;
+            volume.center = Vector3.zero;
+            volume.size = volumeSize;
+
+            var zone = zoneHost.AddComponent<CameraZone>();
+            Wire(zone, "vcam", vcam);
+            WireInt(zone, "priority", 20);
+        }
+
+        private static void WireInt(Object target, string field, int value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(field);
+            if (property == null) return;
+            property.intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         // ------------------------------------------------------------------ auditoría
 
         /// <summary>
@@ -606,7 +699,8 @@ namespace MK.Rebuild.EditorTools
                 // Vale como piso cualquier superficie entre -1.0 y +1.2; un foso queda afuera.
                 bool found = false;
                 float y = 0f;
-                RaycastHit[] hits = Physics.RaycastAll(new Vector3(x, 4f, z), Vector3.down, 10f);
+                RaycastHit[] hits = Physics.RaycastAll(new Vector3(x, 4f, z), Vector3.down, 10f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
                 foreach (RaycastHit hit in hits)
                 {
                     if (hit.collider.transform.root.name == "Player") continue;
