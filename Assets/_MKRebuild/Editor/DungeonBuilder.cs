@@ -474,18 +474,20 @@ namespace MK.Rebuild.EditorTools
                 new Vector3(0f, 0f, 36f),
                 new Vector3(0f, 2f, 25f),
                 "Assets/_MKRebuild/Prefabs/Enemies/Guardia_EB.prefab",
-                new Vector3(0f, 3f, 49f));
+                new Vector3(0f, 3f, 49f),
+                string.Empty);
 
             BuildEncounter(
                 "OrochiEncounter",
                 new Vector3(0f, 0f, 80f),
                 new Vector3(0f, 2f, 65.5f),
                 "Assets/_MKRebuild/Prefabs/Enemies/Orochi_EB.prefab",
-                Vector3.zero);
+                Vector3.zero,
+                "Roar");
         }
 
         private static void BuildEncounter(string name, Vector3 spawnPosition, Vector3 triggerPosition,
-            string bossPrefabPath, Vector3 gatePosition)
+            string bossPrefabPath, Vector3 gatePosition, string introState)
         {
             var host = new GameObject(name);
             host.transform.SetParent(root, false);
@@ -511,6 +513,12 @@ namespace MK.Rebuild.EditorTools
 
             var starter = host.AddComponent<BossEncounterStarter>();
             Wire(starter, "spawner", spawner);
+            if (!string.IsNullOrEmpty(introState))
+            {
+                var starterSo = new SerializedObject(starter);
+                starterSo.FindProperty("introState").stringValue = introState;
+                starterSo.ApplyModifiedPropertiesWithoutUndo();
+            }
 
             if (gatePosition == Vector3.zero) return;
 
@@ -988,8 +996,9 @@ namespace MK.Rebuild.EditorTools
             BuildCue("Cue_MinibossDown", definitions[3], CinematicCue.Trigger.OnBossDeath,
                 new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f), 1.2f, guardian);
 
+            // Sin delay: el beat tiene que empezar antes de que el boss se despierte.
             BuildCue("Cue_FinalBossIntro", definitions[4], CinematicCue.Trigger.OnBossSpawn,
-                new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f), 0.4f, orochi);
+                new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f), 0f, orochi);
 
             BuildCue("Cue_Exit", definitions[5], CinematicCue.Trigger.OnVolume,
                 new Vector3(0f, 2f, 94f), new Vector3(16f, 4f, 3f), 0f);
