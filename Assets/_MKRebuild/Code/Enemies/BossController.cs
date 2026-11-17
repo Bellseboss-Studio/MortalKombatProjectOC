@@ -23,7 +23,7 @@ namespace MK.Rebuild
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody), typeof(HitReceiver))]
-    public sealed class BossController : MonoBehaviour
+    public class BossController : MonoBehaviour
     {
         private enum State { Approach, Slam, Charge, Recovery, Roar, Dead }
 
@@ -79,7 +79,7 @@ namespace MK.Rebuild
         /// phase-3 multiplier on the last one. One place so tells, recovery and cooldowns can
         /// never disagree with the animator speed.
         /// </summary>
-        private float PhaseSpeedMultiplier()
+        protected float PhaseSpeedMultiplier()
         {
             if (definition == null || phase <= 1) return 1f;
             return phase == 2
@@ -165,7 +165,7 @@ namespace MK.Rebuild
             originalScale = visualRoot != null ? visualRoot.localScale : transform.localScale;
         }
 
-        private void Start()
+        protected virtual void Start()
         {
             playerMotor = FindFirstObjectByType<PlayerMotor>();
             BossArena.Instance?.Bind(this);
@@ -244,22 +244,49 @@ namespace MK.Rebuild
 
             float mult = PhaseSpeedMultiplier();
 
-            // Leash: the brute refuses to leave its arena. Roar/Dead are exempt so
-            // the transition and the death visual are never interrupted.
-            if (state != State.Roar && state != State.Dead)
+            // Host beats: the roar and the death visual belong to the host and no brain may
+            // interrupt them.
+            if (state == State.Roar || state == State.Dead)
             {
-                Vector3 toCenter = FlatDirectionTo(leashCenter);
-                if (FlatDistanceTo(leashCenter) > definition.leashRadius &&
-                    toCenter.sqrMagnitude > 0.000001f)
-                {
-                    state = State.Approach;
-                    Face(toCenter, dt);
-                    if (characterVisual != null) characterVisual.SetMoving(true, definition.moveSpeed * mult);
-                    Steer(toCenter, definition.moveSpeed * mult);
-                    return;
-                }
+                StopHorizontal();
+                return;
             }
 
+            // SEAM (change executioner-boss): the leash is a hook because it WRITES state and
+            // returns. A "suspended" flag would force every brain to duplicate the return.
+            if (TickLeash(dt, mult)) return;
+
+            // The ONE decision point. Receives only dt and mult: everything else is read
+            // through the protected accessors, so a brain cannot reach into host internals.
+            TickDecision(dt, mult);
+        }
+
+        /// <summary>
+        /// Default leash: the brute refuses to leave its arena. Returns true when it consumed
+        /// the frame (it moved the boss back toward the leash centre).
+        /// </summary>
+        protected virtual bool TickLeash(float dt, float mult)
+        {
+            Vector3 toCenter = FlatDirectionTo(leashCenter);
+            if (FlatDistanceTo(leashCenter) <= definition.leashRadius ||
+                toCenter.sqrMagnitude <= 0.000001f)
+            {
+                return false;
+            }
+
+            state = State.Approach;
+            Face(toCenter, dt);
+            if (characterVisual != null) characterVisual.SetMoving(true, definition.moveSpeed * mult);
+            Steer(toCenter, definition.moveSpeed * mult);
+            return true;
+        }
+
+        /// <summary>
+        /// Default decision: the brute's approach → slam/charge → recover loop. A boss with its
+        /// own initiative machine overrides this and never touches the host's beats.
+        /// </summary>
+        protected virtual void TickDecision(float dt, float mult)
+        {
             switch (state)
             {
                 case State.Approach:
@@ -277,18 +304,35 @@ namespace MK.Rebuild
                 case State.Recovery:
                     TickRecovery(dt);
                     break;
-
-                case State.Roar:
-                    StopHorizontal();
-                    break;
-
-                case State.Dead:
-                    if (rb != null && !rb.isKinematic) StopHorizontal();
-                    break;
             }
         }
 
-        private void ResolveRefs()
+        // --- Superficie para un cerebro (change executioner-boss) -----------------
+        // Criterio C1-C4 del design: sólo lo que el host YA posee y el cerebro necesita leer.
+
+        protected BossDefinition Definition => definition;
+        protected HitReceiver Receiver => receiver;
+        protected CharacterVisual Visual => characterVisual;
+        protected Rigidbody Body => rb;
+        protected PlayerDamage Player => player;
+
+        /// <summary>Hook: the unscaled roar finished; a brain may resume its own turn here.</summary>
+        protected virtual void OnPhaseRoarFinished() { }
+
+        /// <summary>Hook: the boss was reset for a respawn; a brain resets its own beat here.</summary>
+        protected virtual void OnResetForRespawn() { }
+
+        /// <summary>
+        /// Damage feedback. Default = the brute's rule: no flinch during Slam/Charge/Roar.
+        /// A brain may replace it, but it MUST NOT change state (INIT-4).
+        /// </summary>
+        protected virtual void PlayDamageReaction()
+        {
+            if (state == State.Slam || state == State.Charge || state == State.Roar) return;
+            if (characterVisual != null) characterVisual.PlayHit();
+        }
+
+        protected void ResolveRefs()
         {
             if (player == null) player = FindFirstObjectByType<PlayerDamage>();
             if (playerMotor == null) playerMotor = FindFirstObjectByType<PlayerMotor>();
@@ -501,7 +545,7 @@ namespace MK.Rebuild
         /// player and other enemies (allies) are ignored, so a body never cancels
         /// the commitment; rails/walls do.
         /// </summary>
-        private bool ChargeBlocked()
+        protected bool ChargeBlocked()
         {
             if (rb == null) return false;
 
@@ -621,6 +665,7 @@ namespace MK.Rebuild
             receiver.Invulnerable = false;
             cooldownTimer = 0f;
             state = State.Approach;
+            OnPhaseRoarFinished();
 
             if (music != null) music.NotifyCombat();
         }
@@ -629,13 +674,7 @@ namespace MK.Rebuild
         private void OnDamaged(int damage, Vector3 dir, float launchImpulse)
         {
             if (IsDead || definition == null) return;
-
-            // Hiperarmadura en los ataques: el boss NO flinchea mientras ejecuta Slam o
-            // Charge. Sin esto, el clip de golpe cortaba la animación de ataque y el boss
-            // quedaba en Idle mientras la acción seguía corriendo (embestida invisible).
-            if (state == State.Slam || state == State.Charge || state == State.Roar) return;
-
-            if (characterVisual != null) characterVisual.PlayHit();
+            PlayDamageReaction();
         }
 
         private void OnDied()
@@ -776,6 +815,7 @@ namespace MK.Rebuild
             }
 
             BossHealthBar.Instance?.Bind(this);
+            OnResetForRespawn();
 
             // Dormant again: the encounter only restarts when the flow re-enters BossFight.
             // Without this the boss would resume Approach after the respawn and walk to the
@@ -785,14 +825,14 @@ namespace MK.Rebuild
 
         // --- Movement helpers ------------------------------------------------
 
-        private void Face(Vector3 flatDirection, float dt)
+        protected void Face(Vector3 flatDirection, float dt)
         {
             if (flatDirection.sqrMagnitude < 0.000001f) return;
             Quaternion target = Quaternion.LookRotation(flatDirection, Vector3.up);
             rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, target, definition.turnSpeed * dt));
         }
 
-        private void Steer(Vector3 direction, float speed)
+        protected void Steer(Vector3 direction, float speed)
         {
             Vector3 velocity = rb.linearVelocity;
             velocity.x = direction.x * speed;
@@ -800,7 +840,7 @@ namespace MK.Rebuild
             rb.linearVelocity = velocity;
         }
 
-        private void StopHorizontal()
+        protected void StopHorizontal()
         {
             if (rb == null || rb.isKinematic) return;
             Vector3 velocity = rb.linearVelocity;
@@ -809,14 +849,14 @@ namespace MK.Rebuild
             rb.linearVelocity = velocity;
         }
 
-        private Vector3 FlatDirectionTo(Vector3 worldPosition)
+        protected Vector3 FlatDirectionTo(Vector3 worldPosition)
         {
             Vector3 delta = worldPosition - transform.position;
             delta.y = 0f;
             return delta.sqrMagnitude > 0.000001f ? delta.normalized : Vector3.zero;
         }
 
-        private float FlatDistanceTo(Vector3 worldPosition)
+        protected float FlatDistanceTo(Vector3 worldPosition)
         {
             Vector3 delta = worldPosition - transform.position;
             delta.y = 0f;

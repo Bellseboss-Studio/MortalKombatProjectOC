@@ -30,6 +30,8 @@ namespace MK.Rebuild
         private const string StabState = "Stab";
         private const string SlamState = "Slam";
         private const string RoarState = "Roar";
+        private const string GuardState = "Guard";
+        private const string GuardHitState = "GuardHit";
         private const string FleeState = "Flee";
         private const string HitState = "Hit";
         private const string DeathState = "Death";
@@ -157,6 +159,21 @@ namespace MK.Rebuild
         public void PlayRoar()
         {
             PlayOneShot(RoarState);
+        }
+
+        /// <summary>
+        /// Postura defensiva del Executioner. Es un estado ALIAS: el controller lo mapea a la
+        /// pose de Idle, así que no necesita clip propio y no cae a T-Pose.
+        /// </summary>
+        public void PlayGuard()
+        {
+            PlayOneShot(GuardState);
+        }
+
+        /// <summary>Golpe absorbido por la guardia: reacción corta, distinta de <see cref="PlayHit"/>.</summary>
+        public void PlayGuardHit()
+        {
+            PlayOneShot(GuardHitState);
         }
 
         /// <summary>

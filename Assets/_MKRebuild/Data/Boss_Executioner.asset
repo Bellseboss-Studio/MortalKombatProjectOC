@@ -1,0 +1,110 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fb2204dbb26ce343b27a3fd66df023c, type: 3}
+  m_Name: Boss_Executioner
+  m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.BossDefinition
+  id: boss_executioner
+  phaseHp: 400
+  moveSpeed: 2.5
+  aggroRadius: 30
+  turnSpeed: 180
+  leashRadius: 10
+  slamTell: 0.8
+  slamRecovery: 2
+  slamRadius: 2.8
+  slamDamage: 25
+  chargeTell: 0.8
+  chargeRecovery: 2
+  chargeSpeed: 8
+  chargeDistance: 8
+  chargeOvershoot: 2
+  chargeHitRadius: 1.2
+  chargeDamage: 15
+  chargeStartRange: 8
+  attackCooldown: 1.4
+  phase2SpeedMultiplier: 1.25
+  phases: 2
+  phase3SpeedMultiplier: 1.45
+  roarDuration: 1.2
+  deathDelay: 1.5
+  minionsToSummon: 0
+  shockwaveDamage: 20
+  shockwaveRadius: 4
+  shockwaveDuration: 0.6
+  shockwaveHitRadius: 0.6
+  attacks:
+  - id: E01
+    displayName: Cleave
+    phases: 01000000
+    tell: 0.8
+    damage: 25
+    punish: 1.2
+    responses: 3
+    clips:
+    - Slam
+    punishClip: 
+    flags: 0
+    range: 3
+    weight: 1
+    variantOf: 
+    mechanismSlot: 
+    motion:
+      radius: 0
+      hitRadius: 0
+      speed: 0
+      travel: 0
+      duration: 0
+      markRadius: 0
+  - id: E02
+    displayName: Execution Strike
+    phases: 01000000
+    tell: 0.8
+    damage: 30
+    punish: 1.5
+    responses: 3
+    clips:
+    - Charge
+    - ChargeRun
+    - ChargeRecover
+    punishClip: ChargeRecover
+    flags: 0
+    range: 4
+    weight: 0.8
+    variantOf: E01
+    mechanismSlot: 
+    motion:
+      radius: 0
+      hitRadius: 0
+      speed: 0
+      travel: 0
+      duration: 0
+      markRadius: 0
+  phaseProfiles:
+  - guardChance: 0.55
+    playerWindow: 2.5
+  - guardChance: 0.25
+    playerWindow: 1.8
+  guardDuration: 1.2
+  guardDamageMultiplier: 0.55
+  punishErrorMultiplier: 1
+  parryExposure: 1
+  disarmExposure: 1.5
+  roarExposure: 1
+  minTell: 0.45
+  maxStreak: 2
+  mechanismWalkSpeed: 1.2
+  mechanismArrivalRadius: 1.2
+  walkTimeout: 6
+  closeInTimeout: 5
+  prisonerRallyDelay: 1.5
+  prisonerPrefab: {fileID: 0}
+  prisonerCount: 3

@@ -77,6 +77,20 @@ namespace MK.Rebuild
         /// </summary>
         public event Action<HitReceiver> LethalHit;
 
+        /// <summary>
+        /// Guard seam (change executioner-boss): multiplier [0..1] applied to incoming damage.
+        /// 1 (default) = no reduction and NOT a single new line runs. Only the Executioner
+        /// writes it, and only through its guard state.
+        /// </summary>
+        public float DamageMultiplier { get; set; } = 1f;
+
+        /// <summary>
+        /// Fired when a hit was reduced by <see cref="DamageMultiplier"/>: (receiver, incoming,
+        /// applied). Emitted BEFORE <see cref="Damaged"/> so the visual can pick a guard
+        /// reaction knowing the hit was guarded.
+        /// </summary>
+        public event Action<HitReceiver, int, int> Guarded;
+
         /// <summary>True while HP is above zero.</summary>
         public bool IsAlive => hp > 0;
 
@@ -188,7 +202,16 @@ namespace MK.Rebuild
             if (!IsAlive) return HitOutcome.Ignored;
             if (Blocking) return HitOutcome.Blocked;     // future guard seam: no damage, no feedback
 
-            hp = Mathf.Max(0, hp - damage);
+            // GUARD (change executioner-boss): only the `< 1f` branch is new, so the default
+            // path is byte-for-byte the old one and a 0-damage hit stays 0.
+            int applied = damage;
+            if (DamageMultiplier < 1f)
+            {
+                applied = Mathf.Max(1, Mathf.RoundToInt(damage * Mathf.Clamp01(DamageMultiplier)));
+                if (applied != damage) Guarded?.Invoke(this, damage, applied);
+            }
+
+            hp = Mathf.Max(0, hp - applied);
 
             // Grey-box death: at 0 HP the dummy disappears immediately. Applies to
             // the scene Dummy and debug-spawned dummies alike (shared component).
@@ -208,7 +231,7 @@ namespace MK.Rebuild
 
             // Enemy seam: let the controller react (stagger) BEFORE the feedback
             // coroutine starts. Dummies have no listener, so nothing changes there.
-            Damaged?.Invoke(damage, dir, launchImpulse);
+            Damaged?.Invoke(applied, dir, launchImpulse);
 
             if (feedbackRoutine != null) StopCoroutine(feedbackRoutine);
             feedbackRoutine = StartCoroutine(Feedback(dir));

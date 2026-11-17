@@ -104,5 +104,62 @@ namespace MK.Rebuild
 
         [Tooltip("Thickness of the expanding hit band around the wave front.")]
         public float shockwaveHitRadius = 0.6f;
+
+        // --- Executioner (change executioner-boss) -------------------------------
+        // El cerebro por defecto (Orochi) ignora estos campos; el Executioner los exige.
+        // El validador avisa si los campos viejos de arriba divergen de E01/E02.
+
+        [Header("Executioner · catálogo")]
+        [Tooltip("Ataques del boss. El controller no conoce ningún id: todo sale de acá.")]
+        public BossAttackDefinition[] attacks = System.Array.Empty<BossAttackDefinition>();
+
+        [Tooltip("Perfil por fase (índice 0 = fase 1).")]
+        public BossPhaseProfile[] phaseProfiles = System.Array.Empty<BossPhaseProfile>();
+
+        [Header("Executioner · iniciativa")]
+        [Tooltip("Duración de la postura defensiva, en segundos.")]
+        public float guardDuration = 1.2f;
+
+        [Tooltip("Multiplicador de daño recibido mientras guarda. Debe estar en (0,1).")]
+        [Range(0f, 1f)] public float guardDamageMultiplier = 0.55f;
+
+        [Tooltip("Multiplicador de daño recibido durante Recover/Punish (1 = sin reducción).")]
+        [Range(0f, 1f)] public float punishErrorMultiplier = 1f;
+
+        [Tooltip("Segundos de castigo que abre un parry.")]
+        public float parryExposure = 1f;
+
+        [Tooltip("Segundos de castigo que abre un desarme.")]
+        public float disarmExposure = 1.5f;
+
+        [Tooltip("Segundos de castigo que abre un rugido.")]
+        public float roarExposure = 1f;
+
+        [Tooltip("Piso de legibilidad: ningún ataque puede tener un tell menor, en segundos.")]
+        public float minTell = 0.45f;
+
+        [Tooltip("Máximo de veces seguidas que el mismo ataque puede repetirse.")]
+        public int maxStreak = 2;
+
+        [Tooltip("Velocidad de caminata hacia un mecanismo, en m/s.")]
+        public float mechanismWalkSpeed = 1.2f;
+
+        [Tooltip("Distancia a la que se considera que el boss llegó al mecanismo, en metros.")]
+        public float mechanismArrivalRadius = 1.2f;
+
+        [Tooltip("Segundos máximos caminando a un mecanismo antes de abandonar.")]
+        public float walkTimeout = 6f;
+
+        [Tooltip("Segundos máximos en CloseIn antes de volver a la ventana del jugador.")]
+        public float closeInTimeout = 5f;
+
+        [Tooltip("Segundos entre liberar la celda y que los prisioneros se vuelvan hostiles.")]
+        public float prisonerRallyDelay = 1.5f;
+
+        [Tooltip("Prefab de prisionero. Null = no se liberan prisioneros.")]
+        public EnemyController prisonerPrefab;
+
+        [Tooltip("Prisioneros por celda.")]
+        public int prisonerCount = 3;
     }
 }
