@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -28,6 +29,34 @@ namespace MK.Rebuild
     {
         private const int CanvasSortingOrder = 100;
 
+        /// <summary>
+        /// SEAM ADITIVO (telemetría): el botón <c>TERMINAR SESIÓN</c> sólo AVISA que el jugador
+        /// quiere ver la entrega; quien escuche (el panel de playtest) decide qué hacer. Este
+        /// componente no conoce la telemetría y no escribe nada: el flujo inverso Runtime →
+        /// Telemetry rompería TEL-6.
+        ///
+        /// Sin suscriptores el botón ni se muestra, así que quitando <c>Code/Telemetry/</c> el
+        /// pausa vuelve a ser exactamente el de antes.
+        /// </summary>
+        public static event Action SessionEndRequested;
+
+        /// <summary>
+        /// True mientras el panel de entrega tapa el pausa. Con el overlay arriba, <see
+        /// cref="Update"/> sale temprano para que el Esc del panel no cierre el pausa por detrás.
+        /// </summary>
+        public static bool OverlayActive;
+
+        /// <summary>
+        /// Sin esto, "Enter Play Mode Options" con domain reload desactivado dejaría vivos un
+        /// suscriptor muerto y el flag del overlay entre sesiones de Play.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            SessionEndRequested = null;
+            OverlayActive = false;
+        }
+
         private static readonly Color DimColor = new Color(0f, 0f, 0f, 0.72f);
         private static readonly Color ButtonColor = new Color(0.12f, 0.12f, 0.15f, 0.95f);
         private static readonly Color ButtonHighlighted = new Color(0.32f, 0.36f, 0.42f, 1f);
@@ -41,6 +70,7 @@ namespace MK.Rebuild
         private Button resumeButton;
         private Button restartButton;
         private Button mainMenuButton;
+        private Button sessionEndButton;
 
         private PlayerMotor motor;
         private BodyOwnership.Token bodyToken;
@@ -63,6 +93,10 @@ namespace MK.Rebuild
 
         private void Update()
         {
+            // El panel de entrega (si existe) tapa el pausa y es dueño del Esc: sin esta salida
+            // temprana, un Esc cerraría el pausa por debajo y dejaría el overlay huérfano.
+            if (OverlayActive) return;
+
             EnsureSelection();
 
             Keyboard keyboard = Keyboard.current;
@@ -82,6 +116,7 @@ namespace MK.Rebuild
         private void OnDisable()
         {
             // Safety net: a disabled menu must not keep time frozen or the audio muted.
+            OverlayActive = false;
             if (!isOpen) return;
             isOpen = false;
             if (panel != null) panel.SetActive(false);
@@ -124,6 +159,7 @@ namespace MK.Rebuild
             }
 
             panel.SetActive(true);
+            RefreshSessionEndButton();
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             AudioListener.pause = true;
@@ -139,6 +175,7 @@ namespace MK.Rebuild
             if (!isOpen) return;
 
             isOpen = false;
+            OverlayActive = false;
             if (panel != null) panel.SetActive(false);
 
             // Drop the focus with the card. An inactive button cannot be navigated, but a
@@ -299,6 +336,31 @@ namespace MK.Rebuild
 
             mainMenuButton = CreateButton(panel.transform, "MainMenu", "MENÚ PRINCIPAL", new Vector2(0f, -240f));
             mainMenuButton.onClick.AddListener(ReturnToMenu);
+
+            // Entrega del playtest: sólo aparece si alguien escucha el aviso (el panel de
+            // telemetría). Sin telemetría no hay botón muerto en la escena.
+            sessionEndButton = CreateButton(panel.transform, "SessionEnd", "TERMINAR SESIÓN", new Vector2(0f, -360f));
+            sessionEndButton.onClick.AddListener(RequestSessionEnd);
+            sessionEndButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>Avisa que el jugador quiere ver la entrega. NO cierra la sesión.</summary>
+        private void RequestSessionEnd()
+        {
+            Action listener = SessionEndRequested;
+            if (listener == null) return;
+
+            listener();
+        }
+
+        /// <summary>
+        /// Un botón sin suscriptor es un botón muerto: se muestra sólo cuando hay panel.
+        /// Se re-evalúa en cada <see cref="Open"/> porque el panel se construye después.
+        /// </summary>
+        private void RefreshSessionEndButton()
+        {
+            if (sessionEndButton == null) return;
+            sessionEndButton.gameObject.SetActive(SessionEndRequested != null);
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MK.Rebuild.Telemetry;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEngine;
@@ -77,6 +78,7 @@ namespace MK.Rebuild.EditorTools
             BuildDescent();
             BuildOrochiArena();
             BuildCameras();
+            BuildTelemetry();
             BuildCinematics();
             BuildSafetyNet();
             BuildPauseMenu();
@@ -89,6 +91,15 @@ namespace MK.Rebuild.EditorTools
             Selection.activeGameObject = root.gameObject;
             Debug.Log("[Dungeon] greybox generado: " + root.childCount + " piezas.");
             Audit();
+
+            // La escena se guarda acá: el rig de Telemetry y los Probe_* viven en memoria hasta
+            // que alguien guarda, y eso deja el repo con una escena que no graba nada. Un builder
+            // que no persiste el resultado no es reproducible en un checkout limpio.
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+                UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
+            UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Dungeon] escena guardada: " + UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().path);
         }
 
         // ------------------------------------------------------------------ materiales
@@ -754,6 +765,94 @@ namespace MK.Rebuild.EditorTools
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        private static void WireString(Object target, string field, string value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(field);
+            if (property == null) return;
+            property.stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // ------------------------------------------------------------------ telemetría
+
+        /// <summary>
+        /// Rig de telemetría + un probe de sala por fila del catálogo (10). El rig vive en un GO
+        /// propio porque <see cref="PlaytestLog"/> es <c>DontDestroyOnLoad</c>: un solo archivo por
+        /// proceso aunque se recargue la escena (TEL-1).
+        ///
+        /// Los probes se cuelgan de su <c>Zone_*</c> y copian su volumen: el tamaño se lee, no se
+        /// duplica a mano. <c>descenso</c> no tiene <c>CameraZone</c> y se crea aparte. El
+        /// <c>SessionProbe</c> NO se cablea acá: lo agrega el servicio en <c>sceneLoaded</c> sobre
+        /// el jugador (F2.T5).
+        /// </summary>
+        private static void BuildTelemetry()
+        {
+            var host = new GameObject("Telemetry");
+            host.transform.SetParent(root, false);
+            host.AddComponent<PlaytestLog>();
+
+            for (int i = 0; i < PlaytestRooms.All.Length; i++) BuildRoomProbe(PlaytestRooms.All[i]);
+        }
+
+        private static void BuildRoomProbe(PlaytestRooms.Room room)
+        {
+            // Volumen propio: el corredor de descenso (z 49..63) no tiene CameraZone.
+            if (string.IsNullOrEmpty(room.ZoneName))
+            {
+                var own = new GameObject("Probe_" + room.Id);
+                own.layer = IgnoreRaycastLayer;
+                own.transform.SetParent(root, false);
+                own.transform.position = new Vector3(0f, 0f, 56f);
+
+                var ownVolume = own.AddComponent<BoxCollider>();
+                ownVolume.isTrigger = true;
+                ownVolume.center = Vector3.zero;
+                ownVolume.size = new Vector3(5f, 8f, 14f);
+
+                WireRoomProbe(own.AddComponent<RoomProbe>(), room);
+                return;
+            }
+
+            Transform zone = FindDeep(room.ZoneName);
+            if (zone == null)
+            {
+                Debug.LogWarning("[Dungeon] No se encontró " + room.ZoneName +
+                                 ": la sala '" + room.Id + "' no tendrá probe y el embudo saldrá en 0.");
+                return;
+            }
+
+            var probeHost = new GameObject("Probe_" + room.Id);
+            probeHost.layer = IgnoreRaycastLayer;
+            probeHost.transform.SetParent(zone, false);
+            probeHost.transform.localPosition = Vector3.zero;
+
+            // Una sola fuente de verdad para la geometría: se copia el BoxCollider de la zona.
+            var source = zone.GetComponent<BoxCollider>();
+            var volume = probeHost.AddComponent<BoxCollider>();
+            volume.isTrigger = true;
+            if (source != null)
+            {
+                volume.center = source.center;
+                volume.size = source.size;
+            }
+            else
+            {
+                volume.center = Vector3.zero;
+                volume.size = new Vector3(1f, 1f, 1f);
+                Debug.LogWarning("[Dungeon] " + room.ZoneName + " no tiene BoxCollider: el probe '" +
+                                 room.Id + "' queda con un volumen mínimo.");
+            }
+
+            WireRoomProbe(probeHost.AddComponent<RoomProbe>(), room);
+        }
+
+        private static void WireRoomProbe(RoomProbe probe, PlaytestRooms.Room room)
+        {
+            WireString(probe, "roomId", room.Id);
+            WireFloat(probe, "budget", room.Budget); // espejo informativo para el Inspector
+        }
+
         // ------------------------------------------------------------------ red de seguridad
 
         /// <summary>
@@ -1076,13 +1175,15 @@ namespace MK.Rebuild.EditorTools
                 if (child.name.StartsWith("Cam_")) moves.Add((child, cameras));
                 else if (child.name == "BossTargetGroup") moves.Add((child, cameras));
                 else if (child.name.StartsWith("Zone_")) moves.Add((child, zones));
+                else if (child.name.StartsWith("Probe_")) moves.Add((child, zones));
                 else if (child.name.StartsWith("Checkpoint_")) moves.Add((child, checkpoints));
                 else if (child.name.StartsWith("Lever_")) moves.Add((child, levers));
                 else if (child.name.EndsWith("Encounter") ||
                          child.name.StartsWith("GuardianEncounter") ||
                          child.name.StartsWith("OrochiEncounter"))
                     moves.Add((child, encounters));
-                else if (child.name == "DungeonObjective" || child.name == "VoidReset" || child.name == "GreatDoor")
+                else if (child.name == "DungeonObjective" || child.name == "VoidReset" ||
+                         child.name == "GreatDoor" || child.name == "Telemetry")
                     moves.Add((child, systems));
             }
 
