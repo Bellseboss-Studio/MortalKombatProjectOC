@@ -122,7 +122,9 @@ jobs:
       - name: Guard - demo scene chain in Build Settings
         run: |
           set -euo pipefail
-          for scene in Intro00 Intro01 MainMenu_ Playground; do
+          # La cadena del demo termina en Dungeon (la mazmorra jugable). Playground
+          # quedó como escena de pruebas y no forma parte de Build Settings.
+          for scene in Intro00 Intro01 MainMenu_ Dungeon; do
             grep -q "Assets/_MKRebuild/Scenes/${scene}.unity" ProjectSettings/EditorBuildSettings.asset \
               || { echo "::error::${scene} is missing from EditorBuildSettings"; exit 1; }
           done
