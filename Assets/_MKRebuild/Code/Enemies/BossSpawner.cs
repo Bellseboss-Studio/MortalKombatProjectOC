@@ -21,6 +21,10 @@ namespace MK.Rebuild
         [Tooltip("Spawn the boss in Start. Keep FALSE for an on-demand encounter.")]
         [SerializeField] private bool spawnOnStart = false;
 
+        [Tooltip("Instancia YA colocada en la escena (inactiva). Si está seteada, el spawner la " +
+                 "activa en vez de instanciar el prefab: el boss se puede ver y editar en el Editor.")]
+        [SerializeField] private BossController sceneInstance;
+
         /// <summary>Live boss instance (null until spawned / after death).</summary>
         public BossController Current { get; private set; }
 
@@ -58,6 +62,18 @@ namespace MK.Rebuild
         public void SpawnBoss()
         {
             if (Current != null) return;
+
+            // Instancia pre-colocada: el boss ya existe en la escena (inactivo), así se puede
+            // ver y ajustar en el Editor. Se activa y se deja dormido como cualquier spawn.
+            if (sceneInstance != null)
+            {
+                Current = sceneInstance;
+                if (!Current.gameObject.activeSelf) Current.gameObject.SetActive(true);
+                Current.Frozen = true;
+                Spawned?.Invoke(Current);
+                return;
+            }
+
             if (prefab == null) return;
 
             Transform point = spawnPoint != null ? spawnPoint : transform;

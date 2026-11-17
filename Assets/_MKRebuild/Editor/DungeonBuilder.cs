@@ -498,6 +498,18 @@ namespace MK.Rebuild.EditorTools
             if (boss == null) Debug.LogError("[Dungeon] No se pudo cargar el prefab del boss: " + bossPrefabPath);
             Wire(spawner, "prefab", boss);
 
+            // Instancia pre-colocada e INACTIVA: se ve y se edita en el Editor, y el spawner
+            // la activa en runtime en vez de instanciar otra.
+            GameObject bossPrefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(bossPrefabPath);
+            if (bossPrefabAsset != null)
+            {
+                var placed = (GameObject)PrefabUtility.InstantiatePrefab(bossPrefabAsset, host.transform);
+                placed.name = name + "_Boss";
+                placed.transform.localPosition = Vector3.zero;
+                placed.SetActive(false);
+                Wire(spawner, "sceneInstance", placed.GetComponent<BossController>());
+            }
+
             var entry = new GameObject(name + "_Entry");
             entry.layer = IgnoreRaycastLayer;
             entry.transform.SetParent(host.transform, false);
