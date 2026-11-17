@@ -51,20 +51,27 @@ namespace MK.Rebuild
             return best;
         }
 
-        // LEGACY (V1) — continuation matching by live buffer + direction.
+        // GRAMMAR (combo-grammar-neutral) — continuation matching by the PRESS itself.
         /// <summary>
-        /// Resolves the continuation of <paramref name="step"/> matching a LIVE buffered
-        /// input AND the buffered (facing-relative) direction: among the scalar
-        /// <c>siguiente</c> and the extra <c>branches</c>, picks the link whose input has
-        /// a buffer and whose direction is EXACT or <see cref="AttackDirection.Any"/>
-        /// (wildcard). Exact beats wildcard; ties keep the first (siguiente, then the
-        /// branches in list order). Links with <c>paso &lt; 0</c> (finisher) are skipped,
-        /// as is a non-attack input (no press edge in this slice). False when nothing
-        /// matches.
+        /// Continuation matching keyed by the PRESS instead of the legacy buffers
+        /// (combo-grammar-neutral): among the scalar <c>siguiente</c> and the extra
+        /// <c>branches</c>, returns the link whose <c>input</c> IS
+        /// <paramref name="input"/> and whose <c>direction</c> is EXACT or
+        /// <see cref="AttackDirection.Any"/> (wildcard). Exact beats wildcard; ties keep
+        /// the first (<c>siguiente</c>, then the branches in list order). Links with
+        /// <c>paso &lt; 0</c> are skipped, so a leaf is never a destination — neither an
+        /// advance to -1 nor a forced close. Neutral is <c>1</c>, so a link authored with
+        /// <c>Any</c> still matches a neutral press (that is why the wildcard matters
+        /// here and not <c>Any</c> being "no stick").
+        ///
+        /// PURE MATCHER: it knows nothing about the chain memory, the slot budget or the
+        /// running step (<c>Equals(current)</c>, <c>HasUsed</c>, <c>TryGetStep</c>). All
+        /// of that policy lives in the CALLER's guard, so the resolver can never mutate
+        /// state nor decide that a self-link/used target is acceptable. False when no
+        /// live link matches.
         /// </summary>
         public static bool TryResolveContinuation(
-            ComboStep step, float lightBuffer, float heavyBuffer, AttackDirection bufferedDirection,
-            out ComboLink best)
+            in ComboStep step, ComboInput input, AttackDirection direction, out ComboLink best)
         {
             ComboLink result = default;
             bool found = false;
@@ -81,23 +88,42 @@ namespace MK.Rebuild
 
             void Consider(ComboLink link)
             {
-                if (link.paso < 0) return; // finisher: not an in-combo continuation
-                bool live = link.input == ComboInput.Ligero ? lightBuffer > 0f
-                          : link.input == ComboInput.Pesado ? heavyBuffer > 0f
-                          : false; // H1/H2/Launcher/Dash: no press edge in this slice
-                if (!live) return;
+                if (link.paso < 0) return; // hoja / finisher: nunca es destino (R3)
+                if (link.input != input) return; // el press trae SU input: un input por intento
 
-                bool exact = link.direction != AttackDirection.Any && link.direction == bufferedDirection;
+                bool exact = link.direction != AttackDirection.Any && link.direction == direction;
                 bool wildcard = link.direction == AttackDirection.Any;
                 if (!exact && !wildcard) return;
 
-                if (!found || (exact && !bestExact)) // exact beats wildcard; else first wins
+                if (!found || (exact && !bestExact)) // exacta gana a wildcard; si no, gana la primera
                 {
                     result = link;
                     found = true;
                     bestExact = exact;
                 }
             }
+        }
+
+        // LEGACY (V1) — continuation matching by live buffer + direction.
+        /// <summary>
+        /// Resolves the continuation of <paramref name="step"/> matching a LIVE buffered
+        /// input AND the buffered (facing-relative) direction. Delegates the matching to
+        /// the press overload (one implementation, one precedence), using the buffers
+        /// only as "is this input pressed" flags: Ligero probes with
+        /// <paramref name="lightBuffer"/>, Pesado with <paramref name="heavyBuffer"/>,
+        /// any other input has no press edge in this slice. The probe order cannot change
+        /// V1: every press zeroes the other buffer, so the two are never live at once.
+        /// </summary>
+        public static bool TryResolveContinuation(
+            ComboStep step, float lightBuffer, float heavyBuffer, AttackDirection bufferedDirection,
+            out ComboLink best)
+        {
+            best = default;
+            if (lightBuffer > 0f
+                && TryResolveContinuation(in step, ComboInput.Ligero, bufferedDirection, out best)) return true;
+            if (heavyBuffer > 0f
+                && TryResolveContinuation(in step, ComboInput.Pesado, bufferedDirection, out best)) return true;
+            return false;
         }
     }
 }

@@ -36,6 +36,15 @@ namespace MK.Rebuild
         // T2.6: "pot a paso, una sola lookup". A grammar step may look the press queue up AT
         // MOST once; the flag is cleared by every step transition (start / advance / end).
         private bool grammarLookupSpent;
+
+        // KILL SWITCH (combo-grammar-neutral, R8). Serializado para poder volver al
+        // comportamiento previo en Play Mode, en caliente y sin recompilar ni editar assets:
+        // ON = TODO press resuelve sólo por la matriz de stance. El default (OFF) deja la
+        // precedencia nueva (asset primero para el neutro). Ningún asset lo serializa todavía,
+        // así que el default de C# es el que corre.
+        [Tooltip("KILL SWITCH: ON = todo press resuelve sólo por la matriz de stance (comportamiento previo). Default OFF.")]
+        [SerializeField] private bool neutralPrefersLegacy;
+
         private BodyOwnership.Token attackToken; // body-ownership token for moveLock steps
         private readonly HashSet<HitReceiver> hitThisStep = new HashSet<HitReceiver>();
 
@@ -379,11 +388,15 @@ namespace MK.Rebuild
         /// <summary>
         /// GRAMMAR advance (T2.4, QUEUE in T2.6): the ONE place a press becomes a chain link.
         ///
-        /// ONE press = AT MOST ONE <see cref="StanceComboMatrix.TryResolve"/> call PER STEP, on
-        /// the FRONT of the queue. The press must be inside the step's window (with the asset
-        /// grace applied when it was buffered); the matrix decides where it goes (exact variant,
-        /// else Neutral of the same input, else nothing); a move already used in the chain memory
-        /// is rejected; the slot budget has the last word.
+        /// ONE press = AT MOST ONE LOOKUP PER STEP, on the FRONT of the queue, and the lookup
+        /// covers BOTH sources: the press must be inside the step's window (with the asset grace
+        /// applied when it was buffered), then
+        /// * a NEUTRAL press resolves FIRST against the authored progression of the running step
+        ///   (<c>siguiente</c>, then <c>branches</c>) and only falls back to the matrix when the
+        ///   asset offers no live link;
+        /// * a DIRECTIONAL variant resolves ONLY through the matrix (exact variant, else Neutral
+        ///   of the same input, else nothing) — it never reads the asset.
+        /// A move already used in the chain memory is rejected; the slot budget has the last word.
         ///
         /// FALLO ≠ BORRADO: when the front press does not resolve it is RETAINED by
         /// <see cref="ComboChainState.FailFrontPress"/> (one step of life, discarded on the second
@@ -419,10 +432,48 @@ namespace MK.Rebuild
             grammarLookupSpent = true; // the step's single lookup is spent from here on
 
             ComboMoveRef current = CurrentMove;
-            bool resolved = matrix.TryResolve(in current, input, variant, out ComboMoveRef next)
+            ComboMoveRef next = default;
+            bool have;
+
+            // NEUTRO = 1, no 0 (AttackDirection.Neutral, ComboDefinition.cs:48). El 0 es
+            // AttackDirection.Any, que en el ASSET es wildcard (ComboLink.direction) pero en la
+            // MATRIZ es un valor MUERTO: TryFindEntry compara el variant por igualdad exacta y el
+            // único reintento es con Neutral, así que una entrada serializada con 0 nunca matchea.
+            // Por eso el test es `== Neutral` y no `!= Any`.
+            bool neutralFirst = variant == AttackDirection.Neutral
+                                && !neutralPrefersLegacy   // R8: el kill switch restaura el camino previo
+                                && !dashAttackActive;      // R1: el opener sigue root-only
+
+            // R1 — el press neutro profundiza primero la progresión AUTORADA de ESTE paso
+            // (`siguiente` → `branches`): el paso n avanza al n+1 del mismo asset sin fila nueva,
+            // y por eso reautorar un combo no reabre este change. Las variantes direccionales NO
+            // pasan por acá (R2): su única autoridad sigue siendo la matriz.
+            if (neutralFirst
+                && ComboResolver.TryResolveContinuation(in currentStep, input, variant, out ComboLink link))
+            {
+                // Link intra-asset: el paso destino pertenece al combo que ya está corriendo.
+                next = new ComboMoveRef { combo = activeCombo, stepIndex = link.paso };
+                have = true;
+                // Si un guard lo rechaza, el press MUERE: no se reintenta contra la matriz. Ese
+                // reintento sería una segunda lookup del mismo paso (R5) y podría cobrar dos slots.
+            }
+            else
+            {
+                // Segunda y ÚLTIMA fuente: la precedencia de siempre (exacta → Neutral de la fila).
+                // También es la única fuente cuando el asset no ofrece link vivo (hoja, `paso: -1`,
+                // input distinto) y cuando el neutro es el de una hoja que sí tiene fila (R3).
+                have = matrix.TryResolve(in current, input, variant, out next);
+            }
+
+            // R4 — UN guard para asset y matriz. El `&&` corto-circuita: un destino rechazado no
+            // cobra slot, y TryConsumeSlot queda como última validación y ÚNICA mutación previa a
+            // ResolveFrontPress (R5: a lo sumo una vez por intento). TryGetStep descarta links
+            // hacia pasos que ya no existen sin excepción (`paso: -1` ya lo filtró el resolver).
+            bool resolved = have
                             && next.IsValid
-                            && !next.Equals(in current)                 // dead target / self
                             && next.combo != null
+                            && !next.Equals(in current)                 // dead target / self-link
+                            && next.combo.TryGetStep(next.stepIndex, out ComboStep _)
                             && !chain.HasUsed(in next)                  // NO-REPEAT inside the chain
                             && chain.TryConsumeSlot();                  // chain budget spent
 
