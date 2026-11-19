@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: Stance_Tarkatana
   m_EditorClassIdentifier: MK.Rebuild.Runtime::MK.Rebuild.StanceComboMatrix
   stance: 1
-  connectWindowSeconds: 0.2
-  whiffWindowSeconds: 0.1
+  connectWindowSeconds: 0.28
+  whiffWindowSeconds: 0.2
   bufferGraceSeconds: 0.1
   chainResetSeconds: 0.45
-  chainSlots: 6
+  chainSlots: 4
   styleSpeedScale: 0.8
   damageScaleByHit:
   - 1
@@ -60,5 +60,10 @@ MonoBehaviour:
   - current:
       combo: {fileID: 11400000, guid: bb22cc33dd44ee55ff6600112233aa44, type: 2}
       stepIndex: 0
+    role: 2
+    entries: []
+  - current:
+      combo: {fileID: 11400000, guid: 2adea1b23fae815459426f877712c708, type: 2}
+      stepIndex: 2
     role: 2
     entries: []

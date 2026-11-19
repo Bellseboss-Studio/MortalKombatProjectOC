@@ -282,6 +282,15 @@ namespace MK.Rebuild
             if (to.sqrMagnitude < 0.0001f) to = FacingVector();
             to.Normalize();
 
+            // REMATE (R4): a CONNECTING Closer staggers BEFORE the hit. Stagger() calls
+            // StopHorizontal(), so running it first lets the push that Feedback writes inside
+            // TakeHit survive the stagger. Bosses expose no EnemyController => no-op.
+            if (comboActive && ActiveMatrix != null && ActiveMatrix.RoleOf(CurrentMove) == ComboRole.Closer)
+            {
+                EnemyController enemy = receiver.GetComponentInParent<EnemyController>();
+                if (enemy != null) enemy.Stagger();
+            }
+
             // LAUNCHER (slice 3nonies): the vertical impulse is passed SEPARATELY
             // (not baked into the XZ push) so HitReceiver can drive the juggle-lite
             // arc (rise -> fall -> land) with its own gravity. 0 = normal hit.
