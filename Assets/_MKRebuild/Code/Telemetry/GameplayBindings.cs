@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
@@ -45,6 +46,12 @@ namespace MK.Rebuild.Telemetry
         /// <summary>Distancia a la que un boss vivo explica una muerte.</summary>
         private const float BossKillRadius = 12f;
 
+        /// <summary>Ventana (s, unscaled) en la que el receptor cuenta como aturdido por el remate.</summary>
+        private const float EnderStaggerSeconds = 0.1f;
+
+        /// <summary>Ventana (s, unscaled) de muestreo del desplazamiento horizontal del remate.</summary>
+        private const float EnderSampleSeconds = 0.4f;
+
         /// <summary>
         /// Nombre de la cadena que nunca conectó un golpe. El nombre del asset sólo se conoce por
         /// <see cref="PlayerCombat.OnStepConnected"/>, así que una cadena que salió entera al aire
@@ -71,6 +78,15 @@ namespace MK.Rebuild.Telemetry
         private int lastHp;
         private int lastEncounterFrame = -1;
         private float lastReceiverScan = -1f;
+
+        /// <summary>Receptor del último impacto del paso en curso, para emparejarlo con el remate.</summary>
+        private HitReceiver lastVictim;
+
+        /// <summary>Frame del impacto: el par <c>Damaged</c>→<c>OnStepConnected</c> vive en UN frame.</summary>
+        private int lastVictimFrame = -1;
+
+        /// <summary>Matrices de stance cargadas (mismo truco que <see cref="ResolveComboLength"/>).</summary>
+        private StanceComboMatrix[] matrices;
 
         /// <summary>Cadena de combo abierta (F9). Se cierra al terminar el ataque y emite UNA línea.</summary>
         private ChainCapture openChain;
@@ -111,6 +127,7 @@ namespace MK.Rebuild.Telemetry
         {
             public HitReceiver Receiver;
             public Action<int, Vector3, float> Handler;
+            public Action<HitReceiver> LethalHandler;
         }
 
         /// <summary>
@@ -327,6 +344,9 @@ namespace MK.Rebuild.Telemetry
             spawners = Array.Empty<BossSpawner>();
             triggers = Array.Empty<BossEncounterTrigger>();
             lastHp = 0;
+
+            // La víctima del impacto no sobrevive a la escena vieja.
+            lastVictim = null;
         }
 
         /// <summary>
@@ -481,6 +501,9 @@ namespace MK.Rebuild.Telemetry
         /// </summary>
         private void HandleStepConnected(string moveKey)
         {
+            HitReceiver victim = lastVictimFrame == Time.frameCount ? lastVictim : null;
+            lastVictim = null;
+
             if (!TryParseMoveKey(moveKey, out string combo, out int step)) return;
 
             if (openChain != null && openChain.Combo == null)
@@ -506,6 +529,66 @@ namespace MK.Rebuild.Telemetry
             }
 
             openChain.NoteConnected(step);
+
+            // Remate (R4): el paso conectado es un Closer y su víctima se guardó en ESE impacto.
+            if (victim != null && IsCloserStep(combo, step)) StartEnder(victim);
+        }
+
+        /// <summary>True si el paso es el Closer de la matriz del stance vigente (indeciso = false).</summary>
+        private bool IsCloserStep(string combo, int step)
+        {
+            if (stance == null || string.IsNullOrEmpty(combo)) return false;
+
+            if (matrices == null || matrices.Length == 0)
+                matrices = Resources.FindObjectsOfTypeAll<StanceComboMatrix>();
+            ComboDefinition[] definitions = Resources.FindObjectsOfTypeAll<ComboDefinition>();
+
+            for (int i = 0; i < matrices.Length; i++)
+            {
+                if (matrices[i] == null || matrices[i].Stance != stance.CurrentStance) continue;
+
+                for (int j = 0; j < definitions.Length; j++)
+                {
+                    if (definitions[j] == null || definitions[j].name != combo) continue;
+                    return matrices[i].RoleOf(new ComboMoveRef { combo = definitions[j], stepIndex = step })
+                        == ComboRole.Closer;
+                }
+            }
+
+            return false;
+        }
+
+        private void StartEnder(HitReceiver receiver) => StartCoroutine(MeasureEnder(receiver));
+
+        /// <summary>
+        /// Mide UN remate conectado (una corrutina por víctima): <c>stag</c> = entró en Stagger
+        /// dentro de los 100 ms del impacto (sólo <c>minion</c>: boss/other no lo intentan) y
+        /// <c>dx/dz/d</c> = desplazamiento horizontal desde el impacto hasta 0.4 s después,
+        /// unscaled. Si el receptor se destruye antes, se emite con lo último medido (d parcial).
+        /// </summary>
+        private IEnumerator MeasureEnder(HitReceiver receiver)
+        {
+            EnemyController enemy = receiver.GetComponentInParent<EnemyController>();
+            string kind = enemy != null ? "minion"
+                : receiver.GetComponentInParent<BossController>() != null ? "boss" : "other";
+            Vector3 origin = receiver.transform.position;
+            Vector3 last = origin;
+            float staggerDeadline = Time.unscaledTime + EnderStaggerSeconds;
+            float deadline = Time.unscaledTime + EnderSampleSeconds;
+            bool staggered = false;
+
+            while (receiver != null && Time.unscaledTime < deadline)
+            {
+                if (enemy != null && !staggered && Time.unscaledTime <= staggerDeadline
+                    && enemy.DebugState == "Stagger")
+                    staggered = true;
+                last = receiver.transform.position;
+                yield return null;
+            }
+
+            Vector3 delta = last - origin;
+            PlaytestLog.Instance?.Ender(kind, staggered, delta.x, delta.z,
+                Mathf.Sqrt(delta.x * delta.x + delta.z * delta.z));
         }
 
         /// <summary>
@@ -664,9 +747,16 @@ namespace MK.Rebuild.Telemetry
 
                 var binding = new ReceiverBinding { Receiver = receiver };
                 binding.Handler = (dealt, direction, launch) => HandleEnemyDamaged(binding.Receiver, dealt);
+                binding.LethalHandler = lethal =>
+                {
+                    lastVictim = lethal; // golpe letal: no dispara `Damaged`, pero sí conectó
+                    lastVictimFrame = Time.frameCount;
+                };
 
                 receiver.Damaged -= binding.Handler;
                 receiver.Damaged += binding.Handler;
+                receiver.LethalHit -= binding.LethalHandler;
+                receiver.LethalHit += binding.LethalHandler;
                 receiverBindings.Add(binding);
             }
         }
@@ -679,6 +769,7 @@ namespace MK.Rebuild.Telemetry
                 if (binding == null || binding.Receiver == null) continue;
 
                 binding.Receiver.Damaged -= binding.Handler;
+                binding.Receiver.LethalHit -= binding.LethalHandler;
             }
 
             receiverBindings.Clear();
@@ -696,6 +787,8 @@ namespace MK.Rebuild.Telemetry
 
         private void HandleEnemyDamaged(HitReceiver receiver, int dealt)
         {
+            lastVictim = receiver; // `Damaged` corre dentro de `TakeHit`: es el instante del impacto
+            lastVictimFrame = Time.frameCount;
             int hp = receiver != null ? receiver.HP : 0;
             PlaytestLog.Instance?.EnemyDamaged(dealt, hp);
         }

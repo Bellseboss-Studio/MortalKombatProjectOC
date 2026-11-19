@@ -1191,6 +1191,29 @@ namespace MK.Rebuild.Telemetry
             Log(Channel.Combat, json);
         }
 
+        /// <summary>
+        /// Un remate CONECTADO (canal combat): <c>k</c> = clase del receptor (<c>minion</c> si
+        /// tiene <see cref="EnemyController"/>, <c>boss</c> si tiene <see cref="BossController"/>,
+        /// <c>other</c> si ninguno), <c>stag</c> = entró en <c>Stagger</c> dentro de los 100 ms
+        /// posteriores al impacto (0 en boss/other: no se intenta), y <c>dx/dz/d</c> = desplazamiento
+        /// horizontal medido desde el impacto hasta 0.4 s después (unscaled). Una línea por víctima
+        /// del remate: un cleave de 3 escribe 3 líneas con su propio desplazamiento.
+        /// </summary>
+        public void Ender(string kind, bool staggered, float dx, float dz, float distance)
+        {
+            if (!IsChannelEnabled(Channel.Combat)) return;
+
+            json.Begin("ender");
+            json.Int("t", T());
+            json.Str("r", currentRoom);
+            json.Str("k", kind);
+            json.Int("stag", staggered ? 1 : 0);
+            json.Num("dx", dx);
+            json.Num("dz", dz);
+            json.Num("d", distance);
+            Log(Channel.Combat, json);
+        }
+
         // ------------------------------------------------------------------ pausa
 
         /// <summary>

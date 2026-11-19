@@ -58,6 +58,13 @@ Heurísticas documentadas (el log no las guarda y el script no las inventa en si
   menos y su ``n`` es mayor. La ventana de cancel se MIDE con el histograma de ``ms``; no se
   asume. Las pulsaciones sin paso activo (``step = -1``) son aperturas y no entran en el %.
   Durante la pausa no se graba ningún ``in``: el clic del menú es ``LightAttack``.
+* ``ender`` es UN remate CONECTADO (una línea por víctima): ``k`` = clase del receptor
+  (``minion`` si tiene ``EnemyController``, ``boss`` si tiene ``BossController``, ``other`` si
+  ninguno), ``stag`` = entró en ``Stagger`` dentro de los 100 ms posteriores al impacto (0 en
+  boss/other: no se intenta) y ``dx``/``dz``/``d`` = desplazamiento horizontal desde el impacto
+  hasta 0.4 s después (unscaled; ``d`` es parcial si el receptor se destruyó antes). El comando
+  ``combos`` cierra con la sección REMATE. Un archivo sin ``ender`` es anterior al evento y se
+  avisa, no se lee como "0 remates".
 """
 
 from __future__ import annotations
@@ -88,7 +95,7 @@ TOLERANCE = 0.20
 IDLE_SPEED = 0.10
 MISSING = "—"  # dato ausente: el canal que lo tendría no existe (≠ 0 medido)
 COMBAT_EVENTS = frozenset(
-    ("player.damaged", "enemy.damaged", "combo", "encounter", "boss.phase", "boss.died")
+    ("player.damaged", "enemy.damaged", "combo", "ender", "encounter", "boss.phase", "boss.died")
 )
 
 LEVEL_SUFFIX = ".level.jsonl"
@@ -690,6 +697,84 @@ def cmd_combos(session: Session) -> None:
             "{} x{}".format(combo, per_room[room][combo]) for combo in sorted(per_room[room])
         )
         print("  {:<16}{}".format(room, summary))
+
+    print_ender_report(session)
+
+
+def _median(values: Sequence[float]) -> float:
+    """Mediana determinista: promedio de los dos del medio con cantidad par."""
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return float(ordered[middle])
+    return (float(ordered[middle - 1]) + float(ordered[middle])) / 2.0
+
+
+def _p90(values: Sequence[float]) -> float:
+    """Percentil 90 por rango más cercano (índice redondeado, acotado)."""
+    ordered = sorted(values)
+    index = int(round(0.9 * (len(ordered) - 1)))
+    return float(ordered[min(len(ordered) - 1, max(0, index))])
+
+
+def print_ender_report(session: Session) -> None:
+    """Sección REMATE del comando `combos`: ¿el remate aturdió y cuánto desplazó?
+
+    Lee las líneas `ender` del canal combat. `k` es la clase del receptor (minion / boss /
+    other), `stag` = entró en Stagger dentro de los 100 ms del impacto (0 en boss/other: no se
+    intenta) y `d` = desplazamiento horizontal medido hasta 0.4 s después. `stag` sólo aplica a
+    minion, así que el porcentaje se informa con ese denominador cuando hay jefes.
+    """
+    print()
+    print("REMATE")
+
+    enders = [event for event in sorted_by_t(session.combat) if event.get("e") == "ender"]
+    if not enders:
+        print("  ! esta sesión no tiene líneas 'ender': archivo anterior al evento, o el remate")
+        print("    nunca conectó. Se mide sólo en sesiones nuevas grabadas con -log=level,combat")
+        return
+
+    by_kind: Dict[str, int] = {}
+    staggered: Dict[str, int] = {}
+    distances: List[float] = []
+    common_distances: List[float] = []
+    for event in enders:
+        kind = str(event.get("k", "?"))
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+        if _int_field(event, "stag", 0):
+            staggered[kind] = staggered.get(kind, 0) + 1
+        if event.get("d") is None:
+            continue
+        try:
+            distance = float(event["d"])
+        except (TypeError, ValueError):
+            continue
+        distances.append(distance)
+        if kind == "minion":
+            common_distances.append(distance)
+
+    common = by_kind.get("minion", 0)
+    print("  remates conectados: {}".format(len(enders)))
+    print("  por clase: {}".format(" · ".join(
+        "{} {}".format(kind, by_kind[kind]) for kind in sorted(by_kind))))
+
+    if common:
+        print("  aturdidos (stag=1): {} de {} comunes ({:.1f} %)".format(
+            staggered.get("minion", 0), common,
+            100.0 * staggered.get("minion", 0) / common))
+    if len(enders) > common:
+        print("  sin intento de stagger (boss/other): {} de {}".format(
+            len(enders) - common, len(enders)))
+
+    if not distances:
+        print("  d (m): {} (ninguna línea trae 'd')".format(MISSING))
+        return
+
+    sample = common_distances if common_distances else distances
+    print("  d (m, {}): mediana {:.2f} · p90 {:.2f} · máx {:.2f}".format(
+        "minion" if common_distances else "toda clase",
+        _median(sample), _p90(sample), max(sample)))
+    print("  d > 0.5 m = el remate EMPUJÓ (el jefe reescribe su velocidad: d≈0 en 'boss')")
 
 
 # --------------------------------------------------------------------------- entradas
